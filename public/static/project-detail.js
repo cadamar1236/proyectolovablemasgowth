@@ -317,6 +317,89 @@ function renderProjectDetails(data) {
     </div>
     ` : ''}
 
+    <!-- MVP Generator Section -->
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <div class="flex items-center mb-6">
+        <div class="w-12 h-12 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center mr-4">
+          <i class="fas fa-magic text-white text-xl"></i>
+        </div>
+        <div>
+          <h2 class="text-2xl font-bold text-gray-900">Generador Automático de MVPs</h2>
+          <p class="text-sm text-gray-600">Genera código real y funcional con IA open source</p>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+        <h3 class="font-bold text-gray-900 mb-3">¿Qué obtendrás?</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="flex items-start">
+            <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+            <div>
+              <p class="font-semibold text-gray-900">Código fuente completo</p>
+              <p class="text-sm text-gray-600">Frontend + Backend listo para deployment</p>
+            </div>
+          </div>
+          <div class="flex items-start">
+            <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+            <div>
+              <p class="font-semibold text-gray-900">Base de datos configurada</p>
+              <p class="text-sm text-gray-600">Migraciones y modelos incluidos</p>
+            </div>
+          </div>
+          <div class="flex items-start">
+            <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+            <div>
+              <p class="font-semibold text-gray-900">Deploy automático</p>
+              <p class="text-sm text-gray-600">Listo para Cloudflare Pages</p>
+            </div>
+          </div>
+          <div class="flex items-start">
+            <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+            <div>
+              <p class="font-semibold text-gray-900">Documentación completa</p>
+              <p class="text-sm text-gray-600">README e instrucciones de setup</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-gray-900">Selecciona un Template</h3>
+          <button id="auto-detect-btn" onclick="autoDetectTemplate(${project.id})" 
+                  class="text-primary hover:text-primary/80 text-sm font-semibold">
+            <i class="fas fa-wand-magic mr-1"></i>Auto-detectar
+          </button>
+        </div>
+        <div id="mvp-templates" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Templates will be loaded here -->
+          <div class="text-center py-8 col-span-full">
+            <i class="fas fa-spinner fa-spin text-primary text-2xl mb-2"></i>
+            <p class="text-gray-600">Cargando templates...</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex gap-4">
+        <button id="generate-mvp-btn" onclick="generateFullMVP(${project.id})" 
+                class="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-8 py-4 rounded-lg hover:opacity-90 transition font-semibold text-lg">
+          <i class="fas fa-rocket mr-2"></i>Generar MVP Completo
+        </button>
+        <button onclick="viewMVPDocs()" 
+                class="bg-gray-100 text-gray-700 px-6 py-4 rounded-lg hover:bg-gray-200 transition">
+          <i class="fas fa-book mr-2"></i>Ver Docs
+        </button>
+      </div>
+      
+      <div class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+        <p class="text-sm text-blue-800">
+          <i class="fas fa-info-circle mr-2"></i>
+          <strong>Nota:</strong> El generador usa modelos de IA open source (Llama 3.1) y plantillas optimizadas 
+          para crear MVPs funcionales en minutos. El código generado es 100% tuyo.
+        </p>
+      </div>
+    </div>
+
     <!-- Next Steps -->
     <div class="bg-gradient-to-r from-primary to-secondary rounded-xl shadow-lg p-8 text-white">
       <h2 class="text-3xl font-bold mb-4">Próximos Pasos</h2>

@@ -7,6 +7,7 @@ import type { Bindings } from './types';
 import projects from './api/projects';
 import validation from './api/validation';
 import betaUsers from './api/beta-users';
+import mvpGenerator from './api/mvp-generator';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -20,6 +21,7 @@ app.use('/static/*', serveStatic({ root: './public' }));
 app.route('/api/projects', projects);
 app.route('/api/validation', validation);
 app.route('/api/beta-users', betaUsers);
+app.route('/api/mvp', mvpGenerator);
 
 // Frontend Routes
 app.get('/', (c) => {
@@ -506,6 +508,7 @@ app.get('/project/:id', async (c) => {
     <script>
       const projectId = ${projectId};
     </script>
+    <script src="/static/mvp-generator.js"></script>
     <script src="/static/project-detail.js"></script>
 </body>
 </html>
