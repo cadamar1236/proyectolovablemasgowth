@@ -165,39 +165,81 @@ export async function generateMVPCodeWithGroq(
   template: string,
   apiKey: string
 ): Promise<{ [filename: string]: string }> {
-  const prompt = `Generate complete, production-ready code for a ${template} MVP:
+  const prompt = `Generate a COMPLETE, PRODUCTION-READY ${template} MVP with FULL FUNCTIONALITY:
 
 Project: ${project.title}
 Description: ${project.description}
 Target Market: ${project.target_market}
+Value Proposition: ${project.value_proposition}
 
-Generate actual working code for these files:
-- package.json (with all dependencies)
-- src/index.tsx (Hono backend with API routes)
-- wrangler.jsonc (Cloudflare configuration)
-- vite.config.ts (build configuration)
-- README.md (setup instructions)
+REQUIREMENTS - Generate ALL these files with COMPLETE, WORKING code:
 
-IMPORTANT: 
-1. Use Hono framework with Cloudflare Workers
-2. Include Tailwind CSS for styling
-3. Make it production-ready and functional
-4. Respond ONLY with valid JSON in this format:
+1. package.json - Include ALL necessary dependencies for a real application
+2. src/index.tsx - FULL Hono backend with:
+   - Complete API routes with CRUD operations
+   - Database integration (D1)
+   - Error handling and validation
+   - Authentication endpoints (login, register, logout)
+   - Business logic for the specific use case
+   - HTML responses with complete UI
 
+3. migrations/0001_initial.sql - Complete database schema with:
+   - All necessary tables with proper relationships
+   - Indexes for performance
+   - Foreign keys and constraints
+   - Sample data insertions
+
+4. public/static/app.js - FUNCTIONAL frontend JavaScript with:
+   - API calls to backend endpoints
+   - Form handling and validation
+   - Dynamic UI updates
+   - State management
+   - Error handling
+
+5. public/static/styles.css - Custom styling beyond Tailwind
+
+6. wrangler.jsonc - Cloudflare configuration with D1 database binding
+
+7. vite.config.ts - Build configuration
+
+8. README.md - Complete setup and deployment instructions
+
+CRITICAL REQUIREMENTS:
+- This must be a REAL, WORKING application, not a skeleton
+- Include actual business logic specific to: ${project.description}
+- All API endpoints must have real implementations
+- Frontend must actually work and communicate with backend
+- Database must have proper schema for the use case
+- Include authentication and authorization
+- Add input validation and error handling
+- Make it production-ready and deployable immediately
+
+EXAMPLE FUNCTIONALITY REQUIRED FOR ${template}:
+${getTemplateRequirements(template)}
+
+Respond ONLY with valid JSON (no markdown, no explanations):
 {
   "files": {
-    "package.json": "full package.json content here",
-    "src/index.tsx": "full Hono code here",
-    "wrangler.jsonc": "full config here",
-    "vite.config.ts": "full vite config here",
-    "README.md": "full readme here"
+    "package.json": "complete package.json with all dependencies",
+    "src/index.tsx": "complete Hono backend with ALL API routes and logic",
+    "migrations/0001_initial.sql": "complete database schema",
+    "public/static/app.js": "complete functional frontend code",
+    "public/static/styles.css": "custom CSS styling",
+    "wrangler.jsonc": "complete Cloudflare config",
+    "vite.config.ts": "vite configuration",
+    "README.md": "complete documentation"
   }
 }`;
 
   const messages: GroqMessage[] = [
     {
       role: 'system',
-      content: 'You are an expert full-stack developer specializing in Cloudflare Workers and Hono framework. Generate clean, production-ready code. Always respond with valid JSON only.'
+      content: `You are a senior full-stack engineer with 10+ years experience building production applications. 
+You specialize in Cloudflare Workers, Hono framework, and modern web development.
+You ALWAYS generate complete, working, production-ready code - never skeletons or placeholders.
+Every API endpoint you create has full implementation.
+Every frontend you create is fully functional with real interactivity.
+You respond ONLY with valid JSON containing complete file contents.`
     },
     {
       role: 'user',
@@ -215,4 +257,54 @@ IMPORTANT:
   
   const parsed = JSON.parse(jsonMatch[0]);
   return parsed.files || {};
+}
+
+/**
+ * Get specific requirements for each template type
+ */
+function getTemplateRequirements(template: string): string {
+  const requirements: { [key: string]: string } = {
+    saas: `- User registration and login with JWT authentication
+- User dashboard with profile management
+- Subscription plans and billing integration
+- Settings page with account management
+- API endpoints for all user operations
+- Protected routes and authorization
+- Email verification system`,
+    
+    marketplace: `- Product listing and search functionality
+- Shopping cart with add/remove items
+- Checkout process with payment integration
+- Seller dashboard to manage products
+- Order management system
+- Rating and review system
+- User profiles for buyers and sellers`,
+    
+    landing: `- Hero section with compelling copy
+- Feature showcase with icons and descriptions
+- Pricing table with multiple tiers
+- Contact form with email integration
+- Newsletter signup with validation
+- Testimonials section
+- FAQ section
+- Mobile-responsive design`,
+    
+    dashboard: `- Data visualization with charts (Chart.js)
+- Real-time metrics display
+- Filter and date range selection
+- Export data functionality
+- Multiple dashboard views
+- User activity tracking
+- Performance indicators`,
+    
+    crm: `- Customer list with search and filters
+- Add/edit/delete customer records
+- Deal pipeline management
+- Task and activity tracking
+- Contact history and notes
+- Email integration
+- Reports and analytics`
+  };
+  
+  return requirements[template] || requirements.saas;
 }

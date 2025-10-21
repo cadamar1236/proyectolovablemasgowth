@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Bindings } from '../types';
 import { generateMVPCodeWithGroq } from '../utils/groq';
+import { TEMPLATE_GENERATORS, generateSaaSMVP } from '../utils/mvp-templates';
 
 const mvpGenerator = new Hono<{ Bindings: Bindings }>();
 
@@ -111,136 +112,22 @@ async function generateCodeWithAI(
   return generateBasicTemplate(template, projectDetails);
 }
 
-// Template básico de fallback
+// Template avanzado con funcionalidad completa
 function generateBasicTemplate(
   template: keyof typeof MVP_TEMPLATES,
   projectDetails: any
 ): { [filename: string]: string } {
-  const templateInfo = MVP_TEMPLATES[template];
+  console.log('Generating advanced template for:', template);
   
-  return {
-    'package.json': JSON.stringify({
-      name: projectDetails.title.toLowerCase().replace(/\s+/g, '-'),
-      version: '1.0.0',
-      type: 'module',
-      scripts: {
-        dev: 'vite',
-        build: 'vite build',
-        deploy: 'npm run build && wrangler pages deploy dist'
-      },
-      dependencies: {
-        hono: '^4.10.1'
-      },
-      devDependencies: {
-        '@hono/vite-build': '^1.2.0',
-        '@hono/vite-dev-server': '^0.18.2',
-        vite: '^6.3.5',
-        wrangler: '^4.4.0'
-      }
-    }, null, 2),
-    
-    'src/index.tsx': `import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { serveStatic } from 'hono/cloudflare-workers';
-
-const app = new Hono();
-
-app.use('/api/*', cors());
-app.use('/static/*', serveStatic({ root: './public' }));
-
-app.get('/', (c) => {
-  return c.html(\`
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${projectDetails.title}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50">
-    <div class="max-w-7xl mx-auto px-4 py-16">
-        <h1 class="text-4xl font-bold mb-4">${projectDetails.title}</h1>
-        <p class="text-xl text-gray-600 mb-8">${projectDetails.description}</p>
-        <div class="bg-white rounded-xl shadow-lg p-8">
-            <h2 class="text-2xl font-bold mb-4">¿Cómo funciona?</h2>
-            <p class="text-gray-700 mb-4">${projectDetails.value_proposition}</p>
-            <button class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
-                Comenzar Ahora
-            </button>
-        </div>
-    </div>
-</body>
-</html>
-  \`);
-});
-
-app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-export default app;`,
-    
-    'wrangler.jsonc': JSON.stringify({
-      name: projectDetails.title.toLowerCase().replace(/\s+/g, '-'),
-      compatibility_date: new Date().toISOString().split('T')[0],
-      pages_build_output_dir: './dist',
-      compatibility_flags: ['nodejs_compat']
-    }, null, 2),
-    
-    'vite.config.ts': `import { defineConfig } from 'vite';
-import pages from '@hono/vite-cloudflare-pages';
-
-export default defineConfig({
-  plugins: [pages()],
-  build: {
-    outDir: 'dist'
+  // Use specific template generator
+  const generator = TEMPLATE_GENERATORS[template];
+  
+  if (generator) {
+    return generator(projectDetails);
   }
-});`,
-    
-    'README.md': `# ${projectDetails.title}
-
-${projectDetails.description}
-
-## Mercado Objetivo
-${projectDetails.target_market}
-
-## Propuesta de Valor
-${projectDetails.value_proposition}
-
-## Tech Stack
-${templateInfo.stack.map(t => `- ${t}`).join('\n')}
-
-## Instalación
-
-\`\`\`bash
-npm install
-\`\`\`
-
-## Desarrollo
-
-\`\`\`bash
-npm run dev
-\`\`\`
-
-## Deployment
-
-\`\`\`bash
-npm run deploy
-\`\`\`
-
-## Características
-
-- ✅ Diseño responsive con Tailwind CSS
-- ✅ Backend con Cloudflare Workers
-- ✅ Deployment automático a Cloudflare Pages
-- ✅ Zero configuration
-
----
-
-Generado automáticamente por ValidAI Studio
-`
-  };
+  
+  // Fallback to SaaS if template not found
+  return generateSaaSMVP(projectDetails);
 }
 
 // Endpoint principal: Generar MVP completo
