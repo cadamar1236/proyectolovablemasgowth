@@ -23,7 +23,7 @@ Validamos y lanzamos startups exitosas 10x más rápido utilizando IA y el model
 - Validación y almacenamiento en D1 Database
 
 ### 3. **Análisis IA de Mercado** ✅
-- Powered by **Cloudflare AI (Llama 3.1 8B)**
+- Powered by **Groq AI - Kimi K2 Instruct** (ultra-rápido)
 - Análisis automático de:
   - Competidores principales
   - Tendencias de mercado
@@ -122,7 +122,7 @@ Proyecto pre-cargado: **HealthTrack AI**
 - **Hono** v4.10.1 - Framework web ultrarrápido
 - **Cloudflare Workers** - Runtime edge
 - **Cloudflare D1** - Base de datos SQLite distribuida
-- **Cloudflare AI** - LLMs open source (Llama 3.1 8B)
+- **Groq AI** - Kimi K2 Instruct (ultra-rápido, open source) ⚡
 
 ### Frontend
 - **Tailwind CSS** - Styling utility-first
