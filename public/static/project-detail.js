@@ -385,9 +385,13 @@ function renderProjectDetails(data) {
                 class="flex-1 bg-gradient-to-r from-primary to-secondary text-white px-8 py-4 rounded-lg hover:opacity-90 transition font-semibold text-lg">
           <i class="fas fa-rocket mr-2"></i>Generar MVP Completo
         </button>
-        <button onclick="viewMVPDocs()" 
-                class="bg-gray-100 text-gray-700 px-6 py-4 rounded-lg hover:bg-gray-200 transition">
-          <i class="fas fa-book mr-2"></i>Ver Docs
+        <button onclick="showPreview(${project.id})" 
+                class="bg-blue-600 text-white px-6 py-4 rounded-lg hover:bg-blue-700 transition">
+          <i class="fas fa-eye mr-2"></i>Preview
+        </button>
+        <button onclick="showDeployOptions(${project.id})" 
+                class="bg-green-600 text-white px-6 py-4 rounded-lg hover:bg-green-700 transition">
+          <i class="fas fa-cloud-upload-alt mr-2"></i>Deploy
         </button>
       </div>
       
@@ -492,6 +496,190 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Show MVP Preview
+function showPreview(projectId) {
+  // Open preview in new tab
+  window.open(`/api/deploy/preview/${projectId}`, '_blank');
+}
+
+// Show deployment options
+async function showDeployOptions(projectId) {
+  // Check deployment status first
+  try {
+    const statusResponse = await axios.get(`/api/deploy/status/${projectId}`);
+    
+    if (statusResponse.data.status !== 'ready_to_deploy') {
+      alert('Primero debes generar el MVP antes de desplegarlo');
+      return;
+    }
+    
+    // Show deployment modal
+    const modal = document.createElement('div');
+    modal.id = 'deploy-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <h3 class="text-3xl font-bold text-gray-900 mb-2">🚀 Desplegar a Cloudflare Pages</h3>
+            <p class="text-gray-600">Tu MVP estará en vivo en minutos</p>
+          </div>
+          <button onclick="closeDeployModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Nombre del Proyecto</label>
+          <input type="text" id="deploy-project-name" 
+                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                 placeholder="mi-startup-mvp">
+          <p class="text-xs text-gray-500 mt-1">Solo letras minúsculas, números y guiones</p>
+        </div>
+        
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+          <h4 class="font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-terminal text-blue-600 mr-2"></i>
+            Instrucciones de Deployment
+          </h4>
+          <div id="deploy-instructions" class="space-y-2 text-sm text-gray-700">
+            <p><i class="fas fa-spinner fa-spin mr-2"></i>Cargando instrucciones...</p>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <div class="bg-white border-2 border-gray-200 rounded-xl p-4 text-center hover:border-primary transition cursor-pointer" onclick="deployMethodLocal()">
+            <i class="fas fa-laptop-code text-3xl text-blue-600 mb-2"></i>
+            <h4 class="font-bold text-gray-900 mb-1">Deploy Local</h4>
+            <p class="text-xs text-gray-600">Desde tu computadora</p>
+          </div>
+          <div class="bg-white border-2 border-gray-200 rounded-xl p-4 text-center hover:border-primary transition cursor-pointer" onclick="deployMethodGitHub()">
+            <i class="fab fa-github text-3xl text-gray-900 mb-2"></i>
+            <h4 class="font-bold text-gray-900 mb-1">Deploy via GitHub</h4>
+            <p class="text-xs text-gray-600">Automático con Git</p>
+          </div>
+        </div>
+        
+        <div class="flex gap-4">
+          <button onclick="prepareDeployment(${projectId})" 
+                  class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:opacity-90 transition font-semibold">
+            <i class="fas fa-rocket mr-2"></i>Preparar Deployment
+          </button>
+          <button onclick="closeDeployModal()" 
+                  class="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 transition">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+  } catch (error) {
+    console.error('Error checking deployment status:', error);
+    alert('Error al verificar estado del MVP');
+  }
+}
+
+// Prepare deployment
+async function prepareDeployment(projectId) {
+  const projectName = document.getElementById('deploy-project-name').value;
+  
+  if (!projectName) {
+    alert('Por favor ingresa un nombre para el proyecto');
+    return;
+  }
+  
+  try {
+    const response = await axios.post(`/api/deploy/cloudflare/${projectId}`, {
+      projectName
+    });
+    
+    // Show detailed instructions
+    const instructionsDiv = document.getElementById('deploy-instructions');
+    instructionsDiv.innerHTML = `
+      <div class="space-y-4">
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+          <p class="font-bold text-green-800 mb-2">✅ Deployment preparado</p>
+          <p class="text-sm text-green-700">Tu MVP estará disponible en: <strong>${response.data.estimatedUrl}</strong></p>
+        </div>
+        
+        <div>
+          <h5 class="font-bold text-gray-900 mb-2">Pasos para desplegar:</h5>
+          <ol class="list-decimal list-inside space-y-2">
+            ${response.data.instructions.map(step => `
+              <li class="text-sm text-gray-700">${step}</li>
+            `).join('')}
+          </ol>
+        </div>
+        
+        <div class="bg-gray-900 rounded-lg p-4">
+          <p class="text-xs text-gray-400 mb-2">Comandos:</p>
+          ${response.data.commands.map(cmd => `
+            <div class="flex items-center justify-between bg-gray-800 rounded px-3 py-2 mb-2">
+              <code class="text-green-400 text-sm">${cmd}</code>
+              <button onclick="copyToClipboard('${cmd}')" class="text-gray-400 hover:text-white">
+                <i class="fas fa-copy"></i>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          <p class="font-bold text-yellow-800 mb-1">💡 ${response.data.githubOption.title}</p>
+          <ol class="list-decimal list-inside space-y-1 text-sm text-yellow-700">
+            ${response.data.githubOption.steps.map(step => `
+              <li>${step}</li>
+            `).join('')}
+          </ol>
+        </div>
+        
+        <div class="flex gap-2">
+          <button onclick="downloadMVPCode(${projectId})" 
+                  class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm">
+            <i class="fas fa-download mr-2"></i>Descargar Código
+          </button>
+          <button onclick="window.open('https://dash.cloudflare.com', '_blank')" 
+                  class="flex-1 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm">
+            <i class="fas fa-external-link-alt mr-2"></i>Abrir Cloudflare
+          </button>
+        </div>
+      </div>
+    `;
+    
+  } catch (error) {
+    console.error('Error preparing deployment:', error);
+    alert('Error al preparar deployment');
+  }
+}
+
+// Close deploy modal
+function closeDeployModal() {
+  const modal = document.getElementById('deploy-modal');
+  if (modal) modal.remove();
+}
+
+// Copy to clipboard
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    // Show temporary success message
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+    notification.innerHTML = '<i class="fas fa-check mr-2"></i>Copiado';
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 2000);
+  });
+}
+
+// Deploy methods
+function deployMethodLocal() {
+  alert('Descarga el código y sigue las instrucciones para deployment local');
+}
+
+function deployMethodGitHub() {
+  alert('Sube el código a GitHub y conecta el repositorio a Cloudflare Pages desde el dashboard');
 }
 
 // Initialize

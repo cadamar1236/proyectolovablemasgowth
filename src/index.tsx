@@ -8,6 +8,7 @@ import projects from './api/projects';
 import validation from './api/validation';
 import betaUsers from './api/beta-users';
 import mvpGenerator from './api/mvp-generator';
+import deploy from './api/deploy';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -22,6 +23,7 @@ app.route('/api/projects', projects);
 app.route('/api/validation', validation);
 app.route('/api/beta-users', betaUsers);
 app.route('/api/mvp', mvpGenerator);
+app.route('/api/deploy', deploy);
 
 // Frontend Routes
 app.get('/', (c) => {

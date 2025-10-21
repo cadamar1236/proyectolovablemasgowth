@@ -238,14 +238,18 @@ function showMVPResults(data) {
         </div>
       </div>
       
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button onclick="window.open('/api/deploy/preview/${data.deployment.projectId || projectId}', '_blank')" 
+                class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+          <i class="fas fa-eye mr-2"></i>Ver Preview
+        </button>
         <button onclick="downloadMVPCode(${data.deployment.projectId || 'null'})" 
                 class="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition font-semibold">
-          <i class="fas fa-download mr-2"></i>Descargar Código
+          <i class="fas fa-download mr-2"></i>Descargar
         </button>
-        <button onclick="viewMVPCode()" 
-                class="bg-secondary text-white px-6 py-3 rounded-lg hover:bg-secondary/90 transition font-semibold">
-          <i class="fas fa-eye mr-2"></i>Ver Código
+        <button onclick="closeResultsModal(); showDeployOptions(${data.deployment.projectId || projectId})" 
+                class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-semibold">
+          <i class="fas fa-cloud-upload-alt mr-2"></i>Desplegar
         </button>
       </div>
       
