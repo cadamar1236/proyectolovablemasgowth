@@ -19,7 +19,8 @@ interface GroqResponse {
 export async function callGroqAPI(
   messages: GroqMessage[],
   apiKey: string,
-  model: string = 'moonshotai/kimi-k2-instruct' // Kimi K2 - Excelente para análisis
+  model: string = 'moonshotai/kimi-k2-instruct', // Kimi K2 - Excelente para análisis
+  maxTokens: number = 8000 // Aumentado para código más completo
 ): Promise<string> {
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -32,7 +33,7 @@ export async function callGroqAPI(
         model,
         messages,
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: maxTokens,
         top_p: 1,
         stream: false
       })
@@ -41,16 +42,56 @@ export async function callGroqAPI(
     if (!response.ok) {
       const error = await response.text();
       console.error('Groq API error:', error);
-      throw new Error(`Groq API failed: ${response.status}`);
+      throw new Error(`Groq API failed: ${response.status} - ${error}`);
     }
 
     const data: GroqResponse = await response.json();
-    return data.choices[0]?.message?.content || '';
+    const content = data.choices[0]?.message?.content || '';
+    
+    if (!content) {
+      throw new Error('Empty response from Groq API');
+    }
+    
+    return content;
     
   } catch (error) {
     console.error('Error calling Groq:', error);
     throw error;
   }
+}
+
+/**
+ * Call Groq API with automatic retries
+ */
+export async function callGroqAPIWithRetry(
+  messages: GroqMessage[],
+  apiKey: string,
+  model: string = 'moonshotai/kimi-k2-instruct',
+  maxTokens: number = 8000,
+  maxRetries: number = 3
+): Promise<string> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Groq API attempt ${attempt}/${maxRetries}`);
+      const result = await callGroqAPI(messages, apiKey, model, maxTokens);
+      console.log(`✅ Groq API succeeded on attempt ${attempt}`);
+      return result;
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`❌ Groq API attempt ${attempt} failed:`, error);
+      
+      if (attempt < maxRetries) {
+        // Wait before retry (exponential backoff)
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+  
+  throw new Error(`Groq API failed after ${maxRetries} attempts: ${lastError?.message}`);
 }
 
 /**
