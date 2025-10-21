@@ -19,8 +19,8 @@ interface GroqResponse {
 export async function callGroqAPI(
   messages: GroqMessage[],
   apiKey: string,
-  model: string = 'moonshotai/kimi-k2-instruct', // Kimi K2 - Excelente para análisis
-  maxTokens: number = 8000 // Aumentado para código más completo
+  model: string = 'openai/gpt-oss-120b', // GPT-OSS-120B - Open source model
+  maxTokens: number = 50000 // Máximo configurado para respuestas largas
 ): Promise<string> {
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -66,8 +66,8 @@ export async function callGroqAPI(
 export async function callGroqAPIWithRetry(
   messages: GroqMessage[],
   apiKey: string,
-  model: string = 'moonshotai/kimi-k2-instruct',
-  maxTokens: number = 8000,
+  model: string = 'openai/gpt-oss-120b',
+  maxTokens: number = 50000,
   maxRetries: number = 3
 ): Promise<string> {
   let lastError: Error | null = null;
@@ -288,7 +288,7 @@ You respond ONLY with valid JSON containing complete file contents.`
     }
   ];
 
-  const response = await callGroqAPI(messages, apiKey, 'moonshotai/kimi-k2-instruct');
+  const response = await callGroqAPI(messages, apiKey, 'openai/gpt-oss-120b', 50000);
   
   // Extract JSON from response
   const jsonMatch = response.match(/\{[\s\S]*\}/);

@@ -223,11 +223,12 @@ You respond ONLY with valid JSON containing complete file contents.`
 
   try {
     // Call Groq with retries and high token limit
+    // Using GPT-OSS-120B - Open source model
     const response = await callGroqAPIWithRetry(
       messages,
       groqApiKey,
-      'moonshotai/kimi-k2-instruct',
-      8000, // Max tokens
+      'openai/gpt-oss-120b',
+      50000, // Max tokens - 50K configurado
       5     // Max retries
     );
     
@@ -408,7 +409,7 @@ Start with: -- Database schema for ${project.title}`;
     }
   ];
 
-  const response = await callGroqAPIWithRetry(messages, groqApiKey, 'moonshotai/kimi-k2-instruct', 4000, 3);
+  const response = await callGroqAPIWithRetry(messages, groqApiKey, 'openai/gpt-oss-120b', 50000, 3);
   
   // Clean up response
   let sql = response.trim();
@@ -460,7 +461,7 @@ Start with: import { Hono } from 'hono';`;
     }
   ];
 
-  const response = await callGroqAPIWithRetry(messages, groqApiKey, 'moonshotai/kimi-k2-instruct', 6000, 3);
+  const response = await callGroqAPIWithRetry(messages, groqApiKey, 'openai/gpt-oss-120b', 50000, 3);
   
   // Clean up response - remove markdown if present
   let code = response.trim();
@@ -508,7 +509,7 @@ Start with: // ${project.title} - Frontend Application`;
     }
   ];
 
-  const jsResponse = await callGroqAPIWithRetry(jsMessages, groqApiKey, 'moonshotai/kimi-k2-instruct', 4000, 3);
+  const jsResponse = await callGroqAPIWithRetry(jsMessages, groqApiKey, 'openai/gpt-oss-120b', 50000, 3);
   let jsCode = jsResponse.trim();
   if (jsCode.startsWith('```')) {
     jsCode = jsCode.replace(/```javascript\n?/g, '').replace(/```\n?/g, '');

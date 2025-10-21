@@ -23,7 +23,7 @@ Validamos y lanzamos startups exitosas 10x más rápido utilizando IA y el model
 - Validación y almacenamiento en D1 Database
 
 ### 3. **Análisis IA de Mercado** ✅
-- Powered by **Groq AI - Kimi K2 Instruct** (ultra-rápido)
+- Powered by **Groq AI - OpenAI GPT-OSS-120B** (ultra-rápido, 50K tokens)
 - Análisis automático de:
   - Competidores principales
   - Tendencias de mercado
@@ -49,7 +49,7 @@ Validamos y lanzamos startups exitosas 10x más rápido utilizando IA y el model
   - **Simple CRM**: CRM funcional con gestión de clientes
 
 - **Generación AVANZADA con doble sistema**:
-  1. **Groq AI (Kimi K2)**: Genera código personalizado según tu proyecto
+  1. **Groq AI (GPT-OSS-120B)**: Genera código personalizado según tu proyecto (50K tokens)
      - Prompts detallados con requisitos específicos
      - Código completo y funcional adaptado a tu caso de uso
      - Lógica de negocio específica para tu industria
@@ -149,7 +149,7 @@ Proyecto pre-cargado: **HealthTrack AI**
 - **Hono** v4.10.1 - Framework web ultrarrápido
 - **Cloudflare Workers** - Runtime edge
 - **Cloudflare D1** - Base de datos SQLite distribuida
-- **Groq AI** - Kimi K2 Instruct (ultra-rápido, open source) ⚡
+- **Groq AI** - OpenAI GPT-OSS-120B (50K tokens max, open source) ⚡
 
 ### Frontend
 - **Tailwind CSS** - Styling utility-first
@@ -294,7 +294,7 @@ npm run git:commit       # Git commit rápido
 - **Costo de MVP**: $30,000-$150,000 → **$0 (generado automáticamente)** ✅
 - **Calidad de MVPs**: Código placeholder → **Código completo y funcional** ✅⭐
 - **Líneas de código generadas**: ~100 líneas → **700+ líneas por MVP** ✅⭐
-- **Precisión de análisis**: **85%+** con Groq AI (Kimi K2) ✅
+- **Precisión de análisis**: **85%+** con Groq AI (GPT-OSS-120B) ✅
 - **Usuarios beta disponibles**: **10,000+** en roadmap ✅
 
 ## 🔐 Seguridad
@@ -364,6 +364,6 @@ Proyecto de demostración para Y Combinator pitch.
 
 ---
 
-**Construido con ❤️ usando IA open source y Cloudflare Workers**
+**Construido con ❤️ usando IA open source (GPT-OSS-120B) y Cloudflare Workers**
 
-*Última actualización: 21 de octubre, 2025*
+*Última actualización: 21 de octubre, 2025 - Modelo actualizado a GPT-OSS-120B con 50K tokens*
