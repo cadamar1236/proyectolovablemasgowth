@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Bindings } from '../types';
+import { generateMVPCodeWithGroq } from '../utils/groq';
 
 const mvpGenerator = new Hono<{ Bindings: Bindings }>();
 
@@ -7,7 +8,7 @@ const mvpGenerator = new Hono<{ Bindings: Bindings }>();
  * Sistema de Generación Automática de MVPs
  * 
  * Genera MVPs funcionales usando:
- * - Cloudflare AI (LLMs open source)
+ * - Groq AI (LLMs ultra-rápidos: Llama 3.1 70B)
  * - Templates de código automáticos
  * - GitHub para repositorios
  * - Cloudflare Pages para deployment
@@ -93,62 +94,21 @@ const MVP_TEMPLATES = {
 
 // Generador de código usando IA
 async function generateCodeWithAI(
-  AI: Ai,
+  groqApiKey: string | undefined,
   template: keyof typeof MVP_TEMPLATES,
   projectDetails: any
 ): Promise<{ [filename: string]: string }> {
-  const templateInfo = MVP_TEMPLATES[template];
+  // Try Groq first
+  if (groqApiKey) {
+    try {
+      return await generateMVPCodeWithGroq(projectDetails, template, groqApiKey);
+    } catch (error) {
+      console.error('Groq code generation failed:', error);
+    }
+  }
   
-  const prompt = `Genera código completo para un MVP de ${templateInfo.name}.
-
-Detalles del proyecto:
-- Título: ${projectDetails.title}
-- Descripción: ${projectDetails.description}
-- Mercado: ${projectDetails.target_market}
-- Propuesta de valor: ${projectDetails.value_proposition}
-
-Tech stack: ${templateInfo.stack.join(', ')}
-
-Genera código funcional y listo para producción para estos archivos:
-${templateInfo.files.join(', ')}
-
-Incluye:
-- Backend API completo con Hono
-- Frontend interactivo con Tailwind CSS
-- Base de datos D1 si es necesario
-- Configuración completa para Cloudflare Pages
-- README con instrucciones
-
-Responde SOLO con JSON en este formato:
-{
-  "files": {
-    "src/index.tsx": "código aquí...",
-    "package.json": "código aquí...",
-    ...
-  }
-}`;
-
-  try {
-    const response = await AI.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: 'Eres un experto desarrollador full-stack. Genera código limpio y funcional.' },
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: 4000,
-    });
-    
-    const responseText = response.response || JSON.stringify(response);
-    const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || responseText.match(/\{[\s\S]*\}/);
-    const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
-    
-    const parsed = JSON.parse(jsonText);
-    return parsed.files || {};
-    
-  } catch (error) {
-    console.error('Error generating code with AI:', error);
-    // Fallback: generar código básico
-    return generateBasicTemplate(template, projectDetails);
-  }
+  // Fallback: generar código básico
+  return generateBasicTemplate(template, projectDetails);
 }
 
 // Template básico de fallback
@@ -301,9 +261,9 @@ mvpGenerator.post('/generate-full', async (c) => {
       return c.json({ error: 'Proyecto no encontrado' }, 404);
     }
     
-    // 2. Generar código con IA
+    // 2. Generar código con IA (Groq)
     const generatedFiles = await generateCodeWithAI(
-      c.env.AI,
+      c.env.GROQ_API_KEY,
       template as keyof typeof MVP_TEMPLATES,
       project
     );

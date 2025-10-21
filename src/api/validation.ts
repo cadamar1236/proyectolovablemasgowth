@@ -1,7 +1,268 @@
 import { Hono } from 'hono';
 import type { Bindings } from '../types';
+import { analyzeWithGroq, generateMVPWithGroq } from '../utils/groq';
 
 const validation = new Hono<{ Bindings: Bindings }>();
+
+// AI Analysis Function with Groq API
+async function analyzeWithAI(project: any, groqApiKey?: string): Promise<any | null> {
+  if (!groqApiKey) return null;
+  
+  try {
+    return await analyzeWithGroq(project, groqApiKey);
+  } catch (error) {
+    console.error('Groq API error:', error);
+    return null;
+  }
+}
+
+// Legacy Cloudflare AI function (fallback)
+async function analyzeWithCloudflareAI(project: any, AI?: Ai): Promise<any | null> {
+  if (!AI) return null;
+  
+  try {
+    const prompt = `Analyze this startup idea and provide market insights:
+
+Title: ${project.title}
+Description: ${project.description}
+Target Market: ${project.target_market}
+Value Proposition: ${project.value_proposition}
+
+Please provide:
+1. Top 5 competitors (just names)
+2. Top 5 market trends
+3. Top 5 opportunities
+4. Top 5 threats
+5. Estimated market size
+6. Estimated growth rate
+7. Success probability (0-1)
+
+Format your response as JSON with these exact keys: competitors, market_trends, opportunities, threats, market_size, growth_rate, success_probability`;
+
+    const response = await AI.run('@cf/meta/llama-3.1-8b-instruct', {
+      messages: [
+        { role: 'system', content: 'You are a startup validation expert. Always respond with valid JSON.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 2000,
+    });
+    
+    const responseText = response.response || JSON.stringify(response);
+    const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || responseText.match(/\{[\s\S]*\}/);
+    const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
+    
+    return JSON.parse(jsonText);
+  } catch (error) {
+    console.error('Cloudflare AI error:', error);
+    return null;
+  }
+}
+
+// Smart Analysis Generator (cuando AI no está disponible)
+function generateSmartAnalysis(project: any): any {
+  const keywords = `${project.title} ${project.description} ${project.target_market}`.toLowerCase();
+  
+  // Análisis inteligente basado en keywords
+  const isHealthTech = keywords.includes('health') || keywords.includes('medical') || keywords.includes('salud');
+  const isFinTech = keywords.includes('fintech') || keywords.includes('financial') || keywords.includes('payment');
+  const isSaaS = keywords.includes('saas') || keywords.includes('software') || keywords.includes('platform');
+  const isEcommerce = keywords.includes('ecommerce') || keywords.includes('marketplace') || keywords.includes('shop');
+  const isAI = keywords.includes('ai') || keywords.includes('inteligencia') || keywords.includes('machine learning');
+  
+  let analysis = {
+    competitors: [] as string[],
+    market_trends: [] as string[],
+    opportunities: [] as string[],
+    threats: [] as string[],
+    market_size: '',
+    growth_rate: '',
+    success_probability: 0.65
+  };
+  
+  if (isHealthTech) {
+    analysis = {
+      competitors: ['Teladoc Health', 'Amwell', 'Doctor on Demand', 'HealthTap', 'MDLive'],
+      market_trends: [
+        'Telemedicina creciendo 38% anual post-COVID',
+        'IA en diagnósticos alcanza $36B en 2025',
+        'Regulaciones favorables para salud digital',
+        'Wearables integrados con plataformas médicas',
+        'Adopción masiva de historiales clínicos digitales'
+      ],
+      opportunities: [
+        'Mercado LATAM menos saturado que USA',
+        'Necesidad de soluciones en español',
+        'Partnerships con aseguradoras y hospitales',
+        'Integración con sistemas de salud existentes',
+        'Prevención vs tratamiento es tendencia'
+      ],
+      threats: [
+        'Competidores con más funding (Series C+)',
+        'Regulaciones estrictas de datos médicos (HIPAA)',
+        'Resistencia de médicos tradicionales',
+        'Necesidad de certificaciones médicas',
+        'Responsabilidad legal en diagnósticos'
+      ],
+      market_size: '$254B mercado global de HealthTech para 2027',
+      growth_rate: '37% CAGR',
+      success_probability: 0.73
+    };
+  } else if (isFinTech) {
+    analysis = {
+      competitors: ['Stripe', 'Square', 'PayPal', 'Revolut', 'Wise'],
+      market_trends: [
+        'Pagos digitales crecen 20% anual',
+        'Open Banking revoluciona servicios financieros',
+        'Crypto y blockchain mainstream',
+        'Buy Now Pay Later (BNPL) en auge',
+        'Banking as a Service (BaaS) democratiza finanzas'
+      ],
+      opportunities: [
+        'Underbanked populations en LATAM',
+        'Remesas internacionales caras y lentas',
+        'SMBs necesitan mejores herramientas financieras',
+        'Millennials prefieren apps vs bancos',
+        'Regulación favorable (PSD2, Open Banking)'
+      ],
+      threats: [
+        'Regulaciones financieras complejas',
+        'Bancos tradicionales digitalizándose',
+        'Ciberseguridad es crítica',
+        'Alto costo de adquisición de usuarios',
+        'Necesidad de licencias bancarias'
+      ],
+      market_size: '$305B mercado global de FinTech para 2025',
+      growth_rate: '23% CAGR',
+      success_probability: 0.68
+    };
+  } else if (isSaaS) {
+    analysis = {
+      competitors: ['Salesforce', 'HubSpot', 'Monday.com', 'Notion', 'Airtable'],
+      market_trends: [
+        'SaaS alcanza $195B en 2023',
+        'Shift hacia vertical SaaS especializado',
+        'AI-powered features son must-have',
+        'Product-Led Growth (PLG) domina',
+        'Multi-cloud y APIs abiertas'
+      ],
+      opportunities: [
+        'Nichos verticales sin soluciones específicas',
+        'Integraciones y APIs demandadas',
+        'Freemium funciona para user acquisition',
+        'Remote work impulsa herramientas colaborativas',
+        'Menor costo de infraestructura (cloud)'
+      ],
+      threats: [
+        'Saturación de mercado en categorías populares',
+        'Giants pueden copiar features rápido',
+        'Churn alto si no hay product-market fit',
+        'Customer acquisition cost (CAC) alto',
+        'Necesidad de escalabilidad técnica'
+      ],
+      market_size: '$232B mercado SaaS global para 2024',
+      growth_rate: '18% CAGR',
+      success_probability: 0.71
+    };
+  } else if (isEcommerce) {
+    analysis = {
+      competitors: ['Shopify', 'WooCommerce', 'Amazon', 'MercadoLibre', 'Etsy'],
+      market_trends: [
+        'E-commerce crece 14% anual globalmente',
+        'Social commerce (TikTok, Instagram)',
+        'Headless commerce arquitectures',
+        'Sustainability en packaging y shipping',
+        'AR/VR para try-before-buy'
+      ],
+      opportunities: [
+        'D2C brands evitan intermediarios',
+        'Micro-influencers marketing',
+        'Nicho específico vs generalista',
+        'Suscripciones y recurring revenue',
+        'Cross-border commerce facilitado'
+      ],
+      threats: [
+        'Amazon dominance en muchas categorías',
+        'Logística y fulfillment complejo',
+        'Márgenes bajos en productos físicos',
+        'Retornos y customer service costoso',
+        'Competencia en precio es brutal'
+      ],
+      market_size: '$5.5T ventas e-commerce globales en 2024',
+      growth_rate: '14% CAGR',
+      success_probability: 0.64
+    };
+  } else if (isAI) {
+    analysis = {
+      competitors: ['OpenAI', 'Anthropic', 'Google AI', 'Hugging Face', 'Cohere'],
+      market_trends: [
+        'IA generativa crece 80% anual',
+        'LLMs open source democratizan acceso',
+        'AI agents y automatización',
+        'Edge AI y on-device processing',
+        'Multimodal AI (texto, imagen, audio)'
+      ],
+      opportunities: [
+        'Aplicaciones específicas de industria',
+        'Fine-tuning para casos de uso nicho',
+        'AI tooling y infrastructure',
+        'Privacidad y data sovereignty',
+        'Vertical AI solutions para empresas'
+      ],
+      threats: [
+        'Big Tech domina investigación',
+        'Costos de compute altos',
+        'Regulaciones AI emergentes',
+        'Talent war por AI engineers',
+        'Cambios rápidos en tecnología'
+      ],
+      market_size: '$184B mercado de AI para 2024',
+      growth_rate: '37% CAGR',
+      success_probability: 0.78
+    };
+  } else {
+    // Análisis genérico para otros casos
+    analysis = {
+      competitors: ['Competidor A (líder)', 'Competidor B (innovador)', 'Competidor C (low-cost)', 'Startup emergente D', 'Player tradicional E'],
+      market_trends: [
+        'Digitalización acelerada post-pandemia',
+        'Consumidores demandan experiencias personalizadas',
+        'Sostenibilidad es factor de decisión',
+        'Mobile-first es el estándar',
+        'Automatización reduce costos operativos'
+      ],
+      opportunities: [
+        'Mercado fragmentado con espacio para nuevos players',
+        'Tecnología permite diferenciación',
+        'Cambio de comportamiento del consumidor',
+        'Posibilidad de partnerships estratégicos',
+        'Funding disponible para ideas validadas'
+      ],
+      threats: [
+        'Competencia de incumbents establecidos',
+        'Barreras de entrada en distribución',
+        'Ciclos económicos afectan demanda',
+        'Necesidad de capital para escalar',
+        'Cambios regulatorios pueden impactar'
+      ],
+      market_size: '$1B+ mercado potencial',
+      growth_rate: '15-25% CAGR estimado',
+      success_probability: 0.65
+    };
+  }
+  
+  // Ajustar probabilidad basada en descripción
+  if (project.value_proposition.length > 100) {
+    analysis.success_probability += 0.05; // Propuesta bien definida
+  }
+  if (project.target_market.toLowerCase().includes('latam') || project.target_market.toLowerCase().includes('europa')) {
+    analysis.success_probability += 0.03; // Mercados específicos
+  }
+  
+  // Cap probability
+  analysis.success_probability = Math.min(analysis.success_probability, 0.92);
+  
+  return analysis;
+}
 
 // Analyze market using AI
 validation.post('/analyze', async (c) => {
@@ -22,52 +283,17 @@ validation.post('/analyze', async (c) => {
   ).bind('analyzing', projectId).run();
   
   try {
-    // Use Cloudflare AI to analyze the market
-    const prompt = `Analyze this startup idea and provide market insights:
-
-Title: ${project.title}
-Description: ${project.description}
-Target Market: ${project.target_market}
-Value Proposition: ${project.value_proposition}
-
-Please provide:
-1. Top 5 competitors (just names)
-2. Top 5 market trends
-3. Top 5 opportunities
-4. Top 5 threats
-5. Estimated market size
-6. Estimated growth rate
-7. Success probability (0-1)
-
-Format your response as JSON with these exact keys: competitors, market_trends, opportunities, threats, market_size, growth_rate, success_probability`;
-
-    const response = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: 'You are a startup validation expert. Always respond with valid JSON.' },
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: 2000,
-    });
+    // Try Groq first (fastest and most powerful)
+    let analysis = await analyzeWithAI(project, c.env.GROQ_API_KEY);
     
-    // Parse AI response
-    let analysis;
-    try {
-      const responseText = response.response || JSON.stringify(response);
-      // Extract JSON from markdown code blocks if present
-      const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || responseText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
-      analysis = JSON.parse(jsonText);
-    } catch (e) {
-      // Fallback if AI doesn't return proper JSON
-      analysis = {
-        competitors: ['Competitor 1', 'Competitor 2', 'Competitor 3', 'Competitor 4', 'Competitor 5'],
-        market_trends: ['Digital transformation', 'AI adoption', 'Remote work', 'Cloud migration', 'Automation'],
-        opportunities: ['Underserved market', 'Technology gap', 'Timing advantage', 'Cost reduction', 'Innovation potential'],
-        threats: ['Competition', 'Market saturation', 'Regulatory risks', 'Technology changes', 'Economic factors'],
-        market_size: '$500M - $2B',
-        growth_rate: '25-35% CAGR',
-        success_probability: 0.72
-      };
+    // Fallback to Cloudflare AI if Groq fails
+    if (!analysis && c.env.AI) {
+      analysis = await analyzeWithCloudflareAI(project, c.env.AI);
+    }
+    
+    // Final fallback: use smart analysis based on project data
+    if (!analysis) {
+      analysis = generateSmartAnalysis(project);
     }
     
     // Save analysis to database
@@ -122,38 +348,19 @@ validation.post('/generate-mvp', async (c) => {
   }
   
   try {
-    const prompt = `Generate an MVP specification for this startup:
-
-Title: ${project.title}
-Description: ${project.description}
-Target Market: ${project.target_market}
-Value Proposition: ${project.value_proposition}
-
-Provide:
-1. MVP name
-2. Brief description (2-3 sentences)
-3. Core features (6-8 features)
-4. Recommended tech stack (5-7 technologies)
-5. Estimated development time
-6. Estimated cost
-
-Format as JSON with keys: name, description, features (array), tech_stack (array), estimated_time, estimated_cost`;
-
-    const response = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: 'You are a technical product architect. Always respond with valid JSON.' },
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: 2000,
-    });
-    
     let mvp;
-    try {
-      const responseText = response.response || JSON.stringify(response);
-      const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || responseText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
-      mvp = JSON.parse(jsonText);
-    } catch (e) {
+    
+    // Try Groq first
+    if (c.env.GROQ_API_KEY) {
+      try {
+        mvp = await generateMVPWithGroq(project, c.env.GROQ_API_KEY);
+      } catch (groqError) {
+        console.error('Groq MVP generation failed:', groqError);
+      }
+    }
+    
+    // Fallback to generic MVP if Groq fails
+    if (!mvp) {
       mvp = {
         name: `${project.title} MVP v1.0`,
         description: 'A functional prototype with core features to validate the product-market fit.',

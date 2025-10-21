@@ -1,7 +1,8 @@
 // Type definitions for Cloudflare bindings
 export type Bindings = {
   DB: D1Database;
-  AI: Ai;
+  AI?: Ai;
+  GROQ_API_KEY?: string;
 }
 
 // Project types
