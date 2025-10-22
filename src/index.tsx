@@ -262,118 +262,55 @@ app.get('/', (c) => {
         <!-- Pricing Section -->
         <div id="pricing" class="mb-20">
             <h2 class="text-4xl font-bold text-gray-900 mb-4 text-center">Planes y Precios</h2>
-            <p class="text-xl text-gray-600 mb-12 text-center">Elige el plan perfecto para tu etapa de crecimiento</p>
+            <p class="text-xl text-gray-600 mb-8 text-center">Elige el plan perfecto para tu etapa de crecimiento</p>
             
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                <!-- Starter Plan -->
-                <div class="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200 hover:border-primary transition">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Starter</h3>
-                        <div class="text-4xl font-bold text-primary mb-2">$49<span class="text-lg text-gray-600">/mes</span></div>
-                        <p class="text-gray-600">Para validar tu primera idea</p>
-                    </div>
-                    <ul class="space-y-4 mb-8">
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">1 proyecto de validación</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">500 créditos IA/mes</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">Análisis de mercado básico</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">Soporte por email (48h)</span>
-                        </li>
-                    </ul>
-                    <button class="w-full bg-gray-900 text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition">
-                        Comenzar Ahora
+            <!-- Plan Type Selector -->
+            <div class="flex justify-center mb-6">
+                <div class="bg-gradient-to-r from-primary to-secondary rounded-xl shadow-lg p-1 inline-flex">
+                    <button id="platform-plans-btn" onclick="switchPlanType('platform')" class="px-8 py-3 rounded-lg font-semibold transition bg-white text-primary">
+                        🎯 Plataforma Completa
+                        <span class="block text-xs font-normal mt-1">MVP + IA + Marketplace</span>
+                    </button>
+                    <button id="marketplace-plans-btn" onclick="switchPlanType('marketplace')" class="px-8 py-3 rounded-lg font-semibold transition text-white hover:bg-white/10">
+                        🏪 Solo Marketplace
+                        <span class="block text-xs font-normal mt-1">Red de Validadores</span>
                     </button>
                 </div>
-                
-                <!-- Pro Plan (Most Popular) -->
-                <div class="bg-gradient-to-br from-primary to-secondary rounded-2xl shadow-2xl p-8 text-white relative transform scale-105">
-                    <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                        <span class="bg-yellow-400 text-gray-900 px-4 py-1 rounded-full text-sm font-semibold">
-                            Más Popular
-                        </span>
-                    </div>
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold mb-2">Pro</h3>
-                        <div class="text-4xl font-bold mb-2">$149<span class="text-lg opacity-90">/mes</span></div>
-                        <p class="opacity-90">Para founders serios</p>
-                    </div>
-                    <ul class="space-y-4 mb-8">
-                        <li class="flex items-start">
-                            <i class="fas fa-check mt-1 mr-3"></i>
-                            <span>3 proyectos simultáneos</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check mt-1 mr-3"></i>
-                            <span>2,000 créditos IA/mes</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check mt-1 mr-3"></i>
-                            <span>Growth Framework básico</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check mt-1 mr-3"></i>
-                            <span>Generador de MVP</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check mt-1 mr-3"></i>
-                            <span>Panel beta users (50)</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check mt-1 mr-3"></i>
-                            <span>Soporte prioritario (24h)</span>
-                        </li>
-                    </ul>
-                    <button class="w-full bg-white text-primary px-6 py-3 rounded-lg hover:bg-gray-100 transition font-semibold">
-                        Empezar Prueba 14 Días
+            </div>
+            
+            <!-- Description based on plan type -->
+            <div id="platform-description" class="text-center mb-8 max-w-3xl mx-auto">
+                <p class="text-gray-600">
+                    <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                    Incluye: Generador MVP con IA, Validación automatizada, Analytics y acceso completo al Marketplace de validadores
+                </p>
+            </div>
+            
+            <div id="marketplace-description" class="hidden text-center mb-8 max-w-3xl mx-auto">
+                <p class="text-gray-600">
+                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                    Solo acceso al Marketplace de validadores. <strong>Ideal si ya tienes tu producto</strong> y solo necesitas feedback de expertos.
+                </p>
+            </div>
+            
+            <!-- Billing Toggle -->
+            <div class="flex justify-center mb-8">
+                <div class="bg-white rounded-lg shadow-md p-2 inline-flex">
+                    <button id="monthly-billing-btn" onclick="switchBillingCycle('monthly')" class="px-6 py-2 rounded-md font-semibold transition bg-primary text-white">
+                        Mensual
+                    </button>
+                    <button id="yearly-billing-btn" onclick="switchBillingCycle('yearly')" class="px-6 py-2 rounded-md font-semibold transition text-gray-700 hover:bg-gray-100">
+                        Anual <span class="text-green-600 text-xs ml-1">(Ahorra 20%)</span>
                     </button>
                 </div>
-                
-                <!-- Enterprise Plan -->
-                <div class="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200 hover:border-secondary transition">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Enterprise</h3>
-                        <div class="text-4xl font-bold text-secondary mb-2">$499<span class="text-lg text-gray-600">/mes</span></div>
-                        <p class="text-gray-600">Para equipos y empresas</p>
-                    </div>
-                    <ul class="space-y-4 mb-8">
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">Proyectos ilimitados</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">10,000 créditos IA/mes</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">Growth Framework avanzado</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">MVP personalizado</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">Panel beta users completo</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                            <span class="text-gray-700">Cuenta manager dedicado</span>
-                        </li>
-                    </ul>
-                    <button class="w-full bg-secondary text-white px-6 py-3 rounded-lg hover:bg-secondary/90 transition">
-                        Contactar Ventas
-                    </button>
+            </div>
+            
+            <!-- Plans Grid (will be populated dynamically) -->
+            <div id="pricing-plans-grid" class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                <!-- Loading state -->
+                <div class="col-span-3 text-center py-12">
+                    <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
+                    <p class="text-gray-600">Cargando planes...</p>
                 </div>
             </div>
 
@@ -541,6 +478,7 @@ app.get('/marketplace', (c) => {
     <title>Marketplace de Validadores Beta - ValidAI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
       tailwind.config = {
         theme: {

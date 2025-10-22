@@ -14,45 +14,52 @@ const mvpGenerator = new Hono<{ Bindings: Bindings }>();
  * - Código 100% generado por IA
  */
 
-// Ya no usamos plantillas genéricas - todo es generado dinámicamente
+// Ya no usamos plantillas genéricas - todo es generado dinámicamente con IA pura
 
 // Endpoint principal: Generar MVP completo personalizado
 mvpGenerator.post('/generate-full', async (c) => {
-  const { projectId } = await c.req.json();
-  
   try {
-    console.log('🚀 Starting intelligent MVP generation for project:', projectId);
-    
+    const body = await c.req.json();
+    const { projectId } = body;
+
+    if (!projectId) {
+      return c.json({ error: 'projectId es requerido' }, 400);
+    }
+
     // 1. Obtener TODOS los datos del proyecto
     const project = await c.env.DB.prepare(
       'SELECT * FROM projects WHERE id = ?'
     ).bind(projectId).first();
-    
+
     if (!project) {
       return c.json({ error: 'Proyecto no encontrado' }, 404);
     }
-    
+
     // 2. Obtener prototipo MVP con features
     const mvpPrototype = await c.env.DB.prepare(
       'SELECT * FROM mvp_prototypes WHERE project_id = ?'
     ).bind(projectId).first();
-    
+
     if (!mvpPrototype) {
       return c.json({ error: 'Prototipo MVP no encontrado' }, 404);
     }
-    
+
     // 3. Obtener análisis de mercado
     const marketAnalysis = await c.env.DB.prepare(
       'SELECT * FROM market_analysis WHERE project_id = ?'
     ).bind(projectId).first();
-    
-    console.log('📋 MVP Features:', mvpPrototype.features);
-    console.log('📊 Market Analysis:', marketAnalysis ? 'Found' : 'Not found');
-    
+
     // Parse features
-    const features = JSON.parse(mvpPrototype.features as string);
-    const techStack = JSON.parse(mvpPrototype.tech_stack as string);
-    
+    let features = [];
+    let techStack = [];
+
+    try {
+      features = JSON.parse(mvpPrototype.features as string);
+      techStack = JSON.parse(mvpPrototype.tech_stack as string);
+    } catch (e) {
+      return c.json({ error: 'Error parsing MVP features' }, 500);
+    }
+
     // Parse market analysis if available
     let parsedMarketAnalysis = {
       competitors: [],
@@ -62,7 +69,7 @@ mvpGenerator.post('/generate-full', async (c) => {
       market_size: 'Unknown',
       growth_rate: 'Unknown'
     };
-    
+
     if (marketAnalysis) {
       try {
         parsedMarketAnalysis = {
@@ -74,12 +81,16 @@ mvpGenerator.post('/generate-full', async (c) => {
           growth_rate: marketAnalysis.growth_rate as string || 'Unknown'
         };
       } catch (e) {
-        console.error('Error parsing market analysis:', e);
+        // Continue with default values
       }
     }
+
+    // 4. Verificar que tenemos la API key de Groq
+    if (!c.env.GROQ_API_KEY) {
+      return c.json({ error: 'Configuración de IA no disponible' }, 500);
+    }
     
-    // 4. Generar MVP usando SOLO Groq AI (con reintentos automáticos)
-    console.log('🤖 Generating MVP with PURE Groq AI (with retries)...');
+    // 5. Generar MVP usando SOLO Groq AI (con reintentos automáticos)
     const generatedFiles = await generateCompleteGroqMVP(
       {
         id: project.id as number,
@@ -97,7 +108,7 @@ mvpGenerator.post('/generate-full', async (c) => {
         estimated_cost: mvpPrototype.estimated_cost as string
       },
       parsedMarketAnalysis,
-      c.env.GROQ_API_KEY
+      c.env.GROQ_API_KEY as string
     );
     
     console.log('✅ MVP generated! Files:', Object.keys(generatedFiles));
@@ -119,18 +130,62 @@ mvpGenerator.post('/generate-full', async (c) => {
       generated_at: new Date().toISOString()
     };
     
+    // 7. Auto-crear producto en el marketplace para validación
+    let marketplaceProductId = null;
+    try {
+      // Get user ID from project
+      const projectOwner = await c.env.DB.prepare(
+        'SELECT user_id FROM projects WHERE id = ?'
+      ).bind(projectId).first() as any;
+      
+      if (projectOwner && projectOwner.user_id) {
+        const userId = projectOwner.user_id;
+        
+        // Create marketplace product
+        const productResult = await c.env.DB.prepare(`
+          INSERT INTO beta_products (
+            company_user_id, title, description, category, stage,
+            looking_for, compensation_type, compensation_amount,
+            duration_days, validators_needed, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          userId,
+          project.title,
+          `${project.description}\n\n✨ MVP generado automáticamente usando IA`,
+          'MVP Generated',
+          'mvp',
+          'Validación de MVP generado por IA',
+          'free',
+          0,
+          30,
+          3,
+          'active'
+        ).run();
+        
+        marketplaceProductId = productResult.meta.last_row_id;
+        
+        console.log(`✅ Marketplace product created: ${marketplaceProductId}`);
+      }
+    } catch (marketplaceError) {
+      console.error('Error creating marketplace product:', marketplaceError);
+      // Don't fail the whole request if marketplace creation fails
+    }
+    
     return c.json({
       message: 'MVP personalizado generado exitosamente',
       files: generatedFiles,
       deployment: deploymentInfo,
       features_implemented: features,
+      marketplace_product_id: marketplaceProductId,
+      marketplace_url: marketplaceProductId ? `/marketplace?product=${marketplaceProductId}` : null,
       next_steps: [
         'Descargar archivos generados',
         'Ejecutar: npm install',
         'Crear base de datos D1',
         'Ejecutar: npm run db:migrate',
         'Ejecutar: npm run dev',
-        'Desplegar a Cloudflare Pages'
+        'Desplegar a Cloudflare Pages',
+        ...(marketplaceProductId ? ['🌟 Tu producto ya está en el marketplace para validación'] : [])
       ]
     });
     

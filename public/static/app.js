@@ -3,8 +3,13 @@ let currentUser = { id: 1, name: 'Juan Founder', plan: 'pro' };
 let projects = [];
 let betaUsers = [];
 
-// Initialize app
+// Initialize app only if we're on the main app page (not marketplace)
 document.addEventListener('DOMContentLoaded', () => {
+  // Check if we're on the marketplace page
+  if (window.location.pathname.startsWith('/marketplace')) {
+    return; // Don't initialize app.js on marketplace
+  }
+  
   loadProjects();
   loadBetaUsers();
   setupEventListeners();
@@ -20,14 +25,9 @@ function setupEventListeners() {
 
 // Show/hide validation form
 function showValidationForm() {
-  const formSection = document.getElementById('validation-form-section');
-  const projectsSection = document.getElementById('projects-section');
-  
-  formSection.classList.remove('hidden');
-  projectsSection.classList.add('hidden');
-  
-  // Scroll to form
-  formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // SIEMPRE mostrar selección de plan primero
+  // El usuario debe ver los planes antes de validar su idea
+  showPlanSelectionModal();
 }
 
 function hideValidationForm() {
@@ -36,6 +36,275 @@ function hideValidationForm() {
   
   formSection.classList.add('hidden');
   projectsSection.classList.remove('hidden');
+}
+
+// Check if user is authenticated (simple check for now)
+function isAuthenticated() {
+  return localStorage.getItem('authToken') !== null;
+}
+
+// Scroll to section
+function scrollToSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ============================================
+// PLAN SELECTION MODAL (Pre-MVP)
+// ============================================
+
+function showPlanSelectionModal() {
+  // Create modal if it doesn't exist
+  let modal = document.getElementById('plan-selection-modal');
+  
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'plan-selection-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto';
+    document.body.appendChild(modal);
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-6xl w-full my-8">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-primary to-secondary text-white p-8 rounded-t-2xl">
+        <button onclick="closePlanSelectionModal()" class="float-right text-white hover:text-gray-200 text-2xl">
+          <i class="fas fa-times"></i>
+        </button>
+        <div class="text-center">
+          <h2 class="text-4xl font-bold mb-4">🚀 Elige tu Plan para Comenzar</h2>
+          <p class="text-xl opacity-90">Selecciona el plan perfecto para validar tu idea</p>
+        </div>
+      </div>
+      
+      <!-- Billing Toggle -->
+      <div class="flex justify-center py-6 bg-gray-50">
+        <div class="bg-white rounded-lg shadow-md p-2 inline-flex">
+          <button id="modal-monthly-btn" onclick="switchModalBilling('monthly')" class="px-6 py-2 rounded-md font-semibold transition bg-primary text-white">
+            Mensual
+          </button>
+          <button id="modal-yearly-btn" onclick="switchModalBilling('yearly')" class="px-6 py-2 rounded-md font-semibold transition text-gray-700 hover:bg-gray-100">
+            Anual <span class="text-green-600 text-xs ml-1">(Ahorra 20%)</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Plans Grid -->
+      <div id="modal-plans-grid" class="px-8 pb-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Plans will be loaded here -->
+          <div class="col-span-3 text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
+            <p class="text-gray-600">Cargando planes...</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Footer -->
+      <div class="bg-gray-50 px-8 py-6 rounded-b-2xl border-t">
+        <div class="flex items-center justify-between">
+          <p class="text-sm text-gray-600">
+            <i class="fas fa-shield-alt text-green-500 mr-2"></i>
+            Prueba gratis por 14 días • Cancela cuando quieras
+          </p>
+          <button onclick="closePlanSelectionModal()" class="text-gray-600 hover:text-gray-800 font-semibold">
+            Continuar sin plan →
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  modal.classList.remove('hidden');
+  
+  // Load plans into modal
+  loadPlansIntoModal();
+}
+
+function closePlanSelectionModal() {
+  const modal = document.getElementById('plan-selection-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+let modalBillingCycle = 'monthly';
+
+function switchModalBilling(cycle) {
+  modalBillingCycle = cycle;
+  
+  const monthlyBtn = document.getElementById('modal-monthly-btn');
+  const yearlyBtn = document.getElementById('modal-yearly-btn');
+  
+  if (cycle === 'monthly') {
+    monthlyBtn.classList.add('bg-primary', 'text-white');
+    monthlyBtn.classList.remove('text-gray-700', 'hover:bg-gray-100');
+    
+    yearlyBtn.classList.remove('bg-primary', 'text-white');
+    yearlyBtn.classList.add('text-gray-700', 'hover:bg-gray-100');
+  } else {
+    yearlyBtn.classList.add('bg-primary', 'text-white');
+    yearlyBtn.classList.remove('text-gray-700', 'hover:bg-gray-100');
+    
+    monthlyBtn.classList.remove('bg-primary', 'text-white');
+    monthlyBtn.classList.add('text-gray-700', 'hover:bg-gray-100');
+  }
+  
+  loadPlansIntoModal();
+}
+
+async function loadPlansIntoModal() {
+  const grid = document.getElementById('modal-plans-grid');
+  if (!grid) return;
+  
+  try {
+    const response = await fetch('/api/plans');
+    const data = await response.json();
+    // Filtrar solo planes de plataforma completa (no marketplace-only)
+    const plans = (data.plans || []).filter(p => p.plan_type === 'full');
+    
+    grid.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        ${plans.map((plan, index) => {
+          const price = modalBillingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly;
+          const features = JSON.parse(plan.features || '[]');
+          const isMostPopular = index === 1 && plans.length === 3;
+          
+          const requestsText = plan.validators_limit === -1 ? 'Solicitudes ilimitadas' : `${plan.validators_limit} solicitudes`;
+          const productsText = plan.products_limit === -1 ? 'Productos ilimitados' : `${plan.products_limit} producto${plan.products_limit > 1 ? 's' : ''}`;
+          
+          if (isMostPopular) {
+            return `
+              <div class="bg-gradient-to-br from-primary to-secondary rounded-2xl shadow-2xl p-6 text-white relative transform scale-105 border-4 border-yellow-400">
+                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <span class="bg-yellow-400 text-gray-900 px-4 py-1 rounded-full text-sm font-bold shadow-lg">
+                    ⭐ Más Popular
+                  </span>
+                </div>
+                <div class="text-center mb-6 mt-4">
+                  <h3 class="text-2xl font-bold mb-3">${escapeHtml(plan.display_name)}</h3>
+                  <div class="text-5xl font-bold mb-3">
+                    $${price}
+                  </div>
+                  <p class="text-lg opacity-90">/${modalBillingCycle === 'monthly' ? 'mes' : 'año'}</p>
+                  <p class="opacity-90 mt-2">${escapeHtml(plan.description)}</p>
+                </div>
+                <ul class="space-y-3 mb-6">
+                  <li class="flex items-start">
+                    <i class="fas fa-check-circle mt-1 mr-3 text-xl"></i>
+                    <span class="font-semibold">${productsText}</span>
+                  </li>
+                  <li class="flex items-start">
+                    <i class="fas fa-check-circle mt-1 mr-3 text-xl"></i>
+                    <span class="font-semibold">${requestsText}</span>
+                  </li>
+                  ${features.slice(0, 4).map(f => `
+                    <li class="flex items-start">
+                      <i class="fas fa-check-circle mt-1 mr-3"></i>
+                      <span>${escapeHtml(f)}</span>
+                    </li>
+                  `).join('')}
+                </ul>
+                <button onclick="selectPlanAndContinue(${plan.id}, '${escapeHtml(plan.name)}')" 
+                        class="w-full bg-white text-primary px-6 py-4 rounded-xl hover:bg-gray-100 transition font-bold text-lg shadow-lg">
+                  🚀 Empezar Ahora
+                </button>
+              </div>
+            `;
+          }
+          
+          return `
+            <div class="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-200 hover:border-primary transition">
+              <div class="text-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-900 mb-3">${escapeHtml(plan.display_name)}</h3>
+                <div class="text-4xl font-bold text-primary mb-3">
+                  $${price}
+                </div>
+                <p class="text-lg text-gray-600">/${modalBillingCycle === 'monthly' ? 'mes' : 'año'}</p>
+                <p class="text-gray-600 mt-2">${escapeHtml(plan.description)}</p>
+              </div>
+              <ul class="space-y-3 mb-6">
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+                  <span class="text-gray-700 font-semibold">${productsText}</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+                  <span class="text-gray-700 font-semibold">${requestsText}</span>
+                </li>
+                ${features.slice(0, 4).map(f => `
+                  <li class="flex items-start">
+                    <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+                    <span class="text-gray-700">${escapeHtml(f)}</span>
+                  </li>
+                `).join('')}
+              </ul>
+              <button onclick="selectPlanAndContinue(${plan.id}, '${escapeHtml(plan.name)}')" 
+                      class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition font-semibold">
+                ${index === plans.length - 1 ? 'Contactar Ventas' : 'Comenzar Ahora'}
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    
+  } catch (error) {
+    console.error('Error loading plans into modal:', error);
+    grid.innerHTML = `
+      <div class="col-span-3 text-center py-12">
+        <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+        <p class="text-gray-600">Error al cargar planes</p>
+      </div>
+    `;
+  }
+}
+
+function selectPlanAndContinue(planId, planName) {
+  // Store selected plan in localStorage
+  localStorage.setItem('selectedPlanId', planId);
+  localStorage.setItem('selectedPlanName', planName);
+  localStorage.setItem('selectedBillingCycle', modalBillingCycle);
+  
+  // Close modal
+  closePlanSelectionModal();
+  
+  // Show auth modal with register mode and plan info
+  showAuthModalWithPlan('register', planName);
+}
+
+function showAuthModalWithPlan(mode, planName) {
+  // This function will be called from the existing showAuthModal
+  // We'll enhance it to show the selected plan
+  const modal = document.getElementById('auth-modal');
+  if (!modal) {
+    // Create a simple notification for now
+    alert(`Has seleccionado el plan: ${planName}\n\nPor favor regístrate para continuar con la validación de tu idea.`);
+    
+    // Show standard auth modal
+    if (typeof showAuthModal === 'function') {
+      showAuthModal(mode);
+    }
+    return;
+  }
+  
+  showAuthModal(mode);
+  
+  // Add plan badge to auth modal
+  setTimeout(() => {
+    const authContent = document.getElementById('auth-modal-content');
+    if (authContent && planName) {
+      const planBadge = document.createElement('div');
+      planBadge.className = 'bg-gradient-to-r from-primary to-secondary text-white px-4 py-3 rounded-lg mb-4 text-center';
+      planBadge.innerHTML = `
+        <i class="fas fa-star mr-2"></i>
+        <strong>Plan seleccionado:</strong> ${escapeHtml(planName)}
+      `;
+      authContent.insertBefore(planBadge, authContent.firstChild);
+    }
+  }, 100);
 }
 
 // Scroll to section
@@ -229,4 +498,276 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// ============================================
+// PRICING PLANS
+// ============================================
+
+let currentBillingCycle = 'monthly';
+let currentPlanType = 'platform'; // 'platform' or 'marketplace'
+let pricingPlans = [];
+let allPlans = [];
+
+async function loadPricingPlans() {
+  try {
+    console.log('🔍 [DEBUG] Loading pricing plans...');
+    const response = await fetch('/api/plans');
+    console.log('📡 [DEBUG] Response status:', response.status);
+    const data = await response.json();
+    console.log('📦 [DEBUG] Data received:', data);
+    
+    allPlans = data.plans;
+    console.log('✅ [DEBUG] allPlans loaded:', allPlans ? allPlans.length : 0, 'plans');
+    // Filter plans based on current type
+    filterAndRenderPlans();
+    
+  } catch (error) {
+    console.error('Error loading pricing plans:', error);
+    const grid = document.getElementById('pricing-plans-grid');
+    if (grid) {
+      grid.innerHTML = `
+        <div class="col-span-3 text-center py-12">
+          <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+          <p class="text-gray-600">Error al cargar planes</p>
+        </div>
+      `;
+    }
+  }
+}
+
+function switchPlanType(type) {
+  currentPlanType = type;
+  
+  // Update button states
+  const platformBtn = document.getElementById('platform-plans-btn');
+  const marketplaceBtn = document.getElementById('marketplace-plans-btn');
+  const platformDesc = document.getElementById('platform-description');
+  const marketplaceDesc = document.getElementById('marketplace-description');
+  
+  if (type === 'platform') {
+    platformBtn.classList.add('bg-white', 'text-primary');
+    platformBtn.classList.remove('text-white', 'hover:bg-white/10');
+    
+    marketplaceBtn.classList.remove('bg-white', 'text-primary');
+    marketplaceBtn.classList.add('text-white', 'hover:bg-white/10');
+    
+    platformDesc.classList.remove('hidden');
+    marketplaceDesc.classList.add('hidden');
+  } else {
+    marketplaceBtn.classList.add('bg-white', 'text-primary');
+    marketplaceBtn.classList.remove('text-white', 'hover:bg-white/10');
+    
+    platformBtn.classList.remove('bg-white', 'text-primary');
+    platformBtn.classList.add('text-white', 'hover:bg-white/10');
+    
+    marketplaceDesc.classList.remove('hidden');
+    platformDesc.classList.add('hidden');
+  }
+  
+  filterAndRenderPlans();
+}
+
+function filterAndRenderPlans() {
+  console.log('🔍 [DEBUG] filterAndRenderPlans called');
+  console.log('📋 [DEBUG] allPlans:', allPlans);
+  console.log('🎯 [DEBUG] currentPlanType:', currentPlanType);
+  
+  const grid = document.getElementById('pricing-plans-grid');
+  console.log('🎨 [DEBUG] Grid element:', grid);
+  
+  // Show loading if no plans yet
+  if (!allPlans || allPlans.length === 0) {
+    console.log('⚠️ [DEBUG] No plans available yet, showing loading...');
+    if (grid) {
+      grid.innerHTML = `
+        <div class="col-span-3 text-center py-12">
+          <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
+          <p class="text-gray-600">Cargando planes...</p>
+        </div>
+      `;
+    }
+    return;
+  }
+  
+  // Filter plans based on type
+  if (currentPlanType === 'platform') {
+    pricingPlans = allPlans.filter(p => p.plan_type === 'full');
+  } else {
+    pricingPlans = allPlans.filter(p => p.plan_type === 'marketplace_only');
+  }
+  
+  console.log('✅ [DEBUG] Filtered plans:', pricingPlans.length, 'plans');
+  console.log('📦 [DEBUG] pricingPlans:', pricingPlans);
+  
+  // If no plans in this category, show message
+  if (pricingPlans.length === 0) {
+    console.log('⚠️ [DEBUG] No plans in this category');
+    if (grid) {
+      grid.innerHTML = `
+        <div class="col-span-3 text-center py-12">
+          <i class="fas fa-info-circle text-4xl text-gray-400 mb-4"></i>
+          <p class="text-gray-600">No hay planes disponibles en esta categoría</p>
+        </div>
+      `;
+    }
+    return;
+  }
+  
+  console.log('🚀 [DEBUG] Calling renderPricingPlans()...');
+  renderPricingPlans();
+}
+
+function switchBillingCycle(cycle) {
+  currentBillingCycle = cycle;
+  
+  // Update button states
+  const monthlyBtn = document.getElementById('monthly-billing-btn');
+  const yearlyBtn = document.getElementById('yearly-billing-btn');
+  
+  if (cycle === 'monthly') {
+    monthlyBtn.classList.add('bg-primary', 'text-white');
+    monthlyBtn.classList.remove('text-gray-700', 'hover:bg-gray-100');
+    
+    yearlyBtn.classList.remove('bg-primary', 'text-white');
+    yearlyBtn.classList.add('text-gray-700', 'hover:bg-gray-100');
+  } else {
+    yearlyBtn.classList.add('bg-primary', 'text-white');
+    yearlyBtn.classList.remove('text-gray-700', 'hover:bg-gray-100');
+    
+    monthlyBtn.classList.remove('bg-primary', 'text-white');
+    monthlyBtn.classList.add('text-gray-700', 'hover:bg-gray-100');
+  }
+  
+  renderPricingPlans();
+}
+
+function renderPricingPlans() {
+  const grid = document.getElementById('pricing-plans-grid');
+  if (!grid) return;
+  
+  if (!pricingPlans || pricingPlans.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-3 text-center py-12">
+        <i class="fas fa-info-circle text-4xl text-gray-400 mb-4"></i>
+        <p class="text-gray-600">No hay planes disponibles para esta categoría</p>
+      </div>
+    `;
+    return;
+  }
+  
+  grid.innerHTML = pricingPlans.map((plan, index) => {
+    const price = currentBillingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly;
+    const features = JSON.parse(plan.features || '[]');
+    
+    // Determine if this is the most popular plan
+    let isMostPopular = false;
+    if (currentPlanType === 'platform' && plan.name === 'pro') {
+      isMostPopular = true;
+    } else if (currentPlanType === 'marketplace' && plan.name === 'marketplace_pro') {
+      isMostPopular = true;
+    }
+    
+    // Get limits text - AHORA DICE "SOLICITUDES" en lugar de "VALIDADORES"
+    const requestsText = plan.validators_limit === -1 ? 'Solicitudes ilimitadas' : `${plan.validators_limit} solicitudes`;
+    const productsText = plan.products_limit === -1 ? 'Productos ilimitados' : `${plan.products_limit} producto${plan.products_limit > 1 ? 's' : ''}`;
+    
+    if (isMostPopular) {
+      return `
+        <div class="bg-gradient-to-br from-primary to-secondary rounded-2xl shadow-2xl p-8 text-white relative transform scale-105">
+          <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+            <span class="bg-yellow-400 text-gray-900 px-4 py-1 rounded-full text-sm font-semibold">
+              ⭐ Más Popular
+            </span>
+          </div>
+          <div class="text-center mb-6 mt-4">
+            <h3 class="text-2xl font-bold mb-2">${escapeHtml(plan.display_name)}</h3>
+            <div class="text-5xl font-bold mb-2">
+              $${price}
+            </div>
+            <p class="text-lg opacity-90">/${currentBillingCycle === 'monthly' ? 'mes' : 'año'}</p>
+            <p class="opacity-90 mt-2">${escapeHtml(plan.description)}</p>
+          </div>
+          <ul class="space-y-3 mb-8">
+            <li class="flex items-start">
+              <i class="fas fa-check-circle mt-1 mr-3 text-xl"></i>
+              <span class="font-semibold">${requestsText}</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-check-circle mt-1 mr-3 text-xl"></i>
+              <span class="font-semibold">${productsText}</span>
+            </li>
+            ${features.slice(0, 6).map(f => `
+              <li class="flex items-start">
+                <i class="fas fa-check-circle mt-1 mr-3"></i>
+                <span>${escapeHtml(f)}</span>
+              </li>
+            `).join('')}
+          </ul>
+          <button onclick="selectPlan(${plan.id}, '${escapeHtml(plan.name)}')" 
+                  class="w-full bg-white text-primary px-6 py-4 rounded-xl hover:bg-gray-100 transition font-bold text-lg shadow-lg">
+            🚀 Empezar Ahora
+          </button>
+        </div>
+      `;
+    }
+    
+    return `
+      <div class="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200 hover:border-primary transition">
+        <div class="text-center mb-6">
+          <h3 class="text-2xl font-bold text-gray-900 mb-2">${escapeHtml(plan.display_name)}</h3>
+          <div class="text-4xl font-bold text-primary mb-2">
+            $${price}
+          </div>
+          <p class="text-lg text-gray-600">/${currentBillingCycle === 'monthly' ? 'mes' : 'año'}</p>
+          <p class="text-gray-600 mt-2">${escapeHtml(plan.description)}</p>
+        </div>
+        <ul class="space-y-3 mb-8">
+          <li class="flex items-start">
+            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+            <span class="text-gray-700 font-semibold">${requestsText}</span>
+          </li>
+          <li class="flex items-start">
+            <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+            <span class="text-gray-700 font-semibold">${productsText}</span>
+          </li>
+          ${features.slice(0, 6).map(f => `
+            <li class="flex items-start">
+              <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+              <span class="text-gray-700">${escapeHtml(f)}</span>
+            </li>
+          `).join('')}
+        </ul>
+        <button onclick="selectPlan(${plan.id}, '${escapeHtml(plan.name)}')" 
+                class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition font-semibold">
+          ${plan.price_monthly === 0 ? 'Comenzar Gratis' : (index === pricingPlans.length - 1 ? 'Contactar Ventas' : 'Comenzar Ahora')}
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+function selectPlan(planId, planName) {
+  console.log(`Selected plan: ${planName} (ID: ${planId})`);
+  
+  // Store selected plan
+  localStorage.setItem('selectedPlanId', planId);
+  localStorage.setItem('selectedPlanName', planName);
+  localStorage.setItem('selectedBillingCycle', currentBillingCycle);
+  
+  // Check if user is authenticated
+  if (!isAuthenticated()) {
+    // Show auth modal with plan info
+    showAuthModalWithPlan('register', planName);
+  } else {
+    // User is authenticated, show success and option to upgrade
+    alert(`✅ Plan ${planName} seleccionado.\n\nPuedes continuar a validar tu idea o gestionar tu suscripción desde tu dashboard.`);
+    scrollToSection('validation-form-section');
+    showValidationForm();
+  }
+}
+
+// Load pricing plans on page load
+if (document.getElementById('pricing-plans-grid')) {
+  loadPricingPlans();
 }

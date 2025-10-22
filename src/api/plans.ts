@@ -22,7 +22,8 @@ plans.get('/', async (c) => {
       id, name, display_name, description, 
       price_monthly, price_yearly, 
       validators_limit, products_limit, 
-      features, display_order
+      features, display_order,
+      plan_type, category
     FROM pricing_plans
     WHERE is_active = 1
     ORDER BY display_order ASC

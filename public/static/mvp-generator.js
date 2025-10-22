@@ -1,103 +1,12 @@
-// MVP Generator Interface
+// MVP Generator Interface - AI-Powered (Sin plantillas)
 
-let selectedTemplate = null;
-let availableTemplates = [];
-
-// Load templates on page load
-async function loadMVPTemplates() {
-  try {
-    const response = await axios.get('/api/mvp/templates');
-    availableTemplates = response.data.templates;
-    renderTemplates();
-  } catch (error) {
-    console.error('Error loading templates:', error);
-  }
-}
-
-// Render available templates
-function renderTemplates() {
-  const container = document.getElementById('mvp-templates');
-  
-  if (!container) return;
-  
-  container.innerHTML = availableTemplates.map(template => `
-    <div class="bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition border-2 ${
-      selectedTemplate === template.id ? 'border-primary' : 'border-transparent'
-    }" onclick="selectTemplate('${template.id}')">
-      <div class="flex items-start justify-between mb-4">
-        <div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">${template.name}</h3>
-          <p class="text-gray-600 text-sm">${template.description}</p>
-        </div>
-        ${selectedTemplate === template.id ? '<i class="fas fa-check-circle text-primary text-2xl"></i>' : ''}
-      </div>
-      
-      <div class="mb-4">
-        <h4 class="text-sm font-semibold text-gray-700 mb-2">Tech Stack:</h4>
-        <div class="flex flex-wrap gap-2">
-          ${template.stack.map(tech => `
-            <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-              ${tech}
-            </span>
-          `).join('')}
-        </div>
-      </div>
-      
-      <div class="text-sm text-gray-600">
-        <i class="fas fa-file-code mr-2"></i>${template.files.length} archivos generados
-      </div>
-    </div>
-  `).join('');
-}
-
-// Select template
-function selectTemplate(templateId) {
-  selectedTemplate = templateId;
-  renderTemplates();
-}
-
-// Auto-detect best template for project
-async function autoDetectTemplate(projectId) {
-  const btn = document.getElementById('auto-detect-btn');
-  if (btn) {
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Analizando...';
-    btn.disabled = true;
-  }
-  
-  try {
-    const response = await axios.post('/api/mvp/detect-template', { projectId });
-    selectedTemplate = response.data.recommended_template;
-    renderTemplates();
-    
-    // Show recommendation
-    showNotification(
-      `Recomendamos el template: ${response.data.template_info.name}`,
-      'success'
-    );
-    
-  } catch (error) {
-    console.error('Error detecting template:', error);
-    showNotification('Error al detectar template', 'error');
-  } finally {
-    if (btn) {
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-    }
-  }
-}
-
-// Generate full MVP
+// Generate full MVP directly with AI (no templates)
 async function generateFullMVP(projectId) {
-  if (!selectedTemplate) {
-    showNotification('Por favor selecciona un template', 'warning');
-    return;
-  }
-  
   const btn = document.getElementById('generate-mvp-btn');
+  let originalText = '';
   if (btn) {
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generando MVP...';
+    originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generando MVP con IA...';
     btn.disabled = true;
   }
   
@@ -105,11 +14,10 @@ async function generateFullMVP(projectId) {
   showProgressModal();
   
   try {
-    // Step 1: Generate code
-    updateProgress(25, 'Generando código con IA...');
+    // Step 1: Generate code with AI
+    updateProgress(25, '🤖 Analizando tu proyecto con IA...');
     const response = await axios.post('/api/mvp/generate-full', {
-      projectId,
-      template: selectedTemplate
+      projectId
     });
     
     // Step 2: Files generated
@@ -134,7 +42,7 @@ async function generateFullMVP(projectId) {
     hideProgressModal();
     showNotification('Error al generar MVP', 'error');
   } finally {
-    if (btn) {
+    if (btn && originalText) {
       btn.innerHTML = originalText;
       btn.disabled = false;
     }
@@ -204,6 +112,26 @@ function showMVPResults(data) {
           <i class="fas fa-times text-2xl"></i>
         </button>
       </div>
+      
+      ${data.marketplace_product_id ? `
+        <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-6 mb-6">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center">
+              <div class="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mr-4">
+                <i class="fas fa-star text-white text-xl"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-900 text-lg">¡Tu producto ya está en el Marketplace!</h4>
+                <p class="text-gray-600 text-sm">Comienza a recibir validaciones de expertos ahora</p>
+              </div>
+            </div>
+            <a href="${data.marketplace_url}" 
+               class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition font-semibold whitespace-nowrap">
+              <i class="fas fa-external-link-alt mr-2"></i>Ver en Marketplace
+            </a>
+          </div>
+        </div>
+      ` : ''}
       
       <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 mb-6">
         <h4 class="font-bold text-gray-900 mb-4 flex items-center">
@@ -330,8 +258,5 @@ function showNotification(message, type = 'info') {
 }
 
 // Initialize on page load
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', loadMVPTemplates);
-} else {
-  loadMVPTemplates();
-}
+// No necesitamos cargar templates - la generación es 100% con IA
+console.log('✅ MVP Generator cargado - Generación directa con IA');
