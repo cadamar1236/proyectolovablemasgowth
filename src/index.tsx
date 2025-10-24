@@ -12,6 +12,7 @@ import deploy from './api/deploy';
 import auth from './api/auth';
 import marketplace from './api/marketplace';
 import plans from './api/plans';
+import stripe from './api/stripe';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -25,6 +26,7 @@ app.use('/static/*', serveStatic({ root: './public' }));
 app.route('/api/auth', auth);
 app.route('/api/marketplace', marketplace);
 app.route('/api/plans', plans);
+app.route('/api/stripe', stripe);
 app.route('/api/projects', projects);
 app.route('/api/validation', validation);
 app.route('/api/beta-users', betaUsers);
@@ -1470,6 +1472,7 @@ app.get('/pricing', (c) => {
     <title>Planes de Precios - ValidAI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -1837,7 +1840,7 @@ app.get('/pricing', (c) => {
             grid.innerHTML = plansHTML;
         }
         
-        // Select plan
+        // Select plan and redirect to Stripe Checkout
         async function selectPlan(planId, planName) {
             const token = localStorage.getItem('authToken');
             
@@ -1847,37 +1850,46 @@ app.get('/pricing', (c) => {
                 return;
             }
             
-            if (!currentUser) {
-                await loadCurrentUser();
-            }
-            
-            if (!currentUser) {
-                alert('Error al cargar usuario. Por favor, inicia sesión nuevamente.');
+            // Check if it's the free plan
+            if (planId === 1) {
+                alert('El plan Free no requiere pago. Ya puedes usarlo.');
                 return;
             }
             
-            // Check if requesting upgrade
-            if (userPlanData && userPlanData.user_plan.plan_id < planId) {
-                // Request upgrade
-                const confirmed = confirm(\`¿Deseas solicitar una actualización al plan \${planName.toUpperCase()}? Un administrador revisará tu solicitud.\`);
-                if (!confirmed) return;
+            // Show loading state
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Procesando...';
+            
+            try {
+                // Determine billing cycle
+                const billingCycle = isYearly ? 'yearly' : 'monthly';
                 
-                try {
-                    await axios.post('/api/plans/my/upgrade-request', {
-                        requested_plan_id: planId,
-                        reason: 'Usuario solicitó actualización desde la página de pricing'
-                    }, {
-                        headers: { 'Authorization': \`Bearer \${token}\` }
-                    });
-                    
-                    alert('¡Solicitud de actualización enviada! Te notificaremos cuando sea aprobada.');
-                } catch (error) {
-                    console.error('Error requesting upgrade:', error);
-                    alert(error.response?.data?.error || 'Error al solicitar actualización');
+                // Create checkout session
+                const response = await axios.post('/api/stripe/create-checkout-session', {
+                    plan_id: planId,
+                    billing_cycle: billingCycle
+                }, {
+                    headers: { 
+                        'Authorization': \`Bearer \${token}\`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                // Redirect to Stripe Checkout
+                if (response.data.url) {
+                    window.location.href = response.data.url;
+                } else {
+                    throw new Error('No se recibió URL de checkout');
                 }
-            } else {
-                // Contact for plan change
-                alert(\`Para cambiar tu plan, por favor contacta a soporte o solicita una actualización desde tu dashboard.\`);
+            } catch (error) {
+                console.error('Error creating checkout session:', error);
+                button.disabled = false;
+                button.innerHTML = originalText;
+                
+                const errorMsg = error.response?.data?.error || error.message || 'Error al procesar el pago';
+                alert(\`Error: \${errorMsg}\nPor favor, intenta de nuevo o contacta a soporte.\`);
             }
         }
         
