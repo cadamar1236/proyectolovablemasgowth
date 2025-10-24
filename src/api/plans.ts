@@ -18,6 +18,7 @@ type AuthenticatedContext = { Bindings: Bindings } & { Variables: AuthContext };
 
 /**
  * Get all available pricing plans (public)
+ * Only returns plans with Stripe integration configured
  */
 plans.get('/', async (c) => {
   try {
@@ -26,9 +27,14 @@ plans.get('/', async (c) => {
         id, name, display_name, description, 
         price_monthly, price_yearly, 
         validators_limit, products_limit, 
-        features, display_order, category
+        features, display_order, category,
+        stripe_product_id, stripe_price_id_monthly, stripe_price_id_yearly
       FROM pricing_plans
       WHERE is_active = 1
+        AND stripe_product_id IS NOT NULL
+        AND stripe_product_id != ''
+        AND stripe_price_id_monthly IS NOT NULL
+        AND stripe_price_id_monthly != ''
       ORDER BY display_order ASC
     `).all();
     
