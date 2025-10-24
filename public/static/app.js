@@ -2,12 +2,35 @@
 let currentUser = { id: 1, name: 'Juan Founder', plan: 'pro' };
 let projects = [];
 let betaUsers = [];
+let authToken = null;
+
+// Load current user
+async function loadCurrentUser() {
+  try {
+    const response = await axios.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    currentUser = response.data.user;
+    
+  } catch (error) {
+    console.error('Failed to load user:', error);
+    authToken = null;
+    localStorage.removeItem('authToken');
+  }
+}
 
 // Initialize app only if we're on the main app page (not marketplace)
 document.addEventListener('DOMContentLoaded', () => {
   // Check if we're on the marketplace page
   if (window.location.pathname.startsWith('/marketplace')) {
     return; // Don't initialize app.js on marketplace
+  }
+  
+  // Check for existing auth token
+  authToken = localStorage.getItem('authToken');
+  if (authToken) {
+    loadCurrentUser();
   }
   
   loadProjects();
@@ -40,7 +63,7 @@ function hideValidationForm() {
 
 // Check if user is authenticated (simple check for now)
 function isAuthenticated() {
-  return localStorage.getItem('authToken') !== null;
+  return authToken !== null;
 }
 
 // Scroll to section
@@ -395,8 +418,7 @@ function renderProjects() {
   }
   
   grid.innerHTML = projects.map(project => `
-    <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition cursor-pointer" 
-         onclick="window.location.href='/project/${project.id}'">
+    <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition">
       <div class="flex justify-between items-start mb-4">
         <h3 class="text-xl font-bold text-gray-900">${escapeHtml(project.title)}</h3>
         <span class="px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(project.status)}">
@@ -404,9 +426,16 @@ function renderProjects() {
         </span>
       </div>
       <p class="text-gray-600 mb-4 line-clamp-2">${escapeHtml(project.description)}</p>
-      <div class="flex items-center justify-between text-sm text-gray-500">
+      <div class="flex items-center justify-between text-sm text-gray-500 mb-4">
         <span><i class="far fa-calendar mr-2"></i>${formatDate(project.created_at)}</span>
-        <span class="text-primary hover:text-primary/80">Ver detalles <i class="fas fa-arrow-right ml-1"></i></span>
+        <div class="flex items-center">
+          ${project.rating_average ? `<span class="text-yellow-500 mr-2"><i class="fas fa-star"></i> ${project.rating_average.toFixed(1)}</span>` : ''}
+          ${project.votes_count ? `<span class="text-gray-500">(${project.votes_count} votos)</span>` : ''}
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-primary hover:text-primary/80 cursor-pointer" onclick="window.location.href='/project/${project.id}'">Ver detalles <i class="fas fa-arrow-right ml-1"></i></span>
+        ${generateProjectVoteButtons(project.id)}
       </div>
     </div>
   `).join('');
@@ -592,9 +621,9 @@ function filterAndRenderPlans() {
   
   // Filter plans based on type
   if (currentPlanType === 'platform') {
-    pricingPlans = allPlans.filter(p => p.plan_type === 'full');
+    pricingPlans = allPlans.filter(p => p.category === 'platform');
   } else {
-    pricingPlans = allPlans.filter(p => p.plan_type === 'marketplace_only');
+    pricingPlans = allPlans.filter(p => p.category === 'marketplace');
   }
   
   console.log('✅ [DEBUG] Filtered plans:', pricingPlans.length, 'plans');
@@ -770,4 +799,257 @@ function selectPlan(planId, planName) {
 // Load pricing plans on page load
 if (document.getElementById('pricing-plans-grid')) {
   loadPricingPlans();
+}
+
+// ============================================
+// AUTHENTICATION FUNCTIONS
+// ============================================
+
+function showAuthModal(mode) {
+  // Wait for DOM to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => showAuthModal(mode));
+    return;
+  }
+
+  const modal = document.getElementById('auth-modal');
+  const content = document.getElementById('auth-modal-content');
+  
+  if (!modal || !content) {
+    console.error('Auth modal elements not found. Modal:', modal, 'Content:', content);
+    // Try to create the modal if it doesn't exist
+    createAuthModalIfNeeded(mode);
+    return;
+  }
+  
+  if (mode === 'login') {
+    content.innerHTML = `
+      <h2 class="text-2xl font-bold mb-6">Iniciar Sesión</h2>
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input type="email" id="login-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+          <input type="password" id="login-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+        </div>
+        <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 transition font-semibold">
+          <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
+        </button>
+        <p class="text-center text-sm text-gray-600">
+          ¿No tienes cuenta? <button type="button" onclick="showAuthModal('register')" class="text-primary hover:underline">Regístrate</button>
+        </p>
+      </form>
+    `;
+    
+    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    
+  } else {
+    content.innerHTML = `
+      <h2 class="text-2xl font-bold mb-6">Crear Cuenta</h2>
+      <form id="register-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+          <input type="text" id="register-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input type="email" id="register-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+          <input type="password" id="register-password" required minlength="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+          <select id="register-role" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+            <option value="">Selecciona tu rol</option>
+            <option value="founder">Founder (Busco validadores)</option>
+            <option value="validator">Validador (Quiero validar productos)</option>
+          </select>
+        </div>
+        <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 transition font-semibold">
+          <i class="fas fa-user-plus mr-2"></i>Crear Cuenta
+        </button>
+        <p class="text-center text-sm text-gray-600">
+          ¿Ya tienes cuenta? <button type="button" onclick="showAuthModal('login')" class="text-primary hover:underline">Inicia sesión</button>
+        </p>
+      </form>
+    `;
+    
+    document.getElementById('register-form').addEventListener('submit', handleRegister);
+  }
+  
+  modal.classList.remove('hidden');
+}
+
+function closeAuthModal() {
+  document.getElementById('auth-modal').classList.add('hidden');
+}
+
+async function loadCurrentUser() {
+  try {
+    const response = await axios.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    currentUser = response.data.user;
+    updateAuthUI();
+    
+  } catch (error) {
+    console.error('Failed to load user:', error);
+    authToken = null;
+    localStorage.removeItem('authToken');
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  
+  try {
+    const response = await axios.post('/api/auth/login', { email, password });
+    
+    authToken = response.data.token;
+    currentUser = response.data.user;
+    localStorage.setItem('authToken', authToken);
+    
+    closeAuthModal();
+    updateAuthUI();
+    
+    alert('¡Bienvenido de nuevo!');
+    
+  } catch (error) {
+    alert('Error: ' + (error.response?.data?.error || 'Login falló'));
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  
+  const name = document.getElementById('register-name').value;
+  const email = document.getElementById('register-email').value;
+  const password = document.getElementById('register-password').value;
+  const role = document.getElementById('register-role').value;
+  
+  try {
+    const response = await axios.post('/api/auth/register', { name, email, password, role });
+    
+    authToken = response.data.token;
+    currentUser = response.data.user;
+    localStorage.setItem('authToken', authToken);
+    
+    closeAuthModal();
+    updateAuthUI();
+    
+    alert('¡Cuenta creada exitosamente!');
+    
+  } catch (error) {
+    alert('Error: ' + (error.response?.data?.error || 'Registro falló'));
+  }
+}
+
+function updateAuthUI() {
+  const loginBtn = document.querySelector('button[onclick="showAuthModal(\'login\')"]');
+  const registerBtn = document.querySelector('button[onclick="showAuthModal(\'register\')"]');
+  
+  if (currentUser) {
+    // User is logged in - hide login/register buttons and show user info
+    if (loginBtn) loginBtn.style.display = 'none';
+    if (registerBtn) {
+      registerBtn.outerHTML = `
+        <div class="flex items-center space-x-2">
+          <span class="text-gray-700">Hola, ${currentUser.name}</span>
+          <button onclick="logout()" class="text-red-600 hover:text-red-800 transition">
+            <i class="fas fa-sign-out-alt"></i> Salir
+          </button>
+        </div>
+      `;
+    }
+  }
+}
+
+function logout() {
+  if (confirm('¿Seguro que quieres cerrar sesión?')) {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('authToken');
+    
+    location.reload();
+  }
+}
+
+// Create auth modal if it doesn't exist
+function createAuthModalIfNeeded(mode) {
+  // Check if modal already exists
+  if (document.getElementById('auth-modal')) {
+    return;
+  }
+
+  // Create modal HTML
+  const modalHTML = `
+    <div id="auth-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-md w-full p-8 relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <div id="auth-modal-content">
+                <!-- Auth form will be inserted here -->
+            </div>
+        </div>
+    </div>
+  `;
+
+  // Append to body
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+  // Now try to show the modal again
+  setTimeout(() => showAuthModal(mode), 100);
+}
+
+// Generate vote buttons for projects (only for validators)
+function generateProjectVoteButtons(projectId) {
+  if (!authToken || !currentUser || currentUser.role !== 'validator') {
+    return '';
+  }
+
+  return `
+    <div class="flex items-center space-x-1">
+      ${[1, 2, 3, 4, 5].map(star => `
+        <button onclick="event.stopPropagation(); voteForProject(${projectId}, ${star})"
+                class="text-gray-300 hover:text-yellow-400 transition-colors text-sm"
+                title="Votar ${star} estrella${star > 1 ? 's' : ''}">
+          <i class="fas fa-star"></i>
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+// Vote for a project
+async function voteForProject(projectId, rating) {
+  if (!authToken) {
+    // Show login modal or something
+    return;
+  }
+
+  try {
+    const response = await axios.post(`/api/projects/${projectId}/vote`, {
+      rating: rating
+    }, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+
+    if (response.status === 200) {
+      // Reload projects to show updated ratings
+      await loadProjects();
+    }
+  } catch (error) {
+    console.error('Error voting for project:', error);
+  }
 }

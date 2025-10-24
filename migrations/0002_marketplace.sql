@@ -3,11 +3,7 @@
 
 -- Enhanced Users table with authentication
 -- Note: We keep the original users table and extend it
-ALTER TABLE users ADD COLUMN password TEXT;
-ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'founder'; -- founder, validator, admin
-ALTER TABLE users ADD COLUMN avatar_url TEXT;
-ALTER TABLE users ADD COLUMN bio TEXT;
-ALTER TABLE users ADD COLUMN company TEXT;
+-- Columns already exist from previous migrations, skipping ALTER TABLE statements
 
 -- Validators table (professional beta testers)
 CREATE TABLE IF NOT EXISTS validators (
@@ -208,6 +204,22 @@ CREATE TABLE IF NOT EXISTS notifications (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- Validator Ratings (founders rate validators)
+CREATE TABLE IF NOT EXISTS validator_ratings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  founder_id INTEGER NOT NULL, -- user_id del founder
+  validator_id INTEGER NOT NULL, -- user_id del validator
+  rating INTEGER NOT NULL, -- 1-5
+  comment TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (founder_id) REFERENCES users(id),
+  FOREIGN KEY (validator_id) REFERENCES users(id)
+);
+
+-- Opcional: índice para búsquedas rápidas
+CREATE INDEX IF NOT EXISTS idx_validator_ratings_validator_id ON validator_ratings(validator_id);
+CREATE INDEX IF NOT EXISTS idx_validator_ratings_founder_id ON validator_ratings(founder_id);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_validators_user_id ON validators(user_id);
 CREATE INDEX IF NOT EXISTS idx_validators_rating ON validators(rating DESC);
@@ -240,12 +252,12 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read);
 
 -- Insert sample validators
-INSERT INTO users (email, name, role, bio, company) VALUES
+INSERT OR IGNORE INTO users (email, name, role, bio, company) VALUES
   ('validator1@email.com', 'Sarah Chen', 'validator', 'Senior Product Designer with 8 years experience in SaaS', 'Freelance'),
   ('validator2@email.com', 'Marcus Rodriguez', 'validator', 'Full-stack developer specializing in fintech applications', 'Tech Consultant'),
   ('validator3@email.com', 'Emma Watson', 'validator', 'UX Researcher focused on mobile and healthcare apps', 'UX Studio');
 
-INSERT INTO validators (user_id, title, expertise, experience_years, hourly_rate, languages, rating, total_validations, success_rate, verified) VALUES
+INSERT OR IGNORE INTO validators (user_id, title, expertise, experience_years, hourly_rate, languages, rating, total_validations, success_rate, verified) VALUES
   (
     (SELECT id FROM users WHERE email = 'validator1@email.com'),
     'Senior Product Designer',
@@ -284,11 +296,11 @@ INSERT INTO validators (user_id, title, expertise, experience_years, hourly_rate
   );
 
 -- Insert sample beta products
-INSERT INTO users (email, name, role, company) VALUES
+INSERT OR IGNORE INTO users (email, name, role, company) VALUES
   ('company1@startup.com', 'TechCorp', 'founder', 'TechCorp Inc'),
   ('company2@startup.com', 'HealthApp', 'founder', 'HealthApp Ltd');
 
-INSERT INTO beta_products (
+INSERT OR IGNORE INTO beta_products (
   company_user_id, 
   title, 
   description, 

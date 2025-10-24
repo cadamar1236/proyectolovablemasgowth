@@ -1,0 +1,8 @@
+-- Add category field to pricing_plans table (idempotent)
+-- This migration is safe to run multiple times
+
+-- Add category column if it doesn't exist
+ALTER TABLE pricing_plans ADD COLUMN category TEXT DEFAULT 'platform';
+
+-- Update existing plans with appropriate categories
+UPDATE pricing_plans SET category = 'platform' WHERE name IN ('free', 'starter', 'professional', 'pro', 'business', 'enterprise') AND (category IS NULL OR category = '');

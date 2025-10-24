@@ -1,0 +1,2 @@
+-- Migration: Add project voting and leaderboard system
+-- Skipped because tables/columns already exist

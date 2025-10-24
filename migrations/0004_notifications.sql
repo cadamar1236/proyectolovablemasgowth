@@ -1,7 +1,7 @@
 -- Migration: Notifications System
 -- Adds metadata column to notifications table and triggers for real-time updates
 
--- Add metadata column if it doesn't exist
+-- Add metadata column if it doesn't exist (table was created in 0002_marketplace.sql)
 ALTER TABLE notifications ADD COLUMN metadata TEXT;
 
 -- ============================================
@@ -118,8 +118,8 @@ BEGIN
     bp.company_user_id,
     'contract_completed',
     'Trabajo completado',
-    'El validador ha completado el trabajo para: ' || bp.title,
-    '/marketplace?tab=dashboard&session=' || NEW.id,
+    'El trabajo para el producto "' || bp.title || '" ha sido completado.',
+    '/marketplace?tab=dashboard',
     json_object(
       'session_id', NEW.id,
       'product_id', NEW.product_id
@@ -152,7 +152,7 @@ END;
 -- ============================================
 
 -- Add some sample notifications for testing
-INSERT INTO notifications (user_id, type, title, message, link, metadata, read)
+INSERT OR IGNORE INTO notifications (user_id, type, title, message, link, metadata, read)
 SELECT 
   1,
   'new_application',
@@ -163,7 +163,7 @@ SELECT
   0
 WHERE EXISTS (SELECT 1 FROM users WHERE id = 1);
 
-INSERT INTO notifications (user_id, type, title, message, link, metadata, read)
+INSERT OR IGNORE INTO notifications (user_id, type, title, message, link, metadata, read)
 SELECT 
   1,
   'application_approved',

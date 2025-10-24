@@ -5,11 +5,15 @@ const betaUsers = new Hono<{ Bindings: Bindings }>();
 
 // Get all beta users
 betaUsers.get('/', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM beta_users WHERE available = 1 ORDER BY rating DESC LIMIT 50'
-  ).all();
-  
-  return c.json({ betaUsers: results });
+  try {
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM beta_users WHERE available = 1 ORDER BY rating DESC LIMIT 50'
+    ).all();
+    
+    return c.json({ betaUsers: results });
+  } catch (error) {
+    return c.json({ error: 'Internal server error' }, 500);
+  }
 });
 
 // Get beta user by ID

@@ -10,13 +10,10 @@
     {
       "binding": "DB",
       "database_name": "webapp-production",
-      "database_id": "local-only"
+      "database_id": "5cb67508-cc61-4194-886b-05cf6f1c00fa"
     }
   ],
   "ai": {
     "binding": "AI"
-  },
-  "vars": {
-    "GROQ_API_KEY": "your_groq_api_key_here"
   }
 }

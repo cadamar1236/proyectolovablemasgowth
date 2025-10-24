@@ -4,10 +4,13 @@
  */
 
 import { Hono } from 'hono';
-import type { Bindings } from '../types';
+import type { Bindings, AuthContext } from '../types';
 import { requireAuth, requireRole } from './auth';
 
 const plans = new Hono<{ Bindings: Bindings }>();
+
+// Extend context for authenticated routes
+type AuthenticatedContext = { Bindings: Bindings } & { Variables: AuthContext };
 
 // ============================================
 // PUBLIC ENDPOINTS - Pricing Plans
@@ -17,19 +20,23 @@ const plans = new Hono<{ Bindings: Bindings }>();
  * Get all available pricing plans (public)
  */
 plans.get('/', async (c) => {
-  const { results } = await c.env.DB.prepare(`
-    SELECT 
-      id, name, display_name, description, 
-      price_monthly, price_yearly, 
-      validators_limit, products_limit, 
-      features, display_order,
-      plan_type, category
-    FROM pricing_plans
-    WHERE is_active = 1
-    ORDER BY display_order ASC
-  `).all();
-  
-  return c.json({ plans: results });
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        id, name, display_name, description, 
+        price_monthly, price_yearly, 
+        validators_limit, products_limit, 
+        features, display_order, category
+      FROM pricing_plans
+      WHERE is_active = 1
+      ORDER BY display_order ASC
+    `).all();
+    
+    return c.json({ plans: results });
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
 });
 
 /**
@@ -43,7 +50,7 @@ plans.get('/:id', async (c) => {
       id, name, display_name, description, 
       price_monthly, price_yearly, 
       validators_limit, products_limit, 
-      features, display_order
+      features, display_order, category
     FROM pricing_plans
     WHERE id = ? AND is_active = 1
   `).bind(planId).first();
@@ -63,7 +70,7 @@ plans.get('/:id', async (c) => {
  * Get current user's plan and usage
  */
 plans.get('/my/current', requireAuth, async (c) => {
-  const userId = c.get('userId');
+  const userId = c.get('userId') as number;
   
   const userPlan = await c.env.DB.prepare(`
     SELECT 
@@ -124,7 +131,7 @@ plans.get('/my/current', requireAuth, async (c) => {
  * Check if user can perform action (internal helper exported as endpoint)
  */
 plans.get('/my/check-limit', requireAuth, async (c) => {
-  const userId = c.get('userId');
+  const userId = c.get('userId') as number;
   const { action, amount = '1' } = c.req.query();
   
   if (!action || !['validators', 'products'].includes(action)) {
@@ -283,7 +290,7 @@ plans.get('/my/upgrade-requests', requireAuth, async (c) => {
 /**
  * Get all upgrade requests (admin only)
  */
-plans.get('/admin/upgrade-requests', requireAuth, requireRole(['admin']), async (c) => {
+plans.get('/admin/upgrade-requests', requireAuth, requireRole('admin'), async (c) => {
   const { status = 'pending' } = c.req.query();
   
   let query = `
@@ -318,7 +325,7 @@ plans.get('/admin/upgrade-requests', requireAuth, requireRole(['admin']), async 
 /**
  * Approve/reject upgrade request (admin only)
  */
-plans.post('/admin/upgrade-requests/:id/review', requireAuth, requireRole(['admin']), async (c) => {
+plans.post('/admin/upgrade-requests/:id/review', requireAuth, requireRole('admin'), async (c) => {
   const adminId = c.get('userId');
   const requestId = c.req.param('id');
   const { action, note } = await c.req.json(); // action: 'approve' or 'reject'
@@ -377,7 +384,7 @@ plans.post('/admin/upgrade-requests/:id/review', requireAuth, requireRole(['admi
 /**
  * Manually change user's plan (admin only)
  */
-plans.post('/admin/users/:userId/change-plan', requireAuth, requireRole(['admin']), async (c) => {
+plans.post('/admin/users/:userId/change-plan', requireAuth, requireRole('admin'), async (c) => {
   const targetUserId = c.req.param('userId');
   const { plan_id, billing_cycle = 'monthly', duration_days = 30 } = await c.req.json();
   
@@ -434,7 +441,7 @@ plans.post('/admin/users/:userId/change-plan', requireAuth, requireRole(['admin'
 /**
  * Get plan usage statistics (admin only)
  */
-plans.get('/admin/statistics', requireAuth, requireRole(['admin']), async (c) => {
+plans.get('/admin/statistics', requireAuth, requireRole('admin'), async (c) => {
   // Get plan distribution
   const { results: planDistribution } = await c.env.DB.prepare(`
     SELECT 

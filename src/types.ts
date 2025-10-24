@@ -1,8 +1,11 @@
 // Type definitions for Cloudflare bindings
-export type Bindings = {
-  DB: D1Database;
-  AI?: Ai;
-  GROQ_API_KEY?: string;
+export type Bindings = CloudflareBindings;
+
+// Context types for authenticated routes
+export type AuthContext = {
+  userId: number;
+  userRole: string;
+  userEmail: string;
 }
 
 // Project types
