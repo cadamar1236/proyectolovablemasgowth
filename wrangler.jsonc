@@ -15,5 +15,8 @@
   ],
   "ai": {
     "binding": "AI"
+  },
+  "vars": {
+    "STRIPE_PUBLISHABLE_KEY": "pk_test_51QaDpFAD3LJm7jEI8OpLp1xwPBPqYWXQD5h6nHOcANMF29XlBKBHiPOo9k4FQqXZAhZtPyFvQKRj4JYKqeKjRsUa00RnB3HqRu"
   }
 }
