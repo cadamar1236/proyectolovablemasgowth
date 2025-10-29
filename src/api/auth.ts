@@ -15,7 +15,18 @@ const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
 function hashPassword(password: string): string {
   // TODO: In production, use bcrypt or Argon2
   // For now, simple implementation (NOT SECURE FOR PRODUCTION)
-  return Buffer.from(password).toString('base64');
+  // Using base64 encoding for compatibility with existing passwords
+  try {
+    // For Cloudflare Workers, use btoa if available, otherwise fallback
+    if (typeof btoa !== 'undefined') {
+      return btoa(password);
+    }
+    // Fallback for environments without btoa
+    return Buffer.from(password, 'utf-8').toString('base64');
+  } catch (e) {
+    // Ultimate fallback
+    return password.split('').map(c => c.charCodeAt(0).toString(16)).join('');
+  }
 }
 
 // Helper: Verify password
@@ -274,6 +285,157 @@ auth.post('/logout', async (c) => {
     
   } catch (error) {
     return c.json({ message: 'Logout successful' });
+  }
+});
+
+// Google OAuth endpoints
+auth.get('/google', async (c) => {
+  const clientId = c.env.GOOGLE_CLIENT_ID;
+  const redirectUri = `${new URL(c.req.url).origin}/api/auth/google/callback`;
+
+  if (!clientId) {
+    return c.json({ error: 'Google OAuth not configured' }, 500);
+  }
+
+  // Get role from query parameter (for validator registration)
+  const role = c.req.query('role') || 'founder';
+
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      state: role, // Pass role in state parameter
+      access_type: 'offline',
+      prompt: 'consent'
+    });
+
+  return c.redirect(authUrl);
+});
+
+auth.get('/google/callback', async (c) => {
+  try {
+    const code = c.req.query('code');
+    const state = c.req.query('state') || 'founder'; // Get role from state
+
+    if (!code) {
+      return c.json({ error: 'Authorization code not provided' }, 400);
+    }
+
+    const clientId = c.env.GOOGLE_CLIENT_ID;
+    const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = `${new URL(c.req.url).origin}/api/auth/google/callback`;
+
+    if (!clientId || !clientSecret) {
+      return c.json({ error: 'Google OAuth not configured' }, 500);
+    }
+
+    // Exchange code for access token
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    const tokenData = await tokenResponse.json() as {
+      access_token?: string;
+      error?: string;
+    };
+
+    if (!tokenData.access_token) {
+      return c.json({ error: 'Failed to get access token' }, 400);
+    }
+
+    // Get user info from Google
+    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+      },
+    });
+
+    const userData = await userResponse.json() as {
+      email?: string;
+      name?: string;
+      picture?: string;
+    };
+
+    if (!userData.email) {
+      return c.json({ error: 'Failed to get user email' }, 400);
+    }
+
+    // Check if user exists
+    let existingUser = await c.env.DB.prepare(
+      'SELECT id, role FROM users WHERE email = ?'
+    ).bind(userData.email).first() as any;
+
+    let userId: number;
+    let userRole: string;
+
+    if (existingUser) {
+      // User exists, update their info if needed
+      userId = existingUser.id;
+      userRole = existingUser.role;
+
+      // Update user info from Google
+      await c.env.DB.prepare(`
+        UPDATE users
+        SET name = COALESCE(?, name),
+            avatar_url = COALESCE(?, avatar_url)
+        WHERE id = ?
+      `).bind(userData.name, userData.picture, userId).run();
+    } else {
+      // Create new user
+      userRole = state; // Use role from OAuth state
+
+      // Validate role
+      const validRoles = ['founder', 'validator', 'admin'];
+      if (!validRoles.includes(userRole)) {
+        userRole = 'founder'; // Default to founder
+      }
+
+      const result = await c.env.DB.prepare(`
+        INSERT INTO users (email, name, role, plan, avatar_url)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(userData.email, userData.name, userRole, 'starter', userData.picture).run();
+
+      userId = result.meta.last_row_id;
+
+      // If validator, create validator profile
+      if (userRole === 'validator') {
+        await c.env.DB.prepare(`
+          INSERT INTO validators (user_id, title, expertise)
+          VALUES (?, ?, ?)
+        `).bind(userId, 'New Validator', '[]').run();
+      }
+    }
+
+    // Generate JWT token
+    const token = await sign(
+      {
+        userId,
+        email: userData.email,
+        role: userRole,
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
+      },
+      JWT_SECRET
+    );
+
+    // Redirect to frontend with token
+    const frontendUrl = new URL(c.req.url).origin;
+    return c.redirect(`${frontendUrl}/?token=${token}&role=${userRole}&new_user=${!existingUser}`);
+
+  } catch (error) {
+    console.error('Google OAuth callback error:', error);
+    return c.json({ error: 'OAuth authentication failed' }, 500);
   }
 });
 

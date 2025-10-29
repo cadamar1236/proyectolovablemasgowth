@@ -48,9 +48,21 @@ function setupEventListeners() {
 
 // Show/hide validation form
 function showValidationForm() {
-  // SIEMPRE mostrar selección de plan primero
-  // El usuario debe ver los planes antes de validar su idea
-  showPlanSelectionModal();
+  // Check if user is authenticated first
+  if (!isAuthenticated()) {
+    showAuthModal('validation');
+    return;
+  }
+  
+  // Mostrar directamente el formulario de validación para modo gratuito
+  const formSection = document.getElementById('validation-form-section');
+  const projectsSection = document.getElementById('projects-section');
+
+  formSection.classList.remove('hidden');
+  projectsSection.classList.add('hidden');
+
+  // Scroll to form
+  scrollToSection('validation-form-section');
 }
 
 function hideValidationForm() {
@@ -59,6 +71,178 @@ function hideValidationForm() {
   
   formSection.classList.add('hidden');
   projectsSection.classList.remove('hidden');
+}
+
+// Show authentication modal
+function showAuthModal(redirectTo = null) {
+  let modal = document.getElementById('auth-modal');
+  
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'auth-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+    document.body.appendChild(modal);
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-primary to-secondary text-white p-6 rounded-t-2xl">
+        <h2 class="text-2xl font-bold text-center">Únete a ValidAI Studio</h2>
+        <p class="text-center text-purple-100 mt-2">Regístrate gratis y valida tu idea</p>
+      </div>
+      
+      <!-- Form -->
+      <div class="p-6">
+        <form id="auth-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
+            <input type="text" id="auth-name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input type="email" id="auth-email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+            <input type="password" id="auth-password" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+          
+          <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary text-white py-3 rounded-lg font-semibold hover:opacity-90 transition">
+            Crear cuenta gratis
+          </button>
+        </form>
+        
+        <div class="mt-4 text-center">
+          <p class="text-gray-600">¿Ya tienes cuenta? 
+            <button onclick="switchToLogin()" class="text-primary hover:underline font-medium">Inicia sesión</button>
+          </p>
+        </div>
+      </div>
+      
+      <!-- Close button -->
+      <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-white hover:text-gray-200">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+  `;
+  
+  // Store redirect destination
+  modal.dataset.redirectTo = redirectTo;
+  
+  // Setup form submission
+  document.getElementById('auth-form').addEventListener('submit', handleAuthSubmit);
+  
+  modal.style.display = 'flex';
+}
+
+// Close authentication modal
+function closeAuthModal() {
+  const modal = document.getElementById('auth-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
+// Switch to login mode
+function switchToLogin() {
+  const modal = document.getElementById('auth-modal');
+  if (!modal) return;
+  
+  const form = modal.querySelector('#auth-form');
+  const title = modal.querySelector('h2');
+  const subtitle = modal.querySelector('p');
+  const submitBtn = modal.querySelector('button[type="submit"]');
+  const switchText = modal.querySelector('.text-center p');
+  
+  // Change to login form
+  title.textContent = 'Inicia sesión';
+  subtitle.textContent = 'Accede a tu cuenta de ValidAI Studio';
+  submitBtn.textContent = 'Iniciar sesión';
+  
+  // Hide name field for login
+  const nameField = modal.querySelector('#auth-name').parentElement;
+  nameField.style.display = 'none';
+  
+  // Change switch text
+  switchText.innerHTML = '¿No tienes cuenta? <button onclick="switchToRegister()" class="text-primary hover:underline font-medium">Regístrate</button>';
+  
+  // Update form mode
+  form.dataset.mode = 'login';
+}
+
+// Switch to register mode
+function switchToRegister() {
+  const modal = document.getElementById('auth-modal');
+  if (!modal) return;
+  
+  const form = modal.querySelector('#auth-form');
+  const title = modal.querySelector('h2');
+  const subtitle = modal.querySelector('p');
+  const submitBtn = modal.querySelector('button[type="submit"]');
+  const switchText = modal.querySelector('.text-center p');
+  
+  // Change to register form
+  title.textContent = 'Únete a ValidAI Studio';
+  subtitle.textContent = 'Regístrate gratis y valida tu idea';
+  submitBtn.textContent = 'Crear cuenta gratis';
+  
+  // Show name field for register
+  const nameField = modal.querySelector('#auth-name').parentElement;
+  nameField.style.display = 'block';
+  
+  // Change switch text
+  switchText.innerHTML = '¿Ya tienes cuenta? <button onclick="switchToLogin()" class="text-primary hover:underline font-medium">Inicia sesión</button>';
+  
+  // Update form mode
+  form.dataset.mode = 'register';
+}
+
+// Handle authentication form submission
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  
+  const form = e.target;
+  const mode = form.dataset.mode || 'register';
+  const name = document.getElementById('auth-name').value;
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  
+  try {
+    let response;
+    if (mode === 'register') {
+      response = await axios.post('/api/auth/register', { name, email, password });
+    } else {
+      response = await axios.post('/api/auth/login', { email, password });
+    }
+    
+    // Store auth token
+    authToken = response.data.token;
+    localStorage.setItem('authToken', authToken);
+    
+    // Load user data
+    await loadCurrentUser();
+    
+    // Close modal
+    closeAuthModal();
+    
+    // Redirect based on stored destination
+    const modal = document.getElementById('auth-modal');
+    const redirectTo = modal?.dataset.redirectTo;
+    
+    if (redirectTo === 'validation') {
+      showValidationForm();
+    } else {
+      // Default redirect to dashboard or home
+      window.location.reload();
+    }
+    
+  } catch (error) {
+    console.error('Auth error:', error);
+    alert('Error: ' + (error.response?.data?.error || 'Error de autenticación'));
+  }
 }
 
 // Check if user is authenticated (simple check for now)

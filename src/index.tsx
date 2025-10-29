@@ -1,7 +1,13 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/cloudflare-workers';
+import { verify } from 'hono/jwt';
+import { jsx } from 'hono/jsx';
 import type { Bindings } from './types';
+import { getNotFoundPage, getVotePage } from './html-templates';
+
+// JWT Secret for token verification
+const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
 
 // Import API routes
 import projects from './api/projects';
@@ -13,6 +19,7 @@ import auth from './api/auth';
 import marketplace from './api/marketplace';
 import plans from './api/plans';
 import stripe from './api/stripe';
+import dashboard from './api/dashboard';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -32,6 +39,48 @@ app.route('/api/validation', validation);
 app.route('/api/beta-users', betaUsers);
 app.route('/api/mvp', mvpGenerator);
 app.route('/api/deploy', deploy);
+app.route('/api/dashboard', dashboard);
+
+// Vote page for QR codes
+app.get('/vote/:projectId', async (c) => {
+  const projectId = c.req.param('projectId');
+  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1] ||
+                   c.req.query('token');
+
+  // If no token, redirect to validator registration
+  if (!authToken) {
+    return c.redirect(`/api/auth/google?role=validator&redirect=/vote/${projectId}`);
+  }
+
+  // Verify token
+  try {
+    const payload = await verify(authToken, JWT_SECRET) as any;
+    if (!payload || payload.role !== 'validator') {
+      // Not a validator, redirect to become one
+      return c.redirect(`/api/auth/google?role=validator&redirect=/vote/${projectId}`);
+    }
+
+    // Get project details
+    const project = await c.env.DB.prepare(`
+      SELECT p.*, u.name as creator_name
+      FROM projects p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.id = ?
+    `).bind(projectId).first() as any;
+
+    if (!project) {
+      const html = getNotFoundPage();
+      return c.jsx(html);
+    }
+
+    const html = getVotePage(project, projectId, authToken);
+    return c.jsx(html);
+
+  } catch (error) {
+    // Invalid token, redirect to login
+    return c.redirect(`/api/auth/google?role=validator&redirect=/vote/${projectId}`);
+  }
+});
 
 // Frontend Routes
 app.get('/', (c) => {
@@ -65,36 +114,6 @@ app.get('/', (c) => {
         display: none;
       }
     </style>
-    <script>
-      // Mobile menu toggle
-      function toggleMobileMenu() {
-        const mobileMenu = document.getElementById('mobile-menu');
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        
-        if (mobileMenu.classList.contains('hidden')) {
-          mobileMenu.classList.remove('hidden');
-          mobileMenuButton.innerHTML = '<i class="fas fa-times text-xl"></i>';
-        } else {
-          mobileMenu.classList.add('hidden');
-          mobileMenuButton.innerHTML = '<i class="fas fa-bars text-xl"></i>';
-        }
-      }
-
-      // Close mobile menu when clicking outside
-      document.addEventListener('DOMContentLoaded', () => {
-        document.addEventListener('click', (e) => {
-          const mobileMenu = document.getElementById('mobile-menu');
-          const mobileMenuButton = document.getElementById('mobile-menu-button');
-          
-          if (!mobileMenu?.contains(e.target) && !mobileMenuButton?.contains(e.target)) {
-            mobileMenu?.classList.add('hidden');
-            if (mobileMenuButton) {
-              mobileMenuButton.innerHTML = '<i class="fas fa-bars text-xl"></i>';
-            }
-          }
-        });
-      });
-    </script>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
     <!-- Navigation -->
@@ -110,7 +129,7 @@ app.get('/', (c) => {
                 <!-- Desktop Navigation -->
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="#dashboard" class="text-gray-700 hover:text-primary transition">Dashboard</a>
-                    <a href="#validation" class="text-gray-700 hover:text-primary transition">Validación</a>
+                    <a href="#validation" onclick="showValidationForm();return false;" class="text-gray-700 hover:text-primary transition">Validación</a>
                     <a href="/leaderboard" class="text-gray-700 hover:text-primary transition font-semibold">
                         <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
                     </a>
@@ -120,12 +139,14 @@ app.get('/', (c) => {
                     <a href="/pricing" class="text-gray-700 hover:text-primary transition font-semibold">
                         <i class="fas fa-tag mr-1 text-green-500"></i>Planes
                     </a>
-                    <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition">
-                        Iniciar Sesión
-                    </button>
-                    <button onclick="showAuthModal('register')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-                        Registrarse
-                    </button>
+                    <div class="nav-auth-buttons flex items-center space-x-4">
+                        <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition">
+                            Iniciar Sesión
+                        </button>
+                        <button onclick="showAuthModal('register')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
+                            Registrarse
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Mobile menu button -->
@@ -142,7 +163,7 @@ app.get('/', (c) => {
                     <a href="#dashboard" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
                         <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
                     </a>
-                    <a href="#validation" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
+                    <a href="#validation" onclick="showValidationForm();return false;" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
                         <i class="fas fa-check-circle mr-2"></i>Validación
                     </a>
                     <a href="/leaderboard" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
@@ -154,7 +175,7 @@ app.get('/', (c) => {
                     <a href="/pricing" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
                         <i class="fas fa-tag mr-1 text-green-500"></i>Planes
                     </a>
-                    <div class="border-t pt-2 mt-2">
+                    <div class="nav-auth-buttons border-t pt-2 mt-2">
                         <button onclick="showAuthModal('login')" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-primary transition">
                             <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
                         </button>
@@ -274,9 +295,16 @@ app.get('/', (c) => {
 
         <!-- Validation Form (Hidden by default) -->
         <div id="validation-form-section" class="mb-20 hidden">
-            <div class="bg-white rounded-2xl shadow-xl p-8 max-w-3xl mx-auto">
+            <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl p-8">
                 <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">Validación Express</h2>
-                <p class="text-gray-600 mb-8 text-center">Completa el formulario y obtén resultados en 48 horas</p>
+                <p class="text-gray-600 mb-4 text-center">Completa el formulario y obtén resultados en 48 horas</p>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                        <span class="text-green-800 font-medium">¡Validación básica gratuita!</span>
+                    </div>
+                    <p class="text-green-700 text-sm mt-1">Análisis de mercado con IA, prototipo MVP y estrategias de crecimiento incluidas.</p>
+                </div>
                 
                 <form id="validation-form" class="space-y-6">
                     <div>
@@ -436,6 +464,18 @@ app.get('/', (c) => {
         </div>
     </div>
 
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <div id="auth-modal-content" class="p-6 sm:p-8">
+                <!-- Auth form will be inserted here -->
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="bg-gray-900 text-white py-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -475,38 +515,370 @@ app.get('/', (c) => {
         </div>
     </footer>
 
-    <script>
-        function toggleMobileMenu() {
-            const menu = document.getElementById('mobile-menu');
-            const button = document.getElementById('mobile-menu-button');
-            const icon = button.querySelector('i');
-            
-            if (menu.classList.contains('hidden')) {
-                menu.classList.remove('hidden');
-                icon.classList.remove('fa-bars');
-                icon.classList.add('fa-times');
-            } else {
-                menu.classList.add('hidden');
-                icon.classList.remove('fa-times');
-                icon.classList.add('fa-bars');
-            }
-        }
-
-        // Close mobile menu when clicking outside
-        document.addEventListener('click', function(event) {
-            const menu = document.getElementById('mobile-menu');
-            const button = document.getElementById('mobile-menu-button');
-            
-            if (!menu.contains(event.target) && !button.contains(event.target)) {
-                menu.classList.add('hidden');
-                const icon = button.querySelector('i');
-                icon.classList.remove('fa-times');
-                icon.classList.add('fa-bars');
-            }
-        });
-    </script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script src="/static/app.js"></script>
+    <script>
+      // Mobile menu toggle
+      function toggleMobileMenu() {
+        const menu = document.getElementById('mobile-menu');
+        const button = document.getElementById('mobile-menu-button');
+        const icon = button.querySelector('i');
+        
+        if (menu.classList.contains('hidden')) {
+          menu.classList.remove('hidden');
+          icon.classList.remove('fa-bars');
+          icon.classList.add('fa-times');
+        } else {
+          menu.classList.add('hidden');
+          icon.classList.remove('fa-times');
+          icon.classList.add('fa-bars');
+        }
+      }
+
+      // Close mobile menu when clicking outside
+      document.addEventListener('click', function(event) {
+        const menu = document.getElementById('mobile-menu');
+        const button = document.getElementById('mobile-menu-button');
+        
+        if (menu && button && !menu.contains(event.target) && !button.contains(event.target)) {
+          menu.classList.add('hidden');
+          const icon = button.querySelector('i');
+          if (icon) {
+            icon.classList.remove('fa-times');
+            icon.classList.add('fa-bars');
+          }
+        }
+      });
+
+      // Show validation form
+      function showValidationForm() {
+        const section = document.getElementById('validation-form-section');
+        if (section) {
+          section.classList.remove('hidden');
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+
+      // Scroll to section
+      function scrollToSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section) {
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+
+      // Show role selection for Google login
+      // Login with Google as founder
+      function loginAsFounder() {
+        loginWithGoogle('founder');
+      }
+
+      // Login with Google as validator
+      function loginAsValidator() {
+        loginWithGoogle('validator');
+      }
+
+      function showRoleSelection(action) {
+        const modal = document.getElementById('auth-modal');
+        const modalContent = document.getElementById('auth-modal-content');
+
+        if (!modal || !modalContent) return;
+
+        modal.classList.remove('hidden');
+
+        const title = action === 'login' ? 'Iniciar Sesión con Google' : 'Registro con Google';
+        const description = action === 'login' ? 'Elige tu rol para continuar' : 'Elige tu rol para registrarte';
+        const backAction = action === 'login' ? 'login' : 'register';
+
+        const roleSelectionHtml = '<div class="text-center">' +
+          '<i class="fab fa-google text-4xl text-red-600 mb-4"></i>' +
+          '<h2 class="text-2xl font-bold text-gray-900 mb-4">' + title + '</h2>' +
+          '<p class="text-gray-600 mb-6">' + description + '</p>' +
+          '<div class="space-y-3">' +
+          '<button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
+          '<i class="fas fa-lightbulb text-xl"></i>' +
+          '<span>Fundador - Crear y validar proyectos</span>' +
+          '</button>' +
+          '<button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
+          '<i class="fas fa-star text-xl"></i>' +
+          '<span>Validador - Votar y calificar proyectos</span>' +
+          '</button>' +
+          '</div>' +
+          '<button onclick="showAuthModal(\'' + backAction + '\')" class="mt-4 text-gray-600 hover:text-gray-800 text-sm underline">' +
+          'Volver' +
+          '</button>' +
+          '</div>';
+
+        modalContent.innerHTML = roleSelectionHtml;
+      }
+
+      // Show auth modal
+      function showAuthModal(mode) {
+        const modal = document.getElementById('auth-modal');
+        const modalContent = document.getElementById('auth-modal-content');
+
+        if (!modal || !modalContent) return;
+
+        modal.classList.remove('hidden');
+
+        if (mode === 'login') {
+          const loginHtml = '<div class="text-center">' +
+            '<i class="fas fa-sign-in-alt text-4xl text-primary mb-4"></i>' +
+            '<h2 class="text-2xl font-bold text-gray-900 mb-4">Iniciar Sesión</h2>' +
+            '<button onclick="showRoleSelection(\'login\')" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3 mb-4">' +
+              '<i class="fab fa-google text-xl"></i>' +
+              '<span>Continuar con Google</span>' +
+            '</button>' +
+            '<div class="relative mb-6">' +
+              '<div class="absolute inset-0 flex items-center">' +
+                '<div class="w-full border-t border-gray-300"></div>' +
+              '</div>' +
+              '<div class="relative flex justify-center text-sm">' +
+                '<span class="px-2 bg-white text-gray-500">O inicia sesión con email</span>' +
+              '</div>' +
+            '</div>' +
+            '<form onsubmit="handleTraditionalLogin(event)" class="space-y-4">' +
+              '<div class="text-left">' +
+                '<label class="block text-sm font-medium text-gray-700 mb-1">Email</label>' +
+                '<input type="email" id="login-email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="tu@email.com" />' +
+              '</div>' +
+              '<div class="text-left">' +
+                '<label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>' +
+                '<input type="password" id="login-password" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Tu contraseña" />' +
+              '</div>' +
+              '<button type="submit" class="w-full bg-primary text-white font-semibold py-3 px-6 rounded-lg transition-colors hover:bg-primary/90">Iniciar Sesión</button>' +
+            '</form>' +
+            '<p class="text-sm text-gray-600 mt-4">' +
+              '¿No tienes cuenta? <a href="#" onclick="showRoleSelection(\'register\')" class="text-primary hover:underline">Regístrate</a>' +
+            '</p>' +
+          '</div>';
+          modalContent.innerHTML = loginHtml;
+        } else if (mode === 'register') {
+          const registerHtml = '<div class="text-center">' +
+            '<i class="fas fa-user-plus text-4xl text-primary mb-4"></i>' +
+            '<h2 class="text-2xl font-bold text-gray-900 mb-4">Crear Cuenta</h2>' +
+            '<p class="text-gray-600 mb-6">Elige tu rol para continuar con el registro</p>' +
+            '<div class="space-y-3">' +
+              '<button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
+                '<i class="fas fa-lightbulb text-xl"></i>' +
+                '<span>Fundador - Crear y validar proyectos</span>' +
+              '</button>' +
+              '<button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
+                '<i class="fas fa-star text-xl"></i>' +
+                '<span>Validador - Votar y calificar proyectos</span>' +
+              '</button>' +
+            '</div>' +
+            '<p class="text-sm text-gray-600 mt-4">' +
+              '¿Ya tienes cuenta? <a href="#" onclick="showAuthModal(\'login\')" class="text-primary hover:underline">Inicia sesión</a>' +
+            '</p>' +
+          '</div>';
+          modalContent.innerHTML = registerHtml;
+        }
+      }
+
+      // Close auth modal
+      function closeAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        if (modal) {
+          modal.classList.add('hidden');
+        }
+      }
+
+      // Login with Google
+      function loginWithGoogle(role) {
+        window.location.href = '/api/auth/google?role=' + role;
+      }
+
+      // Handle traditional login
+      async function handleTraditionalLogin(event) {
+        event.preventDefault();
+
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            localStorage.setItem('authToken', data.token);
+            closeAuthModal();
+            updateAuthUI();
+            alert('¡Inicio de sesión exitoso!');
+          } else {
+            alert('Error: ' + (data.error || 'No se pudo iniciar sesión'));
+          }
+        } catch (error) {
+          console.error('Login error:', error);
+          alert('Error al iniciar sesión. Inténtalo de nuevo.');
+        }
+      }
+
+      // Handle traditional registration
+      async function handleTraditionalRegistration(event) {
+        event.preventDefault();
+
+        const name = document.getElementById('reg-name').value;
+        const email = document.getElementById('reg-email').value;
+        const password = document.getElementById('reg-password').value;
+        const role = document.getElementById('reg-role').value;
+
+        try {
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name, email, password, role }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            localStorage.setItem('authToken', data.token);
+            closeAuthModal();
+            updateAuthUI();
+            alert('¡Cuenta creada exitosamente!');
+          } else {
+            alert('Error: ' + (data.error || 'No se pudo crear la cuenta'));
+          }
+        } catch (error) {
+          console.error('Registration error:', error);
+          alert('Error al crear la cuenta. Inténtalo de nuevo.');
+        }
+      }
+
+      // Update authentication UI
+      function updateAuthUI() {
+        const authToken = localStorage.getItem('authToken');
+        const navButtons = document.querySelectorAll('.nav-auth-buttons');
+
+        if (authToken) {
+          // User is logged in - show logout option
+          const logoutHtml = '<button onclick="logout()" class="text-gray-700 hover:text-primary transition">' +
+            '<i class="fas fa-sign-out-alt mr-1"></i>Cerrar Sesión' +
+            '</button>';
+          navButtons.forEach(btn => {
+            btn.innerHTML = logoutHtml;
+          });
+        } else {
+          // User is not logged in - show login/register options
+          const loginHtml = '<button onclick="showAuthModal(\'login\')" class="text-gray-700 hover:text-primary transition">' +
+            '<i class="fas fa-sign-in-alt mr-1"></i>Iniciar Sesión' +
+            '</button>' +
+            '<button onclick="showAuthModal(\'register\')" class="ml-4 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">' +
+            '<i class="fas fa-user-plus mr-1"></i>Registrarse' +
+            '</button>';
+          navButtons.forEach(btn => {
+            btn.innerHTML = loginHtml;
+          });
+        }
+      }
+
+      // Logout function
+      function logout() {
+        localStorage.removeItem('authToken');
+        updateAuthUI();
+        alert('Sesión cerrada exitosamente');
+      }
+
+      // Switch plan type
+      function switchPlanType(type) {
+        const platformBtn = document.getElementById('platform-plans-btn');
+        const marketplaceBtn = document.getElementById('marketplace-plans-btn');
+        const platformDesc = document.getElementById('platform-description');
+        const marketplaceDesc = document.getElementById('marketplace-description');
+        
+        if (type === 'platform') {
+          platformBtn.classList.add('bg-white', 'text-primary');
+          platformBtn.classList.remove('text-white', 'hover:bg-white/10');
+          marketplaceBtn.classList.remove('bg-white', 'text-primary');
+          marketplaceBtn.classList.add('text-white', 'hover:bg-white/10');
+          platformDesc.classList.remove('hidden');
+          marketplaceDesc.classList.add('hidden');
+        } else {
+          marketplaceBtn.classList.add('bg-white', 'text-primary');
+          marketplaceBtn.classList.remove('text-white', 'hover:bg-white/10');
+          platformBtn.classList.remove('bg-white', 'text-primary');
+          platformBtn.classList.add('text-white', 'hover:bg-white/10');
+          marketplaceDesc.classList.remove('hidden');
+          platformDesc.classList.add('hidden');
+        }
+      }
+
+      // Switch billing cycle
+      function switchBillingCycle(cycle) {
+        const monthlyBtn = document.getElementById('monthly-billing-btn');
+        const yearlyBtn = document.getElementById('yearly-billing-btn');
+        
+        if (cycle === 'monthly') {
+          monthlyBtn.classList.add('bg-primary', 'text-white');
+          monthlyBtn.classList.remove('text-gray-700', 'hover:bg-gray-100');
+          yearlyBtn.classList.remove('bg-primary', 'text-white');
+          yearlyBtn.classList.add('text-gray-700', 'hover:bg-gray-100');
+        } else {
+          yearlyBtn.classList.add('bg-primary', 'text-white');
+          yearlyBtn.classList.remove('text-gray-700', 'hover:bg-gray-100');
+          monthlyBtn.classList.remove('bg-primary', 'text-white');
+          monthlyBtn.classList.add('text-gray-700', 'hover:bg-gray-100');
+        }
+      }
+
+      // Check for product parameter and redirect to marketplace, and handle OAuth callback
+      document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Handle OAuth callback token
+        const token = urlParams.get('token');
+        const role = urlParams.get('role');
+        const newUser = urlParams.get('new_user');
+        
+        if (token) {
+          // Store the token
+          localStorage.setItem('authToken', token);
+          
+          // Clean URL by removing the token parameters
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+          
+          // Show success message for new users
+          if (newUser === 'true') {
+            setTimeout(() => {
+              alert('¡Bienvenido! Tu cuenta ha sido creada exitosamente.');
+            }, 500);
+          }
+          
+          // Update UI to show logged in state
+          updateAuthUI();
+          
+          return; // Don't process other parameters if we just logged in
+        }
+        
+        // Handle product parameter redirect
+        const productId = urlParams.get('product');
+        if (productId && /^\d+$/.test(productId)) {
+          window.location.href = '/marketplace?product=' + productId;
+        }
+        
+        // Handle show_auth parameter to automatically show auth modal
+        const showAuth = urlParams.get('show_auth');
+        if (showAuth === 'login') {
+          showAuthModal('login');
+        } else if (showAuth === 'register') {
+          showAuthModal('register');
+        }
+      });
+
+      // Initialize auth UI
+      updateAuthUI();
+    </script>
 </body>
 </html>
   `);
@@ -547,36 +919,6 @@ app.get('/project/:id', async (c) => {
         display: none;
       }
     </style>
-    <script>
-      // Mobile menu toggle
-      function toggleMobileMenu() {
-        const mobileMenu = document.getElementById('mobile-menu');
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        
-        if (mobileMenu.classList.contains('hidden')) {
-          mobileMenu.classList.remove('hidden');
-          mobileMenuButton.innerHTML = '<i class="fas fa-times text-xl"></i>';
-        } else {
-          mobileMenu.classList.add('hidden');
-          mobileMenuButton.innerHTML = '<i class="fas fa-bars text-xl"></i>';
-        }
-      }
-
-      // Close mobile menu when clicking outside
-      document.addEventListener('DOMContentLoaded', () => {
-        document.addEventListener('click', (e) => {
-          const mobileMenu = document.getElementById('mobile-menu');
-          const mobileMenuButton = document.getElementById('mobile-menu-button');
-          
-          if (!mobileMenu?.contains(e.target) && !mobileMenuButton?.contains(e.target)) {
-            mobileMenu?.classList.add('hidden');
-            if (mobileMenuButton) {
-              mobileMenuButton.innerHTML = '<i class="fas fa-bars text-xl"></i>';
-            }
-          }
-        });
-      });
-    </script>
 </head>
 <body class="bg-gray-50">
     <!-- Navigation -->
@@ -605,19 +947,23 @@ app.get('/project/:id', async (c) => {
             </div>
             
             <!-- Mobile Navigation Menu -->
-            <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-200">
-                <div class="px-2 pt-2 pb-3 space-y-1">
-                    <a href="/" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-home mr-2"></i>Inicio
+            <div id="mobile-menu" class="hidden md:hidden">
+                <div class="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
+                    <a href="/" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
+                        <i class="fas fa-home mr-3 text-lg"></i>
+                        <span class="font-medium">Inicio</span>
                     </a>
-                    <a href="/marketplace" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-star mr-2 text-yellow-500"></i>Marketplace
+                    <a href="/marketplace" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
+                        <i class="fas fa-star mr-3 text-yellow-500 text-lg"></i>
+                        <span>Marketplace</span>
                     </a>
-                    <a href="/leaderboard" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-trophy mr-2 text-yellow-500"></i>Leaderboard
+                    <a href="/leaderboard" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
+                        <i class="fas fa-trophy mr-3 text-yellow-500 text-lg"></i>
+                        <span>Leaderboard</span>
                     </a>
-                    <a href="/pricing" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-tag mr-2 text-green-500"></i>Planes
+                    <a href="/pricing" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
+                        <i class="fas fa-tag mr-3 text-green-500 text-lg"></i>
+                        <span>Planes</span>
                     </a>
                 </div>
             </div>
@@ -636,7 +982,23 @@ app.get('/project/:id', async (c) => {
 
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script>
-      const projectId = ${projectId};
+      const projectId = '${projectId}';
+      
+      function toggleMobileMenu() {
+        const menu = document.getElementById('mobile-menu');
+        const button = document.getElementById('mobile-menu-button');
+        const icon = button.querySelector('i');
+        
+        if (menu.classList.contains('hidden')) {
+          menu.classList.remove('hidden');
+          icon.classList.remove('fa-bars');
+          icon.classList.add('fa-times');
+        } else {
+          menu.classList.add('hidden');
+          icon.classList.remove('fa-times');
+          icon.classList.add('fa-bars');
+        }
+      }
     </script>
     <script src="/static/mvp-generator.js"></script>
     <script src="/static/project-detail.js"></script>
@@ -657,6 +1019,7 @@ app.get('/marketplace', (c) => {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -708,10 +1071,10 @@ app.get('/marketplace', (c) => {
                         <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
                     </a>
                     <div id="auth-nav">
-                        <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition mr-4">
+                        <button onclick="window.location.href='/?show_auth=login'" class="text-gray-700 hover:text-primary transition mr-4">
                             Iniciar Sesión
                         </button>
-                        <button onclick="showAuthModal('register')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
+                        <button onclick="window.location.href='/?show_auth=register'" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
                             Registrarse
                         </button>
                     </div>
@@ -746,11 +1109,11 @@ app.get('/marketplace', (c) => {
                         </a>
                         <div class="border-t my-4"></div>
                         <div id="mobile-auth-nav">
-                            <button onclick="showAuthModal('login')" class="flex items-center w-full px-6 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition">
+                            <button onclick="window.location.href='/?show_auth=login'" class="flex items-center w-full px-6 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition">
                                 <i class="fas fa-sign-in-alt mr-3 text-lg"></i>
                                 <span class="font-medium">Iniciar Sesión</span>
                             </button>
-                            <button onclick="showAuthModal('register')" class="flex items-center w-full px-6 py-3 mx-6 mt-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition font-semibold">
+                            <button onclick="window.location.href='/?show_auth=register'" class="flex items-center w-full px-6 py-3 mx-6 mt-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition font-semibold">
                                 <i class="fas fa-user-plus mr-3 text-lg"></i>
                                 <span>Registrarse</span>
                             </button>
@@ -763,26 +1126,24 @@ app.get('/marketplace', (c) => {
 
     <!-- Hero Section -->
     <div class="bg-gradient-to-r from-primary via-secondary to-purple-600 text-white py-12 sm:py-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center">
-                <div class="inline-flex items-center bg-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 mb-4 sm:mb-6">
-                    <i class="fas fa-star text-yellow-300 mr-2 text-sm sm:text-base"></i>
-                    <span class="text-xs sm:text-sm font-semibold">Validadores Profesionales Certificados</span>
-                </div>
-                <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 leading-tight">
-                    Marketplace de Validadores Beta
-                </h1>
-                <p class="text-lg sm:text-xl text-purple-100 max-w-3xl mx-auto mb-6 sm:mb-8 px-2">
-                    Conectamos empresas con validadores profesionales para obtener feedback real antes del lanzamiento
-                </p>
-                <div class="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4">
-                    <button onclick="scrollToSection('products')" class="bg-white text-primary px-6 py-3 sm:px-8 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-gray-100 transition transform hover:scale-105 min-h-[48px] flex items-center justify-center">
-                        <i class="fas fa-box-open mr-2"></i>Ver Productos Beta
-                    </button>
-                    <button onclick="scrollToSection('validators')" class="bg-purple-800 text-white px-6 py-3 sm:px-8 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-purple-900 transition min-h-[48px] flex items-center justify-center">
-                        <i class="fas fa-users mr-2"></i>Conocer Validadores
-                    </button>
-                </div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="inline-flex items-center bg-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 mb-4 sm:mb-6">
+                <i class="fas fa-star text-yellow-300 mr-2 text-sm sm:text-base"></i>
+                <span class="text-xs sm:text-sm font-semibold">Validadores Profesionales Certificados</span>
+            </div>
+            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 leading-tight">
+                Marketplace de Validadores Beta
+            </h1>
+            <p class="text-lg sm:text-xl text-purple-100 max-w-3xl mx-auto mb-6 sm:mb-8 px-2">
+                Conectamos empresas con validadores profesionales para obtener feedback real antes del lanzamiento
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4">
+                <button onclick="scrollToSection('products')" class="bg-white text-primary px-6 py-3 sm:px-8 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-gray-100 transition transform hover:scale-105 min-h-[48px] flex items-center justify-center">
+                    <i class="fas fa-box-open mr-2"></i>Ver Productos Beta
+                </button>
+                <button onclick="scrollToSection('validators')" class="bg-purple-800 text-white px-6 py-3 sm:px-8 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-purple-900 transition min-h-[48px] flex items-center justify-center">
+                    <i class="fas fa-users mr-2"></i>Conocer Validadores
+                </button>
             </div>
         </div>
     </div>
@@ -796,15 +1157,15 @@ app.get('/marketplace', (c) => {
                     <div class="text-gray-600 text-sm">Validadores Activos</div>
                 </div>
                 <div>
-                    <div class="text-3xl font-bold text-secondary">1,200+</div>
+                    <div class="text-3xl font-bold text-primary">1,200+</div>
                     <div class="text-gray-600 text-sm">Productos Validados</div>
                 </div>
                 <div>
-                    <div class="text-3xl font-bold text-green-600">4.8/5</div>
+                    <div class="text-3xl font-bold text-primary">4.8/5</div>
                     <div class="text-gray-600 text-sm">Rating Promedio</div>
                 </div>
                 <div>
-                    <div class="text-3xl font-bold text-orange-600">48h</div>
+                    <div class="text-3xl font-bold text-primary">48h</div>
                     <div class="text-gray-600 text-sm">Tiempo Respuesta</div>
                 </div>
             </div>
@@ -828,6 +1189,10 @@ app.get('/marketplace', (c) => {
                 <button onclick="showTab('my-dashboard')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition hidden whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center" id="my-dashboard-tab">
                     <i class="fas fa-tachometer-alt mr-1 sm:mr-2 text-sm sm:text-base"></i>
                     <span class="text-sm sm:text-base">Dashboard</span>
+                </button>
+                <button onclick="showTab('internal-dashboard')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition hidden whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center" id="internal-dashboard-tab">
+                    <i class="fas fa-cogs mr-1 sm:mr-2 text-sm sm:text-base"></i>
+                    <span class="text-sm sm:text-base">Dashboard Interno</span>
                 </button>
             </div>
         </div>
@@ -898,12 +1263,20 @@ app.get('/marketplace', (c) => {
             <!-- Products Grid -->
             <div id="products-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 <!-- Products will be loaded here -->
-                <div class="col-span-full text-center py-8 sm:py-12">
-                    <i class="fas fa-spinner fa-spin text-3xl sm:text-4xl text-primary mb-3 sm:mb-4"></i>
-                    <p class="text-gray-600 text-sm sm:text-base">Cargando productos...</p>
+                <div class="col-span-full text-center py-20">
+                    <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
+                    <p class="text-gray-600">Cargando productos...</p>
                 </div>
             </div>
-                    <p class="text-gray-600">Cargando productos...</p>
+        </div>
+
+        <!-- Product Detail Tab -->
+        <div id="product-detail-content" class="tab-content hidden">
+            <div id="product-detail-container">
+                <!-- Product detail will be loaded here -->
+                <div class="text-center py-12">
+                    <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
+                    <p class="text-gray-600">Cargando producto...</p>
                 </div>
             </div>
         </div>
@@ -978,6 +1351,13 @@ app.get('/marketplace', (c) => {
             </div>
         </div>
 
+        <!-- Internal Dashboard Tab (for admin users) -->
+        <div id="internal-dashboard-content" class="tab-content hidden">
+            <div id="internal-dashboard-container">
+                <!-- Internal dashboard content will be loaded here -->
+            </div>
+        </div>
+
     </div>
 
     <!-- Auth Modal -->
@@ -993,13 +1373,45 @@ app.get('/marketplace', (c) => {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/marketplace.js"></script>
+    <script>
+      function toggleMobileMenu() {
+        const menu = document.getElementById('mobile-menu');
+        const button = document.getElementById('mobile-menu-button');
+        const icon = button.querySelector('i');
+        
+        if (menu.classList.contains('hidden')) {
+          menu.classList.remove('hidden');
+          icon.classList.remove('fa-bars');
+          icon.classList.add('fa-times');
+        } else {
+          menu.classList.add('hidden');
+          icon.classList.remove('fa-times');
+          icon.classList.add('fa-bars');
+        }
+      }
+      
+      function scrollToSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section) {
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+      
+      function closeAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        if (modal) {
+          modal.classList.add('hidden');
+        }
+      }
+    </script>
 </body>
 </html>
   `);
 });
 
-// Leaderboard Page
+// Leaderboard Page (continuará en el siguiente mensaje debido a límites de longitud)
 app.get('/leaderboard', (c) => {
   return c.html(`
 <!DOCTYPE html>
@@ -1010,6 +1422,7 @@ app.get('/leaderboard', (c) => {
     <title>🏆 Leaderboard de Proyectos - ValidAI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -1031,36 +1444,6 @@ app.get('/leaderboard', (c) => {
         display: none;
       }
     </style>
-    <script>
-      // Mobile menu toggle
-      function toggleMobileMenu() {
-        const mobileMenu = document.getElementById('mobile-menu');
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        
-        if (mobileMenu.classList.contains('hidden')) {
-          mobileMenu.classList.remove('hidden');
-          mobileMenuButton.innerHTML = '<i class="fas fa-times text-xl"></i>';
-        } else {
-          mobileMenu.classList.add('hidden');
-          mobileMenuButton.innerHTML = '<i class="fas fa-bars text-xl"></i>';
-        }
-      }
-
-      // Close mobile menu when clicking outside
-      document.addEventListener('DOMContentLoaded', () => {
-        document.addEventListener('click', (e) => {
-          const mobileMenu = document.getElementById('mobile-menu');
-          const mobileMenuButton = document.getElementById('mobile-menu-button');
-          
-          if (!mobileMenu?.contains(e.target) && !mobileMenuButton?.contains(e.target)) {
-            mobileMenu?.classList.add('hidden');
-            if (mobileMenuButton) {
-              mobileMenuButton.innerHTML = '<i class="fas fa-bars text-xl"></i>';
-            }
-          }
-        });
-      });
-    </script>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
     <!-- Navigation -->
@@ -1098,16 +1481,16 @@ app.get('/leaderboard', (c) => {
             <!-- Mobile Navigation Menu -->
             <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-200">
                 <div class="px-2 pt-2 pb-3 space-y-1">
-                    <a href="/" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
+                    <a href="/" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
                         <i class="fas fa-home mr-2"></i>Inicio
                     </a>
-                    <a href="/leaderboard" class="block px-3 py-2 text-primary font-semibold">
+                    <a href="/leaderboard" class="flex items-center px-3 py-2 text-primary font-semibold">
                         <i class="fas fa-trophy mr-2 text-yellow-500"></i>Leaderboard
                     </a>
-                    <a href="/marketplace" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
+                    <a href="/marketplace" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
                         <i class="fas fa-star mr-2 text-yellow-500"></i>Marketplace
                     </a>
-                    <a href="/pricing" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
+                    <a href="/pricing" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
                         <i class="fas fa-tag mr-2 text-green-500"></i>Planes
                     </a>
                 </div>
@@ -1184,7 +1567,10 @@ app.get('/leaderboard', (c) => {
                                 <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">
                                     <i class="fas fa-users text-blue-500 mr-1"></i>Votos
                                 </th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">Votar</th>
+                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">
+                                    Acción
+                                </th>
+                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">QR</th>
                                 <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Creador</th>
                                 <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">Acciones</th>
                             </tr>
@@ -1204,6 +1590,19 @@ app.get('/leaderboard', (c) => {
         </div>
     </div>
 
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <div id="auth-modal-content" class="p-6 sm:p-8">
+                <!-- Auth form will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script>
         let currentCategory = 'all';
         let leaderboardData = [];
@@ -1261,51 +1660,60 @@ app.get('/leaderboard', (c) => {
                 return;
             }
             
-            tbody.innerHTML = filteredData.map((project, index) => \`
-                <tr class="hover:bg-gray-50 transition">
-                    <td class="px-2 sm:px-6 py-4">
-                        <div class="flex items-center">
-                            \${getPositionBadge(index + 1)}
-                            <span class="ml-2 sm:ml-3 font-semibold text-gray-900 text-sm sm:text-base">#\${index + 1}</span>
-                        </div>
-                    </td>
-                    <td class="px-2 sm:px-6 py-4">
-                        <div>
-                            <h3 class="font-semibold text-gray-900 text-sm sm:text-base">\${project.title}</h3>
-                            <p class="text-xs sm:text-sm text-gray-600 mt-1">\${project.description.substring(0, 100)}...</p>
-                        </div>
-                    </td>
-                    <td class="px-2 sm:px-6 py-4">
-                        <span class="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium \${getCategoryColor(project.category)}">
-                            \${getCategoryIcon(project.category)} \${formatCategory(project.category)}
-                        </span>
-                    </td>
-                    <td class="px-2 sm:px-6 py-4 text-center">
-                        <div class="flex items-center justify-center">
-                            <div class="flex items-center text-sm sm:text-base">
-                                \${generateStars(project.rating_average)}
-                            </div>
-                            <span class="ml-1 sm:ml-2 font-semibold text-sm sm:text-base">\${project.rating_average.toFixed(1)}</span>
-                        </div>
-                    </td>
-                    <td class="px-2 sm:px-6 py-4 text-center">
-                        <span class="font-semibold text-blue-600 text-sm sm:text-base">\${project.votes_count}</span>
-                    </td>
-                    <td class="px-2 sm:px-6 py-4 text-center">
-                        <div class="flex items-center justify-center space-x-1">
-                            \${generateVoteButtons(project.id)}
-                        </div>
-                    </td>
-                    <td class="px-2 sm:px-6 py-4 text-gray-900 text-sm sm:text-base">
-                        \${project.creator_name}
-                    </td>
-                    <td class="px-2 sm:px-6 py-4 text-center">
-                        <button onclick="viewProject(\${project.id})" class="text-primary hover:text-primary/80 font-medium text-sm sm:text-base">
-                            <i class="fas fa-eye mr-1"></i>Ver
-                        </button>
-                    </td>
-                </tr>
-            \`).join('');
+            tbody.innerHTML = filteredData.map((project, index) => {
+                const escapedTitle = project.title.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const escapedDescription = project.description.substring(0, 100).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return '<tr class="hover:bg-gray-50 transition">' +
+                    '<td class="px-2 sm:px-6 py-4">' +
+                        '<div class="flex items-center">' +
+                            getPositionBadge(index + 1) +
+                            '<span class="ml-2 sm:ml-3 font-semibold text-gray-900 text-sm sm:text-base">#' + (index + 1) + '</span>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4">' +
+                        '<div>' +
+                            '<h3 class="font-semibold text-gray-900 text-sm sm:text-base">' + escapedTitle + '</h3>' +
+                            '<p class="text-xs sm:text-sm text-gray-600 mt-1">' + escapedDescription + '...</p>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4">' +
+                        '<span class="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium ' + getCategoryColor(project.category) + '">' +
+                            getCategoryIcon(project.category) + ' ' + formatCategory(project.category) +
+                        '</span>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4 text-center">' +
+                        '<div class="flex items-center justify-center">' +
+                            '<div class="flex items-center text-sm sm:text-base">' +
+                                generateStars(project.rating_average) +
+                            '</div>' +
+                            '<span class="ml-1 sm:ml-2 font-semibold text-sm sm:text-base">' + project.rating_average.toFixed(1) + '</span>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4 text-center">' +
+                        '<span class="font-semibold text-blue-600 text-sm sm:text-base">' + project.votes_count + '</span>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4 text-center">' +
+                        '<div class="flex items-center justify-center space-x-1">' +
+                            generateVoteButtons(project.id) +
+                        '</div>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4 text-center">' +
+                        '<button onclick="showQRCodeFromButton(this)" data-project-id="' + project.id + '" data-project-title="' + project.title.replace(/"/g, '&quot;') + '" ' +
+                                'class="text-green-600 hover:text-green-800 font-medium text-sm sm:text-base" ' +
+                                'title="Mostrar código QR para validadores">' +
+                            '<i class="fas fa-qrcode"></i>' +
+                        '</button>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4 text-gray-900 text-sm sm:text-base">' +
+                        project.creator_name +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4 text-center">' +
+                        '<button onclick="viewProject(' + project.id + ')" class="text-primary hover:text-primary/80 font-medium text-sm sm:text-base">' +
+                            '<i class="fas fa-eye mr-1"></i>Ver' +
+                        '</button>' +
+                    '</td>' +
+                '</tr>';
+            }).join('');
             
             showContent();
         }
@@ -1373,41 +1781,38 @@ app.get('/leaderboard', (c) => {
             window.location.href = '/marketplace?project=' + projectId;
         }
 
-        // Generate vote buttons for a project
         function generateVoteButtons(projectId) {
-            return \`
-                <div class="flex items-center space-x-1">
-                    \${[1, 2, 3, 4, 5].map(star => \`
-                        <button onclick="voteForProject(\${projectId}, \${star})" 
-                                class="text-gray-300 hover:text-yellow-400 transition-colors text-lg"
-                                title="Votar \${star} estrella\${star > 1 ? 's' : ''}">
-                            <i class="fas fa-star"></i>
-                        </button>
-                    \`).join('')}
-                </div>
-            \`;
+            return '<div class="flex items-center space-x-1">' +
+                [1, 2, 3, 4, 5].map(star =>
+                    '<button onclick="voteForProject(' + projectId + ', ' + star + ')" ' +
+                    'class="text-gray-300 hover:text-yellow-400 transition-colors text-lg" ' +
+                    'title="Votar ' + star + ' estrella' + (star > 1 ? 's' : '') + '">' +
+                    '<i class="fas fa-star"></i>' +
+                    '</button>'
+                ).join('') +
+                '</div>';
         }
 
-        // Vote for a project
         async function voteForProject(projectId, rating) {
             if (!authToken) {
-                showAuthModal('login');
+                localStorage.setItem('pendingVote', JSON.stringify({ projectId, rating }));
+                showAuthModal('validator');
                 return;
             }
 
             try {
-                const response = await fetch(\`/api/projects/\${projectId}/vote\`, {
+                const response = await fetch('/api/projects/' + projectId + '/vote', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': \`Bearer \${authToken}\`
+                        'Authorization': 'Bearer ' + authToken
                     },
                     body: JSON.stringify({ rating })
                 });
 
                 if (response.ok) {
                     alert('¡Gracias por tu voto!');
-                    loadLeaderboard(); // Reload leaderboard to show updated ratings
+                    loadLeaderboard();
                 } else {
                     const error = await response.json();
                     alert('Error: ' + (error.error || 'No se pudo registrar el voto'));
@@ -1436,525 +1841,125 @@ app.get('/leaderboard', (c) => {
             document.getElementById('leaderboard-empty').classList.remove('hidden');
         }
 
-        // Authentication modal
         function showAuthModal(mode) {
-            alert('Para votar necesitas iniciar sesión. Redirigiendo a la página principal...');
-            window.location.href = '/';
-        }
-    </script>
-
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl max-w-md w-full p-8 relative">
-            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-            <div id="auth-modal-content">
-                <!-- Auth form will be inserted here -->
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-</body>
-</html>
-  `);
-});
-
-// Pricing Plans Page
-app.get('/pricing', (c) => {
-  return c.html(`
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planes de Precios - ValidAI Studio</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: '#6366f1',
-              secondary: '#8b5cf6',
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-      }
-    </style>
-    <script>
-      // Mobile menu toggle
-      function toggleMobileMenu() {
-        const mobileMenu = document.getElementById('mobile-menu');
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        
-        if (mobileMenu.classList.contains('hidden')) {
-          mobileMenu.classList.remove('hidden');
-          mobileMenuButton.innerHTML = '<i class="fas fa-times text-xl"></i>';
-        } else {
-          mobileMenu.classList.add('hidden');
-          mobileMenuButton.innerHTML = '<i class="fas fa-bars text-xl"></i>';
-        }
-      }
-
-      // Close mobile menu when clicking outside
-      document.addEventListener('DOMContentLoaded', () => {
-        document.addEventListener('click', (e) => {
-          const mobileMenu = document.getElementById('mobile-menu');
-          const mobileMenuButton = document.getElementById('mobile-menu-button');
-          
-          if (!mobileMenu?.contains(e.target) && !mobileMenuButton?.contains(e.target)) {
-            mobileMenu?.classList.add('hidden');
-            if (mobileMenuButton) {
-              mobileMenuButton.innerHTML = '<i class="fas fa-bars text-xl"></i>';
-            }
-          }
-        });
-      });
-    </script>
-</head>
-<body class="bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
-    
-    <!-- Navigation -->
-    <nav class="bg-white shadow-sm sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <a href="/" class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary text-transparent bg-clip-text">
-                        ⚡ ValidAI Studio
-                    </a>
-                </div>
-                
-                <!-- Desktop Navigation -->
-                <div class="hidden md:flex items-center space-x-6">
-                    <a href="/" class="text-gray-700 hover:text-primary transition">Inicio</a>
-                    <a href="/marketplace" class="text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
-                    </a>
-                    <a href="/leaderboard" class="text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
-                    </a>
-                    <a href="/pricing" class="text-primary font-semibold">
-                        <i class="fas fa-tag mr-1 text-green-500"></i>Planes
-                    </a>
-                    <button id="auth-btn" onclick="window.location.href='/#pricing'" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-                        Comenzar Ahora
-                    </button>
-                </div>
-                
-                <!-- Mobile menu button -->
-                <div class="md:hidden flex items-center">
-                    <button id="mobile-menu-button" onclick="toggleMobileMenu()" class="text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-bars text-xl"></i>
-                    </button>
-                </div>
-            </div>
+            const modal = document.getElementById('auth-modal');
+            const modalContent = document.getElementById('auth-modal-content');
             
-            <!-- Mobile Navigation Menu -->
-            <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-200">
-                <div class="px-2 pt-2 pb-3 space-y-1">
-                    <a href="/" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-home mr-2"></i>Inicio
-                    </a>
-                    <a href="/marketplace" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-star mr-2 text-yellow-500"></i>Marketplace
-                    </a>
-                    <a href="/leaderboard" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-trophy mr-2 text-yellow-500"></i>Leaderboard
-                    </a>
-                    <a href="/pricing" class="block px-3 py-2 text-primary font-semibold">
-                        <i class="fas fa-tag mr-2 text-green-500"></i>Planes
-                    </a>
-                    <button onclick="window.location.href='/#pricing'" class="block w-full text-left px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
-                        Comenzar Ahora
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-primary via-secondary to-purple-600 text-white py-12 sm:py-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">Planes y Precios</h1>
-            <p class="text-lg sm:text-xl text-purple-100 mb-8">Elige el plan perfecto para validar y lanzar tu producto con validadores profesionales</p>
+            if (!modal || !modalContent) return;
             
-            <!-- Billing Toggle -->
-            <div class="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4 mb-4">
-                <span id="monthly-label" class="text-base sm:text-lg font-semibold">Mensual</span>
-                <button id="billing-toggle" onclick="toggleBilling()" class="relative inline-flex h-8 w-14 items-center rounded-full bg-white/30 transition-colors">
-                    <span id="billing-slider" class="inline-block h-6 w-6 transform rounded-full bg-white transition-transform translate-x-1"></span>
-                </button>
-                <span id="yearly-label" class="text-base sm:text-lg">Anual <span class="text-yellow-300 font-semibold">(Ahorra 17%)</span></span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Current Plan Usage (for logged-in users) -->
-    <div id="current-plan-section" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-900">Tu Plan Actual</h2>
-                    <p class="text-gray-600 mt-1">Plan: <span id="current-plan-name" class="font-semibold text-primary"></span></p>
-                </div>
-                <div class="text-right">
-                    <p class="text-sm text-gray-600">Estado</p>
-                    <span id="plan-status" class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold"></span>
-                </div>
-            </div>
+            modal.classList.remove('hidden');
             
-            <!-- Usage Bars -->
-            <div class="space-y-6">
-                <div>
-                    <div class="flex justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-700">Validadores Utilizados</span>
-                        <span id="validators-usage" class="text-sm text-gray-600"></span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div id="validators-progress" class="bg-gradient-to-r from-primary to-secondary h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
-                </div>
-                
-                <div>
-                    <div class="flex justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-700">Productos Activos</span>
-                        <span id="products-usage" class="text-sm text-gray-600"></span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div id="products-progress" class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Pricing Plans -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div id="plans-grid" class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Plans will be loaded here -->
-            <div class="text-center py-20 col-span-3">
-                <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
-                <p class="text-gray-600">Cargando planes...</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- FAQ Section -->
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-8">Preguntas Frecuentes</h2>
-        <div class="space-y-4">
-            <div class="bg-white rounded-lg shadow p-4 sm:p-6">
-                <h3 class="font-bold text-base sm:text-lg mb-2">¿Puedo cambiar de plan en cualquier momento?</h3>
-                <p class="text-gray-600 text-sm sm:text-base">Sí, puedes actualizar o cambiar tu plan en cualquier momento. Los cambios se aplicarán inmediatamente.</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-4 sm:p-6">
-                <h3 class="font-bold text-base sm:text-lg mb-2">¿Qué pasa si supero mis límites?</h3>
-                <p class="text-gray-600 text-sm sm:text-base">Si alcanzas los límites de tu plan, se te notificará para actualizar a un plan superior. Tus productos existentes seguirán activos.</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-4 sm:p-6">
-                <h3 class="font-bold text-base sm:text-lg mb-2">¿Ofrecen reembolsos?</h3>
-                <p class="text-gray-600 text-sm sm:text-base">Ofrecemos una garantía de satisfacción de 14 días. Si no estás satisfecho, te reembolsaremos tu dinero.</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-4 sm:p-6">
-                <h3 class="font-bold text-base sm:text-lg mb-2">¿Qué incluye el plan Enterprise?</h3>
-                <p class="text-gray-600 text-sm sm:text-base">El plan Enterprise incluye validadores ilimitados, productos ilimitados, soporte dedicado 24/7, y acceso a validadores exclusivos de alta calidad.</p>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-    <script>
-        let isYearly = false;
-        let allPlans = [];
-        let currentUser = null;
-        let userPlanData = null;
-        
-        // Load user if logged in
-        async function loadCurrentUser() {
-            const token = localStorage.getItem('authToken');
-            if (!token) return;
-            
-            try {
-                const response = await axios.get('/api/auth/me', {
-                    headers: { 'Authorization': \`Bearer \${token}\` }
-                });
-                currentUser = response.data.user;
-                
-                // Load user's plan data
-                await loadUserPlan();
-            } catch (error) {
-                console.error('Error loading user:', error);
-                localStorage.removeItem('authToken');
+            if (mode === 'validator') {
+                modalContent.innerHTML = '<div class="text-center">' +
+                    '<i class="fas fa-user-check text-4xl text-primary mb-4"></i>' +
+                    '<h2 class="text-2xl font-bold text-gray-900 mb-4">Registro como Validador</h2>' +
+                    '<p class="text-gray-600 mb-6">Elige tu rol para registrarte y votar proyectos</p>' +
+                    '<div class="space-y-3">' +
+                        '<button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
+                            '<i class="fas fa-lightbulb text-xl"></i>' +
+                            '<span>Fundador - Crear y validar proyectos</span>' +
+                        '</button>' +
+                        '<button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
+                            '<i class="fas fa-star text-xl"></i>' +
+                            '<span>Validador - Votar y calificar proyectos</span>' +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
             }
         }
-        
-        // Load user's plan usage
-        async function loadUserPlan() {
-            const token = localStorage.getItem('authToken');
-            if (!token) return;
-            
-            try {
-                const response = await axios.get('/api/plans/my/current', {
-                    headers: { 'Authorization': \`Bearer \${token}\` }
-                });
-                userPlanData = response.data;
-                displayUserPlan();
-            } catch (error) {
-                console.error('Error loading user plan:', error);
+
+        function closeAuthModal() {
+            const modal = document.getElementById('auth-modal');
+            if (modal) {
+                modal.classList.add('hidden');
             }
         }
-        
-        // Display user plan
-        function displayUserPlan() {
-            if (!userPlanData) return;
-            
-            const section = document.getElementById('current-plan-section');
-            section.classList.remove('hidden');
-            
-            document.getElementById('current-plan-name').textContent = userPlanData.user_plan.plan_display_name;
-            document.getElementById('plan-status').textContent = userPlanData.user_plan.plan_status;
-            
-            // Validators usage
-            const validatorsUsage = userPlanData.usage.validators;
-            const validatorsText = validatorsUsage.is_unlimited 
-                ? \`\${validatorsUsage.used} / Ilimitado\`
-                : \`\${validatorsUsage.used} / \${validatorsUsage.limit}\`;
-            document.getElementById('validators-usage').textContent = validatorsText;
-            document.getElementById('validators-progress').style.width = \`\${Math.min(validatorsUsage.percentage, 100)}%\`;
-            
-            // Products usage
-            const productsUsage = userPlanData.usage.products;
-            const productsText = productsUsage.is_unlimited
-                ? \`\${productsUsage.used} / Ilimitado\`
-                : \`\${productsUsage.used} / \${productsUsage.limit}\`;
-            document.getElementById('products-usage').textContent = productsText;
-            document.getElementById('products-progress').style.width = \`\${Math.min(productsUsage.percentage, 100)}%\`;
+
+        function loginWithGoogle(role) {
+            window.location.href = '/api/auth/google?role=' + role;
         }
-        
-        // Toggle billing cycle
-        function toggleBilling() {
-            isYearly = !isYearly;
-            const slider = document.getElementById('billing-slider');
-            const monthlyLabel = document.getElementById('monthly-label');
-            const yearlyLabel = document.getElementById('yearly-label');
-            
-            if (isYearly) {
-                slider.classList.add('translate-x-7');
-                monthlyLabel.classList.remove('font-semibold');
-                yearlyLabel.classList.add('font-semibold');
-            } else {
-                slider.classList.remove('translate-x-7');
-                monthlyLabel.classList.add('font-semibold');
-                yearlyLabel.classList.remove('font-semibold');
-            }
-            
-            renderPlans();
+
+        function showQRCodeFromButton(button) {
+            const projectId = button.getAttribute('data-project-id');
+            const projectTitle = button.getAttribute('data-project-title');
+            showQRCode(projectId, projectTitle);
         }
-        
-        // Load plans from API
-        async function loadPlans() {
-            try {
-                const response = await axios.get('/api/plans');
-                allPlans = response.data.plans;
-                renderPlans();
-            } catch (error) {
-                console.error('Error loading plans:', error);
-                document.getElementById('plans-grid').innerHTML = \`
-                    <div class="text-center py-20 col-span-3">
-                        <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-                        <p class="text-gray-600">Error al cargar los planes. Por favor, intenta de nuevo.</p>
-                    </div>
-                \`;
-            }
-        }
-        
-        // Render plans
-        function renderPlans() {
-            const grid = document.getElementById('plans-grid');
+
+        function showQRCode(projectId, projectTitle) {
+            const qrUrl = window.location.origin + '/vote/' + projectId;
             
-            const plansHTML = allPlans.map((plan, index) => {
-                const price = isYearly ? plan.price_yearly : plan.price_monthly;
-                const pricePerMonth = isYearly ? (plan.price_yearly / 12).toFixed(0) : plan.price_monthly;
-                const features = JSON.parse(plan.features || '[]');
-                
-                const isPopular = index === 1; // Pro plan is popular
-                const isCurrentPlan = userPlanData && userPlanData.user_plan.plan_id === plan.id;
-                
-                return \`
-                    <div class="bg-white rounded-2xl shadow-xl p-8 \${isPopular ? 'border-4 border-primary transform scale-105 relative' : 'border-2 border-gray-200'} hover:shadow-2xl transition">
-                        \${isPopular ? '<div class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-gray-900 px-4 py-1 rounded-full text-sm font-semibold">Más Popular</div>' : ''}
-                        \${isCurrentPlan ? '<div class="absolute -top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-semibold">Tu Plan</div>' : ''}
-                        
-                        <div class="text-center mb-6">
-                            <h3 class="text-2xl font-bold text-gray-900 mb-2">\${plan.display_name}</h3>
-                            <p class="text-gray-600 mb-4">\${plan.description}</p>
-                            <div class="text-5xl font-bold \${isPopular ? 'text-primary' : 'text-gray-900'} mb-2">
-                                $\${price}
-                                <span class="text-lg text-gray-600">\${isYearly ? '/año' : '/mes'}</span>
-                            </div>
-                            \${isYearly ? \`<p class="text-sm text-green-600 font-semibold">$\${pricePerMonth}/mes (ahorras $\${(plan.price_monthly * 12 - plan.price_yearly).toFixed(0)})</p>\` : ''}
-                        </div>
-                        
-                        <div class="mb-6 p-4 bg-gray-50 rounded-lg">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-sm text-gray-600">Validadores por producto:</span>
-                                <span class="font-bold text-gray-900">\${plan.validators_limit === -1 ? 'Ilimitados' : plan.validators_limit}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600">Productos activos:</span>
-                                <span class="font-bold text-gray-900">\${plan.products_limit === -1 ? 'Ilimitados' : plan.products_limit}</span>
-                            </div>
-                        </div>
-                        
-                        <ul class="space-y-3 mb-8">
-                            \${features.map(feature => \`
-                                <li class="flex items-start">
-                                    <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
-                                    <span class="text-gray-700">\${feature}</span>
-                                </li>
-                            \`).join('')}
-                        </ul>
-                        
-                        <button onclick="selectPlan(\${plan.id}, '\${plan.name}')" 
-                                class="w-full \${isPopular ? 'bg-gradient-to-r from-primary to-secondary text-white' : 'bg-gray-900 text-white'} px-6 py-4 rounded-lg font-semibold hover:opacity-90 transition transform hover:scale-105 \${isCurrentPlan ? 'opacity-50 cursor-not-allowed' : ''}"
-                                \${isCurrentPlan ? 'disabled' : ''}>
-                            \${isCurrentPlan ? 'Plan Actual' : 'Seleccionar Plan'}
-                        </button>
-                    </div>
-                \`;
-            }).join('');
-            
-            grid.innerHTML = plansHTML;
-        }
-        
-        // Select plan and redirect to Stripe Checkout
-        async function selectPlan(planId, planName) {
-            const token = localStorage.getItem('authToken');
-            
-            if (!token) {
-                alert('Por favor, inicia sesión para seleccionar un plan');
-                window.location.href = '/#pricing';
-                return;
-            }
-            
-            // Check if it's the free plan
-            if (planId === 1) {
-                alert('El plan Free no requiere pago. Ya puedes usarlo.');
-                return;
-            }
-            
-            // Show loading state
-            const button = event.target;
-            const originalText = button.innerHTML;
-            button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Procesando...';
-            
-            try {
-                // Determine billing cycle
-                const billingCycle = isYearly ? 'yearly' : 'monthly';
-                
-                // Create checkout session
-                const response = await axios.post('/api/stripe/create-checkout-session', {
-                    plan_id: planId,
-                    billing_cycle: billingCycle
-                }, {
-                    headers: { 
-                        'Authorization': \`Bearer \${token}\`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                // Redirect to Stripe Checkout
-                if (response.data.url) {
-                    window.location.href = response.data.url;
-                } else {
-                    throw new Error('No se recibió URL de checkout');
+            const modalContent = document.getElementById('auth-modal-content');
+            const escapedTitle = projectTitle.replace(/'/g, "\\'").replace(/"/g, '\\"');
+            const qrHtml = '<div class="text-center">' +
+                '<i class="fas fa-qrcode text-4xl text-green-600 mb-4"></i>' +
+                '<h2 class="text-2xl font-bold text-gray-900 mb-2">Código QR para Validadores</h2>' +
+                '<p class="text-gray-600 mb-4">' + escapedTitle + '</p>' +
+                '<div class="bg-white p-4 rounded-lg border-2 border-gray-200 inline-block mb-6">' +
+                    '<div id="qrcode" class="mx-auto"></div>' +
+                '</div>' +
+                '<div class="flex space-x-3 justify-center">' +
+                    '<button onclick="copyCurrentQRUrl()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">' +
+                        '<i class="fas fa-copy mr-2"></i>Copiar URL' +
+                    '</button>' +
+                    '<button onclick="closeAuthModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">' +
+                        'Cerrar' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+
+            modalContent.innerHTML = qrHtml;
+
+            // Store the URL in a global variable for the copy function
+            window.currentQRUrl = qrUrl;
+
+            setTimeout(() => {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(document.getElementById('qrcode'), {
+                        text: qrUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark: '#000000',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
                 }
-            } catch (error) {
-                console.error('Error creating checkout session:', error);
-                button.disabled = false;
-                button.innerHTML = originalText;
-                
-                const errorMsg = error.response?.data?.error || error.message || 'Error al procesar el pago';
-                alert(\`Error: \${errorMsg}\nPor favor, intenta de nuevo o contacta a soporte.\`);
+            }, 100);
+
+            document.getElementById('auth-modal').classList.remove('hidden');
+        }
+
+        function copyCurrentQRUrl() {
+            const url = window.currentQRUrl;
+            if (!url) return;
+            
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copiada al portapapeles');
+            }).catch(() => {
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('URL copiada al portapapeles');
+            });
+        }
+
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            const button = document.getElementById('mobile-menu-button');
+            const icon = button.querySelector('i');
+            
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                icon.classList.remove('fa-bars');
+                icon.classList.add('fa-times');
+            } else {
+                menu.classList.add('hidden');
+                icon.classList.remove('fa-times');
+                icon.classList.add('fa-bars');
             }
         }
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', async () => {
-            await loadCurrentUser();
-            await loadPlans();
-        });
-    </script>
-
-    <!-- Debug Button -->
-    <button onclick="testAuthDebug()" id="debug-button" class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition">
-        <i class="fas fa-bug mr-1"></i>
-        Debug Auth
-    </button>
-
-    <script>
-        // Simple debug button show
-        setTimeout(function() {
-            console.log('Debug: Attempting to show button');
-            const debugBtn = document.getElementById('debug-button');
-            if (debugBtn) {
-                debugBtn.style.display = 'block';
-                debugBtn.style.backgroundColor = 'red';
-                debugBtn.style.zIndex = '9999';
-                console.log('Debug: Button should now be visible');
-            } else {
-                console.error('Debug: Button element not found');
-                // Create button if it doesn't exist
-                const btn = document.createElement('button');
-                btn.id = 'debug-button';
-                btn.innerHTML = '<i class="fas fa-bug mr-1"></i> Debug Auth';
-                btn.onclick = function() { testAuthDebug(); };
-                btn.className = 'fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition';
-                btn.style.zIndex = '9999';
-                document.body.appendChild(btn);
-                console.log('Debug: Created button dynamically');
-            }
-        }, 1000);
-    </script>
-
-    <script>
-        // Emergency debug button creation
-        console.log('🚨 EMERGENCY: Creating debug button immediately');
-        const emergencyBtn = document.createElement('button');
-        emergencyBtn.id = 'emergency-debug-button';
-        emergencyBtn.innerHTML = '🔧 DEBUG AUTH';
-        emergencyBtn.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: red; color: white; padding: 10px 15px; border-radius: 5px; border: none; cursor: pointer; z-index: 10000; font-size: 14px;';
-        emergencyBtn.onclick = async function() {
-            console.log('🔧 Debug button clicked');
-            alert('Testing auth... check console');
-            try {
-                const response = await fetch('/api/marketplace/dashboard/debug', {
-                    headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || 'no-token') }
-                });
-                const data = await response.json();
-                alert('Result: ' + JSON.stringify(data, null, 2));
-                console.log('🔧 Debug result:', data);
-            } catch (error) {
-                alert('Error: ' + error.message);
-                console.error('🔧 Debug error:', error);
-            }
-        };
-        document.body.appendChild(emergencyBtn);
-        console.log('🚨 EMERGENCY: Debug button created');
     </script>
 </body>
 </html>

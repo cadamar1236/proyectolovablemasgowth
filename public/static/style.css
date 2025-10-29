@@ -1,1 +1,85 @@
 h1 { font-family: Arial, Helvetica, sans-serif; }
+
+/* Checklist animations */
+.checklist-item {
+  transition: all 0.3s ease;
+}
+
+.checklist-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.completed-animation {
+  animation: completedPulse 1s ease-out;
+}
+
+@keyframes completedPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); background: linear-gradient(135deg, #10b981, #059669); }
+  100% { transform: scale(1); }
+}
+
+.goal-checkbox {
+  transform: scale(1.2);
+  transition: all 0.2s ease;
+}
+
+.goal-checkbox:checked {
+  background-color: #10b981;
+  border-color: #10b981;
+}
+
+.goal-checkbox:checked + label {
+  text-decoration: line-through;
+  color: #6b7280;
+}
+
+/* Enhanced card animations */
+.dashboard-card {
+  transition: all 0.3s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Progress bar animation */
+.progress-bar {
+  transition: width 0.8s ease-out;
+}
+
+/* Chart animations */
+.chart-container {
+  animation: fadeInUp 0.8s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom chart styling */
+.chart-tooltip {
+  background: rgba(0, 0, 0, 0.9) !important;
+  border: 1px solid #3b82f6 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Stats card hover effects */
+.stats-card {
+  transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}

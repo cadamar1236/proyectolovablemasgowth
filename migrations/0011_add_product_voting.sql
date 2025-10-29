@@ -15,13 +15,13 @@ CREATE TABLE IF NOT EXISTS product_votes (
 );
 
 -- Add rating fields to beta_products table
--- ALTER TABLE beta_products ADD COLUMN rating_average REAL DEFAULT 0.0;
--- ALTER TABLE beta_products ADD COLUMN votes_count INTEGER DEFAULT 0;
+ALTER TABLE beta_products ADD COLUMN rating_average REAL DEFAULT 0.0;
+ALTER TABLE beta_products ADD COLUMN votes_count INTEGER DEFAULT 0;
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_product_votes_product ON product_votes(product_id);
 CREATE INDEX IF NOT EXISTS idx_product_votes_user ON product_votes(user_id);
--- CREATE INDEX IF NOT EXISTS idx_beta_products_rating ON beta_products(rating_average DESC, votes_count DESC);
+CREATE INDEX IF NOT EXISTS idx_beta_products_rating ON beta_products(rating_average DESC, votes_count DESC);
 
 -- Trigger: Update product rating when vote is inserted
 -- CREATE TRIGGER IF NOT EXISTS update_product_rating_insert
