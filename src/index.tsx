@@ -590,26 +590,24 @@ app.get('/', (c) => {
         const description = action === 'login' ? 'Elige tu rol para continuar' : 'Elige tu rol para registrarte';
         const backAction = action === 'login' ? 'login' : 'register';
 
-        const roleSelectionHtml = '<div class="text-center">' +
-          '<i class="fab fa-google text-4xl text-red-600 mb-4"></i>' +
-          '<h2 class="text-2xl font-bold text-gray-900 mb-4">' + title + '</h2>' +
-          '<p class="text-gray-600 mb-6">' + description + '</p>' +
-          '<div class="space-y-3">' +
-          '<button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
-          '<i class="fas fa-lightbulb text-xl"></i>' +
-          '<span>Fundador - Crear y validar proyectos</span>' +
-          '</button>' +
-          '<button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
-          '<i class="fas fa-star text-xl"></i>' +
-          '<span>Validador - Votar y calificar proyectos</span>' +
-          '</button>' +
-          '</div>' +
-          '<button onclick="showAuthModal(\'' + backAction + '\')" class="mt-4 text-gray-600 hover:text-gray-800 text-sm underline">' +
-          'Volver' +
-          '</button>' +
-          '</div>';
-
-        modalContent.innerHTML = roleSelectionHtml;
+        modalContent.innerHTML = \`<div class="text-center">
+          <i class="fab fa-google text-4xl text-red-600 mb-4"></i>
+          <h2 class="text-2xl font-bold text-gray-900 mb-4">\${title}</h2>
+          <p class="text-gray-600 mb-6">\${description}</p>
+          <div class="space-y-3">
+          <button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">
+          <i class="fas fa-lightbulb text-xl"></i>
+          <span>Fundador - Crear y validar proyectos</span>
+          </button>
+          <button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">
+          <i class="fas fa-star text-xl"></i>
+          <span>Validador - Votar y calificar proyectos</span>
+          </button>
+          </div>
+          <button onclick="showAuthModal('\` + backAction + \`')" class="mt-4 text-gray-600 hover:text-gray-800 text-sm underline">
+          Volver
+          </button>
+          </div>\`;
       }
 
       // Show auth modal
@@ -622,56 +620,56 @@ app.get('/', (c) => {
         modal.classList.remove('hidden');
 
         if (mode === 'login') {
-          const loginHtml = '<div class="text-center">' +
-            '<i class="fas fa-sign-in-alt text-4xl text-primary mb-4"></i>' +
-            '<h2 class="text-2xl font-bold text-gray-900 mb-4">Iniciar Sesión</h2>' +
-            '<button onclick="showRoleSelection(\'login\')" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3 mb-4">' +
-              '<i class="fab fa-google text-xl"></i>' +
-              '<span>Continuar con Google</span>' +
-            '</button>' +
-            '<div class="relative mb-6">' +
-              '<div class="absolute inset-0 flex items-center">' +
-                '<div class="w-full border-t border-gray-300"></div>' +
-              '</div>' +
-              '<div class="relative flex justify-center text-sm">' +
-                '<span class="px-2 bg-white text-gray-500">O inicia sesión con email</span>' +
-              '</div>' +
-            '</div>' +
-            '<form onsubmit="handleTraditionalLogin(event)" class="space-y-4">' +
-              '<div class="text-left">' +
-                '<label class="block text-sm font-medium text-gray-700 mb-1">Email</label>' +
-                '<input type="email" id="login-email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="tu@email.com" />' +
-              '</div>' +
-              '<div class="text-left">' +
-                '<label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>' +
-                '<input type="password" id="login-password" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Tu contraseña" />' +
-              '</div>' +
-              '<button type="submit" class="w-full bg-primary text-white font-semibold py-3 px-6 rounded-lg transition-colors hover:bg-primary/90">Iniciar Sesión</button>' +
-            '</form>' +
-            '<p class="text-sm text-gray-600 mt-4">' +
-              '¿No tienes cuenta? <a href="#" onclick="showRoleSelection(\'register\')" class="text-primary hover:underline">Regístrate</a>' +
-            '</p>' +
-          '</div>';
+          const loginHtml = \`<div class="text-center">
+            <i class="fas fa-sign-in-alt text-4xl text-primary mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">Iniciar Sesión</h2>
+            <button onclick="showRoleSelection('login')" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3 mb-4">
+              <i class="fab fa-google text-xl"></i>
+              <span>Continuar con Google</span>
+            </button>
+            <div class="relative mb-6">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-300"></div>
+              </div>
+              <div class="relative flex justify-center text-sm">
+                <span class="px-2 bg-white text-gray-500">O inicia sesión con email</span>
+              </div>
+            </div>
+            <form onsubmit="handleTraditionalLogin(event)" class="space-y-4">
+              <div class="text-left">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" id="login-email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="tu@email.com" />
+              </div>
+              <div class="text-left">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                <input type="password" id="login-password" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Tu contraseña" />
+              </div>
+              <button type="submit" class="w-full bg-primary text-white font-semibold py-3 px-6 rounded-lg transition-colors hover:bg-primary/90">Iniciar Sesión</button>
+            </form>
+            <p class="text-sm text-gray-600 mt-4">
+              ¿No tienes cuenta? <a href="#" onclick="showRoleSelection('register')" class="text-primary hover:underline">Regístrate</a>
+            </p>
+          </div>\`;
           modalContent.innerHTML = loginHtml;
         } else if (mode === 'register') {
-          const registerHtml = '<div class="text-center">' +
-            '<i class="fas fa-user-plus text-4xl text-primary mb-4"></i>' +
-            '<h2 class="text-2xl font-bold text-gray-900 mb-4">Crear Cuenta</h2>' +
-            '<p class="text-gray-600 mb-6">Elige tu rol para continuar con el registro</p>' +
-            '<div class="space-y-3">' +
-              '<button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
-                '<i class="fas fa-lightbulb text-xl"></i>' +
-                '<span>Fundador - Crear y validar proyectos</span>' +
-              '</button>' +
-              '<button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
-                '<i class="fas fa-star text-xl"></i>' +
-                '<span>Validador - Votar y calificar proyectos</span>' +
-              '</button>' +
-            '</div>' +
-            '<p class="text-sm text-gray-600 mt-4">' +
-              '¿Ya tienes cuenta? <a href="#" onclick="showAuthModal(\'login\')" class="text-primary hover:underline">Inicia sesión</a>' +
-            '</p>' +
-          '</div>';
+          const registerHtml = \`<div class="text-center">
+            <i class="fas fa-user-plus text-4xl text-primary mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">Crear Cuenta</h2>
+            <p class="text-gray-600 mb-6">Elige tu rol para continuar con el registro</p>
+            <div class="space-y-3">
+              <button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">
+                <i class="fas fa-lightbulb text-xl"></i>
+                <span>Fundador - Crear y validar proyectos</span>
+              </button>
+              <button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">
+                <i class="fas fa-star text-xl"></i>
+                <span>Validador - Votar y calificar proyectos</span>
+              </button>
+            </div>
+            <p class="text-sm text-gray-600 mt-4">
+              ¿Ya tienes cuenta? <a href="#" onclick="showAuthModal('login')" class="text-primary hover:underline">Inicia sesión</a>
+            </p>
+          </div>\`;
           modalContent.innerHTML = registerHtml;
         }
       }
@@ -762,20 +760,20 @@ app.get('/', (c) => {
 
         if (authToken) {
           // User is logged in - show logout option
-          const logoutHtml = '<button onclick="logout()" class="text-gray-700 hover:text-primary transition">' +
-            '<i class="fas fa-sign-out-alt mr-1"></i>Cerrar Sesión' +
-            '</button>';
+          const logoutHtml = \`<button onclick="logout()" class="text-gray-700 hover:text-primary transition">
+            <i class="fas fa-sign-out-alt mr-1"></i>Cerrar Sesión
+            </button>\`;
           navButtons.forEach(btn => {
             btn.innerHTML = logoutHtml;
           });
         } else {
           // User is not logged in - show login/register options
-          const loginHtml = '<button onclick="showAuthModal(\'login\')" class="text-gray-700 hover:text-primary transition">' +
-            '<i class="fas fa-sign-in-alt mr-1"></i>Iniciar Sesión' +
-            '</button>' +
-            '<button onclick="showAuthModal(\'register\')" class="ml-4 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">' +
-            '<i class="fas fa-user-plus mr-1"></i>Registrarse' +
-            '</button>';
+          const loginHtml = \`<button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition">
+            <i class="fas fa-sign-in-alt mr-1"></i>Iniciar Sesión
+            </button>
+            <button onclick="showAuthModal('register')" class="ml-4 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
+            <i class="fas fa-user-plus mr-1"></i>Registrarse
+            </button>\`;
           navButtons.forEach(btn => {
             btn.innerHTML = loginHtml;
           });
