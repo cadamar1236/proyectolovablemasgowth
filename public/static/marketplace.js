@@ -3784,6 +3784,158 @@ function closeCreateProductModal() {
   }
 }
 
+// Function to open select product modal for validator
+function openSelectProductModal(validatorId, validatorName) {
+  if (!authToken || !currentUser) {
+    showToast('Debes iniciar sesión como founder', 'error');
+    return;
+  }
+  
+  const modal = document.createElement('div');
+  modal.id = 'select-product-modal';
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">
+            <i class="fas fa-paper-plane text-primary mr-2"></i>
+            Solicitar Opinión de ${escapeHtml(validatorName)}
+          </h2>
+          <button onclick="closeSelectProductModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <form id="request-validator-form" class="space-y-6">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              Tu Producto (opcional)
+            </label>
+            <select id="request-product-id" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+              <option value="">Sin producto específico</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              Mensaje al validador *
+            </label>
+            <textarea 
+              id="request-message" 
+              required 
+              rows="5"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+              placeholder="Hola, me gustaría obtener tu opinión sobre mi idea...
+
+¿Qué opinas del potencial de mercado?
+¿Qué cambiarías?
+
+¡Gracias!"
+            ></textarea>
+          </div>
+          
+          <div class="flex space-x-4">
+            <button 
+              type="submit" 
+              class="flex-1 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition font-semibold"
+            >
+              <i class="fas fa-paper-plane mr-2"></i>Enviar Solicitud
+            </button>
+            <button 
+              type="button" 
+              onclick="closeSelectProductModal()" 
+              class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  loadUserProductsForRequest(validatorId);
+  
+  document.getElementById('request-validator-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleSendValidatorRequest(validatorId);
+  });
+}
+
+// Function to load user's products for request
+async function loadUserProductsForRequest(validatorId) {
+  try {
+    const response = await axios.get('/api/marketplace/products/my', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const select = document.getElementById('request-product-id');
+    if (select && response.data.products) {
+      // Clear existing options except first
+      while (select.options.length > 1) {
+        select.remove(1);
+      }
+      
+      // Add user's products
+      response.data.products.forEach(product => {
+        const option = document.createElement('option');
+        option.value = product.id;
+        option.textContent = product.title;
+        select.appendChild(option);
+      });
+    }
+  } catch (error) {
+    console.error('Error loading products:', error);
+  }
+}
+
+// Function to handle sending validator request
+async function handleSendValidatorRequest(validatorId) {
+  const productId = document.getElementById('request-product-id').value;
+  const message = document.getElementById('request-message').value;
+  
+  try {
+    const response = await axios.post('/api/validator-requests/send', {
+      validatorId: validatorId,
+      projectId: productId || null,
+      message: message
+    }, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    showToast('¡Solicitud enviada exitosamente!', 'success');
+    closeSelectProductModal();
+  } catch (error) {
+    console.error('Error sending request:', error);
+    const errorMsg = error.response?.data?.error || 'Error al enviar la solicitud';
+    showToast(errorMsg, 'error');
+  }
+}
+
+// Function to close select product modal
+function closeSelectProductModal() {
+  const modal = document.getElementById('select-product-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// Function to open chat with validator
+function openChatWithValidator(validatorId, validatorName) {
+  showToast('Para chatear, primero envía una solicitud al validador', 'info');
+  // Redirect to send request
+  openSelectProductModal(validatorId, validatorName);
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Make functions globally available
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
@@ -3791,3 +3943,6 @@ window.showCreateProductModal = showCreateProductModal;
 window.closeCreateProductModal = closeCreateProductModal;
 window.handleCreateProduct = handleCreateProduct;
 window.toggleCompensationAmount = toggleCompensationAmount;
+window.openSelectProductModal = openSelectProductModal;
+window.closeSelectProductModal = closeSelectProductModal;
+window.openChatWithValidator = openChatWithValidator;
