@@ -88,85 +88,10 @@ app.get('/vote/:projectId', async (c) => {
   }
 });
 
-// Frontend Routes - Serve landing page inline (compatible with Cloudflare Workers)
+// Frontend Routes - Serve full landing page with auth (improved visuals)
 app.get('/', (c) => {
-  return c.html(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Validate | Product Validation Marketplace</title>
-    <meta name="description" content="Connect with expert validators. Get real feedback, validate your product faster, and launch with confidence.">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: '#4F46E5',
-              secondary: '#7C3AED',
-              accent: '#F59E0B',
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; }
-      .gradient-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-      .gradient-secondary { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-      .hover-lift { transition: transform 0.3s ease, box-shadow 0.3s ease; }
-      .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
-      .animate-fade-in { animation: fadeIn 0.6s ease-in; }
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-      .card-hover { transition: all 0.3s ease; }
-      .card-hover:hover { transform: translateY(-8px); box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-gray-50 via-white to-gray-50">
-    <nav class="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/" class="flex items-center space-x-2">
-                        <div class="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
-                            <i class="fas fa-check-double text-white text-xl"></i>
-                        </div>
-                        <span class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                            Validate
-                        </span>
-                    </a>
-                </div>
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="/marketplace" class="px-6 py-2.5 gradient-primary text-white rounded-lg font-semibold hover:shadow-lg transition transform hover:scale-105">
-                        Get Started
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
-    <section class="relative overflow-hidden pt-20 pb-32">
-        <div class="absolute inset-0 bg-gradient-to-br from-primary/5 via-purple-50 to-secondary/5"></div>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-            <div class="text-center animate-fade-in">
-                <h1 class="text-5xl md:text-7xl font-extrabold text-gray-900 mb-6 leading-tight">
-                    Get Real Feedback<br>
-                    <span class="bg-gradient-to-r from-primary via-purple-600 to-secondary bg-clip-text text-transparent">
-                        From Expert Validators
-                    </span>
-                </h1>
-                <p class="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
-                    Connect with experienced product validators who provide honest feedback to help you build products people actually want.
-                </p>
-                <a href="/marketplace" class="inline-block px-8 py-4 gradient-primary text-white rounded-xl font-bold text-lg hover:shadow-2xl transition transform hover:scale-105">
-                    <i class="fas fa-rocket mr-2"></i>Find Validators
-                </a>
-            </div>
-        </div>
-    </section>
-</body>
-</html>`);
+  // Redirect to /old route which has all the functionality
+  return c.redirect('/old');
 });
 
 // Legacy route (keep for backwards compatibility)
@@ -230,31 +155,44 @@ app.get('/old', (c) => {
         </div>
     </nav>
 
-    <!-- Hero Section - YC Style -->
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20">
-        <div class="text-center">
-                <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6">
-                    Validamos y lanzamos startups exitosas
-                    <span class="block text-yellow-300">10x más rápido</span>
+    <!-- Hero Section - Improved Visual Design -->
+    <div class="relative bg-gradient-to-br from-primary via-purple-600 to-secondary overflow-hidden">
+        <div class="absolute inset-0 bg-black/10"></div>
+        <!-- Decorative elements -->
+        <div class="absolute top-0 left-0 w-full h-full overflow-hidden">
+            <div class="absolute top-20 left-10 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-20 right-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl"></div>
+        </div>
+        
+        <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-28">
+            <div class="text-center">
+                <div class="inline-block mb-6">
+                    <span class="px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-full text-sm font-semibold border border-white/30">
+                        🎯 Trusted by 500+ Founders
+                    </span>
+                </div>
+                <h1 class="text-4xl sm:text-5xl md:text-7xl font-extrabold mb-6 text-white">
+                    Connect with Expert<br>
+                    <span class="bg-gradient-to-r from-yellow-300 to-orange-400 bg-clip-text text-transparent">Product Validators</span>
                 </h1>
-                <p class="text-lg sm:text-xl md:text-2xl mb-8 text-purple-100">
-                    Plataforma IA + Venture Studio = Éxito 10x
+                <p class="text-xl sm:text-2xl md:text-3xl mb-6 text-white font-semibold">
+                    The Marketplace for Product Validation
                 </p>
-                <p class="text-base sm:text-lg mb-12 max-w-3xl mx-auto text-purple-50">
-                    De la idea a datos accionables en 48 horas. Validación + Growth Marketing + Escalamiento.
+                <p class="text-base sm:text-lg md:text-xl mb-12 max-w-3xl mx-auto text-white/90 leading-relaxed">
+                    Get honest feedback from experienced validators. Launch products people actually want. Find validators or become one today.
                 </p>
-                <div class="flex flex-col sm:flex-row justify-center gap-4 sm:gap-4">
-                    <button onclick="showValidationForm()" class="bg-white text-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-gray-100 transition transform hover:scale-105">
-                        <i class="fas fa-rocket mr-2"></i>Validar Mi Idea Ahora
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <button onclick="window.location.href='/marketplace'" class="bg-white text-primary px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition transform hover:scale-105 shadow-2xl">
+                        <i class="fas fa-search mr-2"></i>Find Validators
                     </button>
-                    <button onclick="scrollToSection('pricing')" class="bg-purple-800 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-purple-900 transition">
-                        Ver Planes
+                    <button onclick="window.location.href='/marketplace'" class="bg-white/10 backdrop-blur-sm border-2 border-white text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/20 transition">
+                        <i class="fas fa-star mr-2"></i>Become a Validator
                     </button>
                 </div>
             </div>
         </div>
         <div class="absolute bottom-0 left-0 right-0">
-            <svg viewBox="0 0 1440 120" class="fill-gray-50">
+            <svg viewBox="0 0 1440 120" class="fill-white">
                 <path d="M0,64L80,69.3C160,75,320,85,480,80C640,75,800,53,960,48C1120,43,1280,53,1360,58.7L1440,64L1440,120L0,120Z"></path>
             </svg>
         </div>
@@ -262,22 +200,22 @@ app.get('/old', (c) => {
 
     <!-- Stats Section -->
     <div class="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <div class="text-4xl font-bold text-primary mb-2">48h</div>
-                <div class="text-gray-600">Validación completa</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-blue-100">
+                <div class="text-5xl font-extrabold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-3">48h</div>
+                <div class="text-gray-700 font-semibold">Average Response Time</div>
             </div>
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <div class="text-4xl font-bold text-primary mb-2">90%</div>
-                <div class="text-gray-600">Más rápido que métodos tradicionales</div>
+            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-purple-100">
+                <div class="text-5xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-3">1000+</div>
+                <div class="text-gray-700 font-semibold">Expert Validators</div>
             </div>
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <div class="text-4xl font-bold text-primary mb-2">85%</div>
-                <div class="text-gray-600">Precisión en predicciones</div>
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-green-100">
+                <div class="text-5xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-3">95%</div>
+                <div class="text-gray-700 font-semibold">Success Rate</div>
             </div>
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <div class="text-4xl font-bold text-primary mb-2">10K+</div>
-                <div class="text-gray-600">Usuarios beta disponibles</div>
+            <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-orange-100">
+                <div class="text-5xl font-extrabold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent mb-3">$50</div>
+                <div class="text-gray-700 font-semibold">Average Cost per Validation</div>
             </div>
         </div>
     </div>
@@ -286,50 +224,50 @@ app.get('/old', (c) => {
     <div id="app" class="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <!-- Features Section -->
         <div id="dashboard" class="mb-20">
-            <h2 class="text-4xl font-bold text-gray-900 mb-4 text-center">¿Cómo Funciona?</h2>
+            <h2 class="text-4xl font-bold text-gray-900 mb-4 text-center">How It Works</h2>
             <p class="text-xl text-gray-600 mb-12 text-center max-w-3xl mx-auto">
-                De idea a datos accionables en 5 pasos automáticos
+                Get validated in 5 simple steps
             </p>
             
             <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition">
-                    <div class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                        <span class="text-2xl font-bold text-primary">1</span>
+                <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105">
+                    <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 border-2 border-white/40">
+                        <span class="text-2xl font-bold text-white">1</span>
                     </div>
-                    <h3 class="text-lg font-semibold mb-2 text-gray-900">Input de Idea</h3>
-                    <p class="text-gray-600 text-sm">Completa el formulario con los detalles de tu idea y mercado objetivo</p>
+                    <h3 class="text-lg font-bold mb-2 text-white">Post Your Product</h3>
+                    <p class="text-white/90 text-sm leading-relaxed">Share product details, target audience, and what feedback you need</p>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition">
-                    <div class="w-12 h-12 bg-secondary/10 rounded-full flex items-center justify-center mb-4">
-                        <span class="text-2xl font-bold text-secondary">2</span>
+                <div class="bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105">
+                    <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 border-2 border-white/40">
+                        <span class="text-2xl font-bold text-white">2</span>
                     </div>
-                    <h3 class="text-lg font-semibold mb-2 text-gray-900">Análisis IA</h3>
-                    <p class="text-gray-600 text-sm">Nuestra IA analiza competidores, tendencias y oportunidades en tiempo real</p>
+                    <h3 class="text-lg font-bold mb-2 text-white">Browse Validators</h3>
+                    <p class="text-white/90 text-sm leading-relaxed">Find expert validators by specialty, experience, and ratings</p>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition">
-                    <div class="w-12 h-12 bg-purple-500/10 rounded-full flex items-center justify-center mb-4">
-                        <span class="text-2xl font-bold text-purple-500">3</span>
+                <div class="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105">
+                    <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 border-2 border-white/40">
+                        <span class="text-2xl font-bold text-white">3</span>
                     </div>
-                    <h3 class="text-lg font-semibold mb-2 text-gray-900">Generador MVP</h3>
-                    <p class="text-gray-600 text-sm">Creación automática de prototipos funcionales usando IA generativa</p>
+                    <h3 class="text-lg font-bold mb-2 text-white">Invite Validators</h3>
+                    <p class="text-white/90 text-sm leading-relaxed">Send invitations to validators who match your product needs</p>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition">
-                    <div class="w-12 h-12 bg-pink-500/10 rounded-full flex items-center justify-center mb-4">
-                        <span class="text-2xl font-bold text-pink-500">4</span>
+                <div class="bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105">
+                    <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 border-2 border-white/40">
+                        <span class="text-2xl font-bold text-white">4</span>
                     </div>
-                    <h3 class="text-lg font-semibold mb-2 text-gray-900">Testing Beta</h3>
-                    <p class="text-gray-600 text-sm">Panel pre-seleccionado prueba tu producto y proporciona feedback detallado</p>
+                    <h3 class="text-lg font-bold mb-2 text-white">Get Feedback</h3>
+                    <p class="text-white/90 text-sm leading-relaxed">Receive detailed insights, ratings, and actionable recommendations</p>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition">
-                    <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center mb-4">
-                        <span class="text-2xl font-bold text-green-500">5</span>
+                <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105">
+                    <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 border-2 border-white/40">
+                        <span class="text-2xl font-bold text-white">5</span>
                     </div>
-                    <h3 class="text-lg font-semibold mb-2 text-gray-900">Resultados</h3>
-                    <p class="text-gray-600 text-sm">Métricas claras y recomendaciones para iterar o seguir adelante</p>
+                    <h3 class="text-lg font-bold mb-2 text-white">Launch Better</h3>
+                    <p class="text-white/90 text-sm leading-relaxed">Iterate based on feedback and launch with confidence</p>
                 </div>
             </div>
         </div>
