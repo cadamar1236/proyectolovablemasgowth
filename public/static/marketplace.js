@@ -3463,6 +3463,15 @@ async function renderGoalsDashboard(metrics) {
     console.log('All dashboard data loaded successfully');        
     loading = false;
     renderDashboard();
+    
+    // Load validator invitations after dashboard renders
+    if (currentUser) {
+      if (currentUser.role === 'founder') {
+        await renderFounderInvitations();
+      } else if (currentUser.role === 'validator') {
+        await renderValidatorInvitations();
+      }
+    }
   } catch (error) {
     console.error('Error loading dashboard data:', error);
     dashboardContent.innerHTML = `
@@ -3475,6 +3484,208 @@ async function renderGoalsDashboard(metrics) {
     return;
   }
 } // Close renderGoalsDashboard function
+
+// ============================================
+// VALIDATOR INVITATIONS MANAGEMENT
+// ============================================
+
+// Render founder's sent invitations
+async function renderFounderInvitations() {
+  try {
+    const response = await axios.get('/api/marketplace/founder/invitations', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const invitations = response.data.invitations || [];
+    
+    if (invitations.length === 0) {
+      return; // Don't show section if no invitations
+    }
+    
+    const invitationsSection = `
+      <div class="max-w-7xl mx-auto mt-8 px-6">
+        <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          <div class="flex items-center mb-6">
+            <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mr-4">
+              <i class="fas fa-paper-plane text-white text-xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800">Invitaciones Enviadas a Validadores</h2>
+            <span class="ml-auto px-4 py-2 bg-purple-100 text-purple-800 rounded-full font-bold">${invitations.length}</span>
+          </div>
+          
+          <div class="space-y-4">
+            ${invitations.map(invitation => `
+              <div class="bg-gradient-to-r ${
+                invitation.status === 'accepted' ? 'from-green-50 to-emerald-50 border-green-200' :
+                invitation.status === 'rejected' ? 'from-red-50 to-pink-50 border-red-200' :
+                'from-blue-50 to-indigo-50 border-blue-200'
+              } border-2 rounded-xl p-6 transition-all duration-200 hover:shadow-lg">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center mb-2">
+                      <h3 class="text-lg font-bold text-gray-800 mr-3">${escapeHtml(invitation.validator_name || invitation.validator_email)}</h3>
+                      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        invitation.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                        invitation.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }">
+                        <i class="fas ${
+                          invitation.status === 'accepted' ? 'fa-check-circle' :
+                          invitation.status === 'rejected' ? 'fa-times-circle' :
+                          'fa-clock'
+                        } mr-1"></i>
+                        ${
+                          invitation.status === 'accepted' ? 'Aceptada' :
+                          invitation.status === 'rejected' ? 'Rechazada' :
+                          'Pendiente'
+                        }
+                      </span>
+                    </div>
+                    <div class="text-gray-600 space-y-1">
+                      <p><i class="fas fa-box text-purple-500 mr-2"></i><strong>Producto:</strong> ${escapeHtml(invitation.product_title)}</p>
+                      <p><i class="fas fa-briefcase text-blue-500 mr-2"></i><strong>Rol:</strong> ${escapeHtml(invitation.validator_title || 'Validator')}</p>
+                      ${invitation.hourly_rate ? `<p><i class="fas fa-dollar-sign text-green-500 mr-2"></i><strong>Tarifa:</strong> $${invitation.hourly_rate}/hora</p>` : ''}
+                      ${invitation.expertise_areas ? `<p><i class="fas fa-tags text-orange-500 mr-2"></i><strong>Áreas:</strong> ${escapeHtml(invitation.expertise_areas)}</p>` : ''}
+                      <p class="text-sm text-gray-500 mt-2"><i class="fas fa-calendar mr-1"></i>Enviada: ${new Date(invitation.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                      ${invitation.accepted_at ? `<p class="text-sm text-gray-500"><i class="fas fa-check mr-1"></i>Aceptada: ${new Date(invitation.accepted_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>` : ''}
+                    </div>
+                  </div>
+                  <div class="ml-4">
+                    ${invitation.status === 'accepted' ? `
+                      <button
+                        onclick="openChatWithValidator(${invitation.validator_id}, '${escapeHtml(invitation.validator_name || invitation.validator_email)}')"
+                        class="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition font-semibold shadow-md"
+                      >
+                        <i class="fas fa-comments mr-2"></i>Chatear
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Append to dashboard content
+    const dashboardContent = document.getElementById('dashboard-content');
+    dashboardContent.insertAdjacentHTML('beforeend', invitationsSection);
+    
+  } catch (error) {
+    console.error('Error loading founder invitations:', error);
+  }
+}
+
+// Render validator's incoming invitations
+async function renderValidatorInvitations() {
+  try {
+    const response = await axios.get('/api/marketplace/validator/invitations', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const invitations = response.data.invitations || [];
+    
+    if (invitations.length === 0) {
+      return; // Don't show section if no invitations
+    }
+    
+    const invitationsSection = `
+      <div class="max-w-7xl mx-auto mt-8 px-6">
+        <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          <div class="flex items-center mb-6">
+            <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mr-4">
+              <i class="fas fa-envelope-open-text text-white text-xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800">Invitaciones de Founders</h2>
+            <span class="ml-auto px-4 py-2 bg-blue-100 text-blue-800 rounded-full font-bold">${invitations.length}</span>
+          </div>
+          
+          <div class="space-y-4">
+            ${invitations.map(invitation => `
+              <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-6 transition-all duration-200 hover:shadow-lg">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center mb-2">
+                      <h3 class="text-lg font-bold text-gray-800 mr-3">${escapeHtml(invitation.product_title)}</h3>
+                      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                        <i class="fas fa-user mr-1"></i>
+                        ${escapeHtml(invitation.founder_name)}
+                      </span>
+                    </div>
+                    <div class="text-gray-600 space-y-1 mb-4">
+                      <p>${escapeHtml(invitation.product_description || 'Sin descripción')}</p>
+                      <div class="flex items-center gap-4 mt-2">
+                        ${invitation.category ? `<span class="inline-flex items-center px-3 py-1 bg-white rounded-full text-sm font-medium text-gray-700"><i class="fas fa-tag mr-1"></i>${escapeHtml(invitation.category)}</span>` : ''}
+                        ${invitation.stage ? `<span class="inline-flex items-center px-3 py-1 bg-white rounded-full text-sm font-medium text-gray-700"><i class="fas fa-seedling mr-1"></i>${escapeHtml(invitation.stage)}</span>` : ''}
+                      </div>
+                      <p class="text-sm text-gray-500 mt-2"><i class="fas fa-calendar mr-1"></i>Recibida: ${new Date(invitation.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex gap-3 justify-end">
+                  <button
+                    onclick="respondToInvitation(${invitation.id}, 'reject', '${escapeHtml(invitation.product_title)}')"
+                    class="px-6 py-3 bg-white border-2 border-red-300 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-400 transition font-semibold shadow-sm"
+                  >
+                    <i class="fas fa-times-circle mr-2"></i>Rechazar
+                  </button>
+                  <button
+                    onclick="respondToInvitation(${invitation.id}, 'accept', '${escapeHtml(invitation.product_title)}')"
+                    class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition font-semibold shadow-md"
+                  >
+                    <i class="fas fa-check-circle mr-2"></i>Aceptar
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Append to dashboard content
+    const dashboardContent = document.getElementById('dashboard-content');
+    dashboardContent.insertAdjacentHTML('beforeend', invitationsSection);
+    
+  } catch (error) {
+    console.error('Error loading validator invitations:', error);
+  }
+}
+
+// Respond to validator invitation
+async function respondToInvitation(invitationId, decision, productTitle) {
+  const actionText = decision === 'accept' ? 'aceptar' : 'rechazar';
+  
+  if (!confirm(`¿Estás seguro de que quieres ${actionText} la invitación para "${productTitle}"?`)) {
+    return;
+  }
+  
+  try {
+    await axios.post(
+      `/api/marketplace/validator/invitations/${invitationId}/respond`,
+      { decision },
+      { headers: { Authorization: `Bearer ${authToken}` } }
+    );
+    
+    showToast(
+      decision === 'accept' ? 
+        `¡Invitación aceptada! Ahora puedes comenzar a validar "${productTitle}"` :
+        'Invitación rechazada',
+      decision === 'accept' ? 'success' : 'info'
+    );
+    
+    // Reload dashboard to reflect changes
+    await loadMyDashboard();
+    
+  } catch (error) {
+    console.error('Error responding to invitation:', error);
+    showToast('Error al responder a la invitación', 'error');
+  }
+}
+
+// Make functions available globally
+window.respondToInvitation = respondToInvitation;
 
 // Make functions available globally
 window.markGoalCompleted = function(goalId) {

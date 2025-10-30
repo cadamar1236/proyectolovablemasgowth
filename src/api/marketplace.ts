@@ -1508,6 +1508,39 @@ marketplace.get('/validator/invitations', requireAuth, async (c) => {
   });
 });
 
+// Get founder's sent invitations
+marketplace.get('/founder/invitations', requireAuth, async (c) => {
+  const userId = c.get('userId');
+  
+  // Get all invitations sent by this founder for their products
+  const invitations = await c.env.DB.prepare(`
+    SELECT 
+      va.id,
+      va.product_id,
+      va.validator_id,
+      va.status,
+      va.message,
+      va.created_at,
+      va.accepted_at,
+      bp.title as product_title,
+      v.title as validator_title,
+      v.hourly_rate,
+      v.expertise_areas,
+      vu.name as validator_name,
+      vu.email as validator_email
+    FROM validator_applications va
+    JOIN beta_products bp ON va.product_id = bp.id
+    JOIN validators v ON va.validator_id = v.id
+    JOIN users vu ON v.user_id = vu.id
+    WHERE bp.company_user_id = ? AND va.status IN ('invited', 'accepted', 'rejected')
+    ORDER BY va.created_at DESC
+  `).bind(userId).all();
+  
+  return c.json({
+    invitations: invitations.results || []
+  });
+});
+
 // Validator responds to invitation
 marketplace.post('/validator/invitations/:invitationId/respond', requireAuth, async (c) => {
   const userId = c.get('userId');

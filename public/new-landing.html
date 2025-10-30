@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validate | Product Validation Marketplace</title>
+    <meta name="description" content="Connect with expert validators. Get real feedback, validate your product faster, and launch with confidence.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: '#4F46E5',
+              secondary: '#7C3AED',
+              accent: '#F59E0B',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; }
+      .gradient-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+      .gradient-secondary { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+      .hover-lift { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+      .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+      .animate-fade-in { animation: fadeIn 0.6s ease-in; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      .card-hover { transition: all 0.3s ease; }
+      .card-hover:hover { transform: translateY(-8px); box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-white to-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-2">
+                        <div class="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
+                            <i class="fas fa-check-double text-white text-xl"></i>
+                        </div>
+                        <span class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                            Validate
+                        </span>
+                    </a>
+                </div>
+                
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="/marketplace" class="text-gray-700 hover:text-primary transition font-medium">
+                        Browse Products
+                    </a>
+                    <a href="/marketplace" class="text-gray-700 hover:text-primary transition font-medium">
+                        For Validators
+                    </a>
+                    <a href="/pricing" class="text-gray-700 hover:text-primary transition font-medium">
+                        Pricing
+                    </a>
+                    <a href="/marketplace" class="px-6 py-2.5 gradient-primary text-white rounded-lg font-semibold hover:shadow-lg transition transform hover:scale-105">
+                        Get Started
+                    </a>
+                </div>
+                
+                <div class="md:hidden flex items-center">
+                    <button onclick="toggleMobileMenu()" class="text-gray-700 hover:text-primary">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden md:hidden bg-white border-b border-gray-200">
+        <div class="px-4 py-4 space-y-3">
+            <a href="/marketplace" class="block text-gray-700 hover:text-primary font-medium">Browse Products</a>
+            <a href="/marketplace" class="block text-gray-700 hover:text-primary font-medium">For Validators</a>
+            <a href="/pricing" class="block text-gray-700 hover:text-primary font-medium">Pricing</a>
+            <a href="/marketplace" class="block px-6 py-2.5 gradient-primary text-white rounded-lg font-semibold text-center">Get Started</a>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="relative overflow-hidden pt-20 pb-32">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/5 via-purple-50 to-secondary/5"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div class="text-center animate-fade-in">
+                <div class="inline-block mb-6">
+                    <span class="px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold">
+                        🚀 Trusted by 500+ Founders
+                    </span>
+                </div>
+                <h1 class="text-5xl md:text-7xl font-extrabold text-gray-900 mb-6 leading-tight">
+                    Get Real Feedback<br>
+                    <span class="bg-gradient-to-r from-primary via-purple-600 to-secondary bg-clip-text text-transparent">
+                        From Expert Validators
+                    </span>
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
+                    Connect with experienced product validators who provide honest feedback to help you build products people actually want.
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4 mb-16">
+                    <a href="/marketplace" class="px-8 py-4 gradient-primary text-white rounded-xl font-bold text-lg hover:shadow-2xl transition transform hover:scale-105">
+                        <i class="fas fa-rocket mr-2"></i>Find Validators
+                    </a>
+                    <a href="/marketplace" class="px-8 py-4 bg-white text-primary border-2 border-primary rounded-xl font-bold text-lg hover:bg-primary hover:text-white transition">
+                        Become a Validator
+                    </a>
+                </div>
+                
+                <!-- Trust Badges -->
+                <div class="flex flex-wrap justify-center items-center gap-8 text-gray-500 text-sm">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <span>4.9/5 Rating</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-users text-blue-500"></i>
+                        <span>1,000+ Validators</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-check-circle text-green-500"></i>
+                        <span>5,000+ Products Validated</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">48h</div>
+                    <div class="text-gray-600 font-medium">Average Response Time</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">95%</div>
+                    <div class="text-gray-600 font-medium">Success Rate</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">$50</div>
+                    <div class="text-gray-600 font-medium">Average Cost</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">24/7</div>
+                    <div class="text-gray-600 font-medium">Marketplace Access</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="py-24 bg-gradient-to-br from-gray-50 to-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">How It Works</h2>
+                <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                    Get validation in 3 simple steps
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Step 1 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg card-hover">
+                    <div class="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center mb-6">
+                        <span class="text-3xl font-bold text-white">1</span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Post Your Product</h3>
+                    <p class="text-gray-600 leading-relaxed">
+                        Share your product details, target audience, and what feedback you're looking for. Set your budget and timeline.
+                    </p>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg card-hover">
+                    <div class="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center mb-6">
+                        <span class="text-3xl font-bold text-white">2</span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Connect with Validators</h3>
+                    <p class="text-gray-600 leading-relaxed">
+                        Browse expert validators by specialty, experience, and ratings. Choose who validates your product.
+                    </p>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg card-hover">
+                    <div class="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center mb-6">
+                        <span class="text-3xl font-bold text-white">3</span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Get Actionable Feedback</h3>
+                    <p class="text-gray-600 leading-relaxed">
+                        Receive detailed insights, ratings, and recommendations to improve your product before launch.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-24 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Why Validate?</h2>
+                <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                    Everything you need to validate your product effectively
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 card-hover">
+                    <div class="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-users text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Expert Validators</h3>
+                    <p class="text-gray-600">
+                        Access 1,000+ verified validators with expertise in your industry and product category.
+                    </p>
+                </div>
+                
+                <!-- Feature 2 -->
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 card-hover">
+                    <div class="w-14 h-14 bg-purple-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-bolt text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Fast Turnaround</h3>
+                    <p class="text-gray-600">
+                        Get feedback within 48 hours. No more waiting weeks for user testing results.
+                    </p>
+                </div>
+                
+                <!-- Feature 3 -->
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 card-hover">
+                    <div class="w-14 h-14 bg-green-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-shield-alt text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Quality Guaranteed</h3>
+                    <p class="text-gray-600">
+                        Every validator is vetted and rated. Get honest, constructive feedback you can trust.
+                    </p>
+                </div>
+                
+                <!-- Feature 4 -->
+                <div class="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-8 card-hover">
+                    <div class="w-14 h-14 bg-yellow-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-comments text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Direct Communication</h3>
+                    <p class="text-gray-600">
+                        Chat directly with validators to clarify questions and dig deeper into feedback.
+                    </p>
+                </div>
+                
+                <!-- Feature 5 -->
+                <div class="bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl p-8 card-hover">
+                    <div class="w-14 h-14 bg-red-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-chart-line text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Detailed Analytics</h3>
+                    <p class="text-gray-600">
+                        Track validation progress, feedback trends, and validator ratings in real-time.
+                    </p>
+                </div>
+                
+                <!-- Feature 6 -->
+                <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-8 card-hover">
+                    <div class="w-14 h-14 bg-indigo-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-dollar-sign text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Flexible Pricing</h3>
+                    <p class="text-gray-600">
+                        Pay per validation or subscribe for unlimited access. Plans starting at just $49/month.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24 gradient-primary relative overflow-hidden">
+        <div class="absolute inset-0 bg-black/10"></div>
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+            <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">
+                Ready to Validate Your Product?
+            </h2>
+            <p class="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
+                Join hundreds of founders who are building better products with real feedback from expert validators.
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <a href="/marketplace" class="px-10 py-4 bg-white text-primary rounded-xl font-bold text-lg hover:shadow-2xl transition transform hover:scale-105">
+                    Get Started Now
+                </a>
+                <a href="/marketplace" class="px-10 py-4 bg-transparent text-white border-2 border-white rounded-xl font-bold text-lg hover:bg-white hover:text-primary transition">
+                    View Validators
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
+                            <i class="fas fa-check-double text-white"></i>
+                        </div>
+                        <span class="text-xl font-bold">Validate</span>
+                    </div>
+                    <p class="text-gray-400">
+                        The trusted marketplace for product validation.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Product</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="/marketplace" class="hover:text-white transition">Browse Products</a></li>
+                        <li><a href="/marketplace" class="hover:text-white transition">Find Validators</a></li>
+                        <li><a href="/pricing" class="hover:text-white transition">Pricing</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Company</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition">About</a></li>
+                        <li><a href="#" class="hover:text-white transition">Blog</a></li>
+                        <li><a href="#" class="hover:text-white transition">Careers</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Support</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition">Help Center</a></li>
+                        <li><a href="#" class="hover:text-white transition">Contact Us</a></li>
+                        <li><a href="#" class="hover:text-white transition">Terms</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-gray-400">
+                <p>&copy; 2025 Validate. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        }
+        
+        // Redirect to marketplace
+        setTimeout(() => {
+            if (window.location.pathname === '/') {
+                // Optional: Auto-redirect or show more content
+            }
+        }, 100);
+    </script>
+</body>
+</html>
