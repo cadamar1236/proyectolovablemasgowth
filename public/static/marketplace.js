@@ -3995,12 +3995,169 @@ function closeCreateProductModal() {
   }
 }
 
+// Function to open select product modal for validator
+function openSelectProductModal(validatorId, validatorName) {
+  if (!authToken || !currentUser) {
+    showToast('Debes iniciar sesión como founder', 'error');
+    return;
+  }
+  
+  // Show modal to select product and send request
+  const modal = document.createElement('div');
+  modal.id = 'select-product-modal';
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">
+            <i class="fas fa-paper-plane text-primary mr-2"></i>
+            Request Opinion from ${escapeHtml(validatorName)}
+          </h2>
+          <button onclick="closeSelectProductModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <form id="request-validator-form" class="space-y-6">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              Your Product (optional)
+            </label>
+            <select id="request-product-id" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+              <option value="">No specific product</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              Message to validator *
+            </label>
+            <textarea 
+              id="request-message" 
+              required 
+              rows="5"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+              placeholder="Hi, I'd like to get your opinion on my idea...
+
+What do you think about the market potential?
+What would you change?
+
+Thanks!"
+            ></textarea>
+            <p class="text-sm text-gray-500 mt-2">
+              <i class="fas fa-info-circle mr-1"></i>
+              Be specific about what feedback you need
+            </p>
+          </div>
+          
+          <div class="flex space-x-4">
+            <button 
+              type="submit" 
+              class="flex-1 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition font-semibold"
+            >
+              <i class="fas fa-paper-plane mr-2"></i>Send Request
+            </button>
+            <button 
+              type="button" 
+              onclick="closeSelectProductModal()" 
+              class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Load user's products
+  loadUserProductsForRequest(validatorId);
+  
+  // Add form submit handler
+  document.getElementById('request-validator-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleSendValidatorRequest(validatorId);
+  });
+}
+
+// Function to load user's products for request
+async function loadUserProductsForRequest(validatorId) {
+  try {
+    const response = await axios.get('/api/marketplace/products', {
+      headers: { Authorization: `Bearer ${authToken}` },
+      params: { founder_id: currentUser.id }
+    });
+    
+    const select = document.getElementById('request-product-id');
+    if (select && response.data.products) {
+      response.data.products.forEach(product => {
+        const option = document.createElement('option');
+        option.value = product.id;
+        option.textContent = product.title;
+        select.appendChild(option);
+      });
+    }
+  } catch (error) {
+    console.error('Error loading products:', error);
+  }
+}
+
+// Function to handle send validator request
+async function handleSendValidatorRequest(validatorId) {
+  const productId = document.getElementById('request-product-id').value;
+  const message = document.getElementById('request-message').value;
+  
+  try {
+    const response = await axios.post('/api/validator-requests/send', {
+      validatorId: validatorId,
+      projectId: productId || null,
+      message: message
+    }, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    showToast('Request sent successfully! You will be notified when the validator responds.', 'success');
+    closeSelectProductModal();
+  } catch (error) {
+    console.error('Error sending request:', error);
+    const errorMsg = error.response?.data?.error || 'Failed to send request';
+    showToast(errorMsg, 'error');
+  }
+}
+
+// Function to close select product modal
+function closeSelectProductModal() {
+  const modal = document.getElementById('select-product-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// Function to open chat with validator
+function openChatWithValidator(validatorId, validatorName) {
+  if (!authToken || !currentUser) {
+    showToast('You must be logged in', 'error');
+    return;
+  }
+  
+  showToast('Chat feature coming soon! For now, please use the "Add" button to send a validation request.', 'info');
+  // TODO: Implement full chat interface
+  // For now, redirect to request modal
+  openSelectProductModal(validatorId, validatorName);
+}
+
 // Make functions globally available
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
 window.showCreateProductModal = showCreateProductModal;
 window.closeCreateProductModal = closeCreateProductModal;
 window.handleCreateProduct = handleCreateProduct;
+window.openSelectProductModal = openSelectProductModal;
+window.closeSelectProductModal = closeSelectProductModal;
+window.openChatWithValidator = openChatWithValidator;
 window.toggleCompensationAmount = toggleCompensationAmount;
 
 // ============================================
