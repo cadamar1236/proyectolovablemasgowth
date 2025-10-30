@@ -88,8 +88,11 @@ app.get('/vote/:projectId', async (c) => {
   }
 });
 
-// Frontend Routes
-app.get('/', (c) => {
+// Frontend Routes - Redirect to new landing page
+app.get('/', serveStatic({ path: './public/new-landing.html' }));
+
+// Legacy route (keep for backwards compatibility)
+app.get('/old', (c) => {
   return c.html(`
 <!DOCTYPE html>
 <html lang="en">
