@@ -3791,3 +3791,359 @@ window.showCreateProductModal = showCreateProductModal;
 window.closeCreateProductModal = closeCreateProductModal;
 window.handleCreateProduct = handleCreateProduct;
 window.toggleCompensationAmount = toggleCompensationAmount;
+
+// ============================================
+// MISSING FUNCTIONS - FIX FOR ERROR
+// ============================================
+
+// Function to open select product modal for validator invitation
+async function openSelectProductModal(validatorId, validatorName) {
+  console.log('openSelectProductModal called:', { validatorId, validatorName });
+  
+  if (!authToken || !currentUser) {
+    showToast('Debes iniciar sesión', 'error');
+    return;
+  }
+  
+  if (currentUser.role !== 'founder') {
+    showToast('Solo los fundadores pueden invitar validadores', 'error');
+    return;
+  }
+  
+  try {
+    // Load founder's products
+    const response = await axios.get('/api/marketplace/my-products', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const myProducts = response.data.products || [];
+    
+    if (myProducts.length === 0) {
+      showToast('Primero debes crear un producto para invitar validadores', 'warning');
+      return;
+    }
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'select-product-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-xl max-w-md w-full">
+        <div class="flex items-center justify-between p-6 border-b">
+          <h2 class="text-xl font-bold text-gray-900">Select Product for ${escapeHtml(validatorName)}</h2>
+          <button onclick="closeSelectProductModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-6">
+          <p class="text-gray-600 mb-4">Choose which product you want ${escapeHtml(validatorName)} to validate:</p>
+          <div class="space-y-2">
+            ${myProducts.map(product => `
+              <button
+                onclick="inviteValidatorToProduct(${validatorId}, ${product.id}, '${escapeHtml(validatorName)}', '${escapeHtml(product.title)}')"
+                class="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition"
+              >
+                <div class="font-semibold text-gray-900">${escapeHtml(product.title)}</div>
+                <div class="text-sm text-gray-600">${escapeHtml(product.category || 'No category')}</div>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+  } catch (error) {
+    console.error('Error loading products:', error);
+    showToast('Error al cargar tus productos', 'error');
+  }
+}
+
+// Function to close select product modal
+function closeSelectProductModal() {
+  const modal = document.getElementById('select-product-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// Function to invite validator to a specific product
+async function inviteValidatorToProduct(validatorId, productId, validatorName, productTitle) {
+  console.log('inviteValidatorToProduct:', { validatorId, productId, validatorName, productTitle });
+  
+  if (!authToken) {
+    showToast('Debes iniciar sesión', 'error');
+    return;
+  }
+  
+  try {
+    const response = await axios.post(
+      `/api/marketplace/products/${productId}/invite-validator`,
+      { validator_id: validatorId },
+      { headers: { Authorization: `Bearer ${authToken}` } }
+    );
+    
+    showToast(`¡${validatorName} fue invitado a validar ${productTitle}!`, 'success');
+    closeSelectProductModal();
+    
+  } catch (error) {
+    console.error('Error inviting validator:', error);
+    const errorMsg = error.response?.data?.error || 'Error al invitar validador';
+    showToast(errorMsg, 'error');
+  }
+}
+
+// Function to open chat with validator
+async function openChatWithValidator(validatorId, validatorName) {
+  console.log('openChatWithValidator called:', { validatorId, validatorName });
+  
+  if (!authToken || !currentUser) {
+    showToast('Debes iniciar sesión para chatear', 'error');
+    return;
+  }
+  
+  try {
+    // Check if there's an active session with this validator
+    const sessionResponse = await axios.get(`/api/marketplace/sessions/validator/${validatorId}`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const session = sessionResponse.data.session;
+    
+    if (!session) {
+      showToast('No tienes una sesión activa con este validador. Primero debes invitarlo a uno de tus productos.', 'warning');
+      return;
+    }
+    
+    // Open chat modal
+    const modal = document.createElement('div');
+    modal.id = 'chat-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between p-6 border-b">
+          <h2 class="text-xl font-bold text-gray-900">Chat with ${escapeHtml(validatorName)}</h2>
+          <button onclick="closeChatModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
+          <div class="text-center text-gray-500">
+            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+            <p>Loading messages...</p>
+          </div>
+        </div>
+        <div class="p-6 border-t">
+          <form id="chat-form" class="flex space-x-2">
+            <input
+              type="text"
+              id="chat-message-input"
+              placeholder="Type your message..."
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+            <button
+              type="submit"
+              class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+            >
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Load messages
+    await loadChatMessages(session.id);
+    
+    // Set up form handler
+    document.getElementById('chat-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('chat-message-input');
+      const message = input.value.trim();
+      
+      if (!message) return;
+      
+      try {
+        await axios.post(
+          `/api/marketplace/sessions/${session.id}/messages`,
+          { message },
+          { headers: { Authorization: `Bearer ${authToken}` } }
+        );
+        
+        input.value = '';
+        await loadChatMessages(session.id);
+        
+      } catch (error) {
+        console.error('Error sending message:', error);
+        showToast('Error al enviar mensaje', 'error');
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error opening chat:', error);
+    showToast('Error al abrir el chat', 'error');
+  }
+}
+
+// Function to load chat messages
+async function loadChatMessages(sessionId) {
+  try {
+    const response = await axios.get(`/api/marketplace/sessions/${sessionId}/messages`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const messages = response.data.messages || [];
+    const container = document.getElementById('chat-messages');
+    
+    if (messages.length === 0) {
+      container.innerHTML = `
+        <div class="text-center text-gray-500">
+          <i class="fas fa-comments text-4xl mb-2"></i>
+          <p>No messages yet. Start the conversation!</p>
+        </div>
+      `;
+    } else {
+      container.innerHTML = messages.map(msg => `
+        <div class="flex ${msg.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}">
+          <div class="max-w-xs ${msg.sender_id === currentUser.id ? 'bg-primary text-white' : 'bg-white border border-gray-200'} rounded-lg p-3">
+            <div class="font-semibold text-sm mb-1">${escapeHtml(msg.sender_name)}</div>
+            <div class="text-sm">${escapeHtml(msg.message)}</div>
+            <div class="text-xs opacity-70 mt-1">${new Date(msg.created_at).toLocaleTimeString()}</div>
+          </div>
+        </div>
+      `).join('');
+      
+      // Scroll to bottom
+      container.scrollTop = container.scrollHeight;
+    }
+    
+  } catch (error) {
+    console.error('Error loading messages:', error);
+    const container = document.getElementById('chat-messages');
+    container.innerHTML = `
+      <div class="text-center text-red-500">
+        <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+        <p>Error loading messages</p>
+      </div>
+    `;
+  }
+}
+
+// Function to close chat modal
+function closeChatModal() {
+  const modal = document.getElementById('chat-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// Function to show validator profile
+async function showValidatorProfile(validatorId) {
+  console.log('showValidatorProfile called:', validatorId);
+  
+  try {
+    const response = await axios.get(`/api/marketplace/validators/${validatorId}`);
+    const validator = response.data.validator;
+    
+    const modal = document.createElement('div');
+    modal.id = 'validator-profile-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto';
+    modal.innerHTML = `
+      <div class="bg-white rounded-xl max-w-2xl w-full my-8">
+        <div class="flex items-center justify-between p-6 border-b">
+          <h2 class="text-2xl font-bold text-gray-900">${escapeHtml(validator.name)}</h2>
+          <button onclick="closeValidatorProfile()" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-6">
+          <div class="flex items-start space-x-4">
+            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-3xl font-bold">
+              ${validator.name?.charAt(0) || 'V'}
+            </div>
+            <div class="flex-1">
+              <h3 class="text-xl font-semibold text-gray-900">${escapeHtml(validator.title || 'Validator')}</h3>
+              <div class="flex items-center mt-2">
+                <span class="text-yellow-500 text-lg">★</span>
+                <span class="text-lg font-semibold ml-1">${validator.rating ? validator.rating.toFixed(1) : 'N/A'}</span>
+                <span class="text-sm text-gray-500 ml-2">(${validator.total_validations || 0} validations)</span>
+              </div>
+            </div>
+          </div>
+          
+          ${validator.bio ? `
+            <div>
+              <h4 class="font-semibold text-gray-900 mb-2">About</h4>
+              <p class="text-gray-700">${escapeHtml(validator.bio)}</p>
+            </div>
+          ` : ''}
+          
+          ${validator.expertise ? `
+            <div>
+              <h4 class="font-semibold text-gray-900 mb-2">Expertise</h4>
+              <div class="flex flex-wrap gap-2">
+                ${JSON.parse(validator.expertise || '[]').map(exp => 
+                  `<span class="badge bg-blue-100 text-blue-800 text-sm px-3 py-1">${escapeHtml(exp)}</span>`
+                ).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          <div class="grid grid-cols-2 gap-4">
+            ${validator.hourly_rate ? `
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <div class="text-sm text-gray-600">Hourly Rate</div>
+                <div class="text-xl font-bold text-gray-900">$${validator.hourly_rate}/h</div>
+              </div>
+            ` : ''}
+            ${validator.experience_years ? `
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <div class="text-sm text-gray-600">Experience</div>
+                <div class="text-xl font-bold text-gray-900">${validator.experience_years} years</div>
+              </div>
+            ` : ''}
+          </div>
+          
+          ${authToken && currentUser?.role === 'founder' ? `
+            <div class="flex space-x-3">
+              <button onclick="closeValidatorProfile(); openSelectProductModal(${validator.id}, '${escapeHtml(validator.name)}')" class="flex-1 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition font-semibold">
+                <i class="fas fa-plus mr-2"></i>Invite to Product
+              </button>
+              <button onclick="closeValidatorProfile(); openChatWithValidator(${validator.id}, '${escapeHtml(validator.name)}')" class="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition font-semibold">
+                <i class="fas fa-comment-dots mr-2"></i>Chat
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+  } catch (error) {
+    console.error('Error loading validator profile:', error);
+    showToast('Error al cargar el perfil del validador', 'error');
+  }
+}
+
+// Function to close validator profile
+function closeValidatorProfile() {
+  const modal = document.getElementById('validator-profile-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// Make new functions globally available
+window.openSelectProductModal = openSelectProductModal;
+window.closeSelectProductModal = closeSelectProductModal;
+window.inviteValidatorToProduct = inviteValidatorToProduct;
+window.openChatWithValidator = openChatWithValidator;
+window.closeChatModal = closeChatModal;
+window.loadChatMessages = loadChatMessages;
+window.showValidatorProfile = showValidatorProfile;
+window.closeValidatorProfile = closeValidatorProfile;

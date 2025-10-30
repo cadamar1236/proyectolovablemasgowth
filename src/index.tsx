@@ -92,11 +92,12 @@ app.get('/vote/:projectId', async (c) => {
 app.get('/', (c) => {
   return c.html(`
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ValidAI Studio - Validación IA + Venture Studio</title>
+    <title>Product Validation Marketplace | Connect Founders with Expert Validators</title>
+    <meta name="description" content="The trusted marketplace connecting product founders with expert validators. Get real feedback, validate your product, and launch with confidence.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script>
@@ -104,100 +105,53 @@ app.get('/', (c) => {
         theme: {
           extend: {
             colors: {
-              primary: '#6366f1',
-              secondary: '#8b5cf6',
+              primary: '#FF5100',
+              secondary: '#FFA500',
             }
           }
         }
       }
     </script>
     <style>
-      .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-      }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; }
+      .yc-orange { color: #FF5100; }
+      .yc-bg-orange { background-color: #FF5100; }
+      .hover-lift { transition: transform 0.2s; }
+      .hover-lift:hover { transform: translateY(-2px); }
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+<body class="bg-white">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
+    <nav class="border-b border-gray-200 bg-white">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-14">
                 <div class="flex items-center">
-                    <span class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                        ⚡ ValidAI Studio
-                    </span>
+                    <a href="/" class="text-xl font-bold yc-orange">
+                        Validate
+                    </a>
                 </div>
                 
-                <!-- Desktop Navigation -->
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="#dashboard" class="text-gray-700 hover:text-primary transition">Dashboard</a>
-                    <a href="#validation" onclick="showValidationForm();return false;" class="text-gray-700 hover:text-primary transition">Validación</a>
-                    <a href="/leaderboard" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
+                <div class="flex items-center space-x-6">
+                    <a href="/marketplace" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+                        Browse Products
                     </a>
-                    <a href="/marketplace" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
+                    <a href="/marketplace" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+                        For Validators
                     </a>
-                    <a href="/pricing" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-tag mr-1 text-green-500"></i>Planes
+                    <a href="/pricing" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+                        Pricing
                     </a>
-                    <div class="nav-auth-buttons flex items-center space-x-4">
-                        <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition">
-                            Iniciar Sesión
-                        </button>
-                        <button onclick="showAuthModal('register')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-                            Registrarse
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Mobile menu button -->
-                <div class="md:hidden flex items-center">
-                    <button onclick="toggleMobileMenu()" class="text-gray-700 hover:text-primary transition" id="mobile-menu-button">
-                        <i class="fas fa-bars text-xl"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Mobile Navigation Menu -->
-            <div class="md:hidden hidden" id="mobile-menu">
-                <div class="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
-                    <a href="#dashboard" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                    <a href="/marketplace" class="text-sm font-medium yc-bg-orange text-white px-4 py-2 rounded hover:bg-opacity-90">
+                        Get Started
                     </a>
-                    <a href="#validation" onclick="showValidationForm();return false;" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-check-circle mr-2"></i>Validación
-                    </a>
-                    <a href="/leaderboard" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
-                    </a>
-                    <a href="/marketplace" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
-                    </a>
-                    <a href="/pricing" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-tag mr-1 text-green-500"></i>Planes
-                    </a>
-                    <div class="nav-auth-buttons border-t pt-2 mt-2">
-                        <button onclick="showAuthModal('login')" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-primary transition">
-                            <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
-                        </button>
-                        <button onclick="showAuthModal('register')" class="block w-full text-left px-3 py-2 mt-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
-                            <i class="fas fa-user-plus mr-2"></i>Registrarse
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <div class="relative overflow-hidden bg-gradient-to-r from-primary via-secondary to-purple-600 text-white">
-        <div class="max-w-7xl mx-auto px-4 py-16 sm:py-20 md:py-24 sm:px-6 lg:px-8">
-            <div class="text-center">
+    <!-- Hero Section - YC Style -->
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20">
+        <div class="text-center">
                 <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6">
                     Validamos y lanzamos startups exitosas
                     <span class="block text-yellow-300">10x más rápido</span>
