@@ -440,6 +440,25 @@ marketplace.get('/products/:id', async (c) => {
   });
 });
 
+// Get my products (authenticated)
+marketplace.get('/products/my', requireAuth, async (c) => {
+  const userId = c.get('userId');
+  
+  const { results } = await c.env.DB.prepare(`
+    SELECT 
+      p.*,
+      u.name as company_name,
+      u.avatar_url as company_avatar,
+      u.company
+    FROM beta_products p
+    JOIN users u ON p.company_user_id = u.id
+    WHERE p.company_user_id = ?
+    ORDER BY p.created_at DESC
+  `).bind(userId).all();
+  
+  return c.json({ products: results });
+});
+
 // Create beta product (authenticated, founders only)
 marketplace.post('/products', requireAuth, async (c) => {
   const userId = c.get('userId');
@@ -676,6 +695,68 @@ marketplace.post('/applications', requireAuth, async (c) => {
     product_id
   ).run();
   
+  return c.json({
+    id: result.meta.last_row_id,
+    message: 'Application submitted successfully'
+  });
+});
+
+// Apply to validate a product (authenticated, validators only) - Alternative route
+marketplace.post('/products/:id/apply', requireAuth, async (c) => {
+  const userId = c.get('userId');
+  const userRole = c.get('userRole');
+  const productId = c.req.param('id');
+
+  if (userRole !== 'validator') {
+    return c.json({ error: 'Only validators can apply' }, 403);
+  }
+
+  const { message } = await c.req.json();
+
+  // Get validator ID
+  const validator = await c.env.DB.prepare(
+    'SELECT id FROM validators WHERE user_id = ?'
+  ).bind(userId).first() as any;
+
+  if (!validator) {
+    return c.json({ error: 'Validator profile not found' }, 404);
+  }
+
+  // Check if product exists and is active
+  const product = await c.env.DB.prepare(
+    'SELECT id, validators_needed, validators_accepted FROM beta_products WHERE id = ? AND status = ?'
+  ).bind(productId, 'active').first() as any;
+
+  if (!product) {
+    return c.json({ error: 'Product not found or not accepting applications' }, 404);
+  }
+
+  // Check if already applied
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM validator_applications WHERE product_id = ? AND validator_id = ?'
+  ).bind(productId, validator.id).first();
+
+  if (existing) {
+    return c.json({ error: 'Already applied to this product' }, 400);
+  }
+
+  // Create application
+  const result = await c.env.DB.prepare(`
+    INSERT INTO validator_applications (product_id, validator_id, message, status)
+    VALUES (?, ?, ?, 'pending')
+  `).bind(productId, validator.id, message || '').run();
+
+  // Notify company (create notification)
+  await c.env.DB.prepare(`
+    INSERT INTO notifications (user_id, type, title, message, link)
+    SELECT company_user_id, 'application', 'Nueva aplicación para validación', ?, ?
+    FROM beta_products WHERE id = ?
+  `).bind(
+    `Un validador ha aplicado para probar tu producto`,
+    `/marketplace/applications/${result.meta.last_row_id}`,
+    productId
+  ).run();
+
   return c.json({
     id: result.meta.last_row_id,
     message: 'Application submitted successfully'
@@ -1313,6 +1394,26 @@ marketplace.get('/notifications/unread-count', requireAuth, async (c) => {
 
 // Get founder's own products
 marketplace.get('/my-products', requireAuth, async (c) => {
+  const userId = c.get('userId');
+  
+  const result = await c.env.DB.prepare(`
+    SELECT 
+      p.*,
+      u.name as company_name,
+      COUNT(DISTINCT va.id) as validators_count
+    FROM beta_products p
+    JOIN users u ON p.company_user_id = u.id
+    LEFT JOIN validator_applications va ON p.id = va.product_id AND va.status = 'approved'
+    WHERE p.company_user_id = ?
+    GROUP BY p.id
+    ORDER BY p.created_at DESC
+  `).bind(userId).all();
+  
+  return c.json({ products: result.results || [] });
+});
+
+// Get founder's own products (alias for /my-products)
+marketplace.get('/products/my', requireAuth, async (c) => {
   const userId = c.get('userId');
   
   const result = await c.env.DB.prepare(`

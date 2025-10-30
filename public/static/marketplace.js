@@ -47,9 +47,28 @@ function generateProductVoteButtons(item) {
   if (!currentUser) {
     return '<p class="text-sm text-gray-500">Inicia sesión para votar</p>';
   }
+
+  // Check if user is a validator
+  const isValidator = currentUser.validator_id !== null && currentUser.validator_id !== undefined;
+
+  if (isValidator) {
+    // For validators: show apply button instead of vote buttons
+    return `
+      <div class="flex items-center justify-between">
+        <button onclick="event.stopPropagation(); applyToProduct(${productId})" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition text-sm font-semibold flex items-center">
+          <i class="fas fa-plus mr-2"></i>Aplicar para validar
+        </button>
+        <div class="text-center">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(`${window.location.origin}/marketplace?product=${productId}`)}" alt="QR para compartir producto" class="inline-block">
+          <p class="text-xs text-gray-500">Comparte este producto</p>
+        </div>
+      </div>
+    `;
+  }
+
   const voteUrl = `${window.location.origin}/marketplace?product=${productId}`;
   if (item.user_vote) {
-    // Ya votó, mostrar su voto
+    // Already voted, show their vote
     return `
       <div class="flex items-center space-x-2">
         <div class="text-sm text-green-600">Tu voto: ${item.user_vote} estrella${item.user_vote > 1 ? 's' : ''}</div>
@@ -65,7 +84,7 @@ function generateProductVoteButtons(item) {
       </div>
     `;
   } else {
-    // No ha votado, mostrar estrellas para votar
+    // Hasn't voted, show stars to vote
     return `
       <div class="flex items-center space-x-2">
         <div class="flex space-x-1">
@@ -94,6 +113,30 @@ async function voteForProduct(productId, rating = 1) {
     loadMarketplaceItems();
   } catch (error) {
     console.error('Failed to vote for product:', error);
+  }
+}
+
+// Apply to validate product function
+async function applyToProduct(productId) {
+  if (!currentUser || !currentUser.validator_id) {
+    showToast('Solo validadores pueden aplicar a productos', 'error');
+    return;
+  }
+
+  try {
+    const response = await axios.post(`/api/marketplace/products/${productId}/apply`, {
+      message: 'Estoy interesado en validar este producto.'
+    }, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    showToast('¡Aplicación enviada exitosamente! El fundador revisará tu solicitud.', 'success');
+    // Reload marketplace items to update UI if needed
+    loadMarketplaceItems();
+  } catch (error) {
+    console.error('Failed to apply to product:', error);
+    const errorMessage = error.response?.data?.error || 'Error al aplicar al producto';
+    showToast(errorMessage, 'error');
   }
 }
 
