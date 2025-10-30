@@ -88,8 +88,86 @@ app.get('/vote/:projectId', async (c) => {
   }
 });
 
-// Frontend Routes - Redirect to new landing page
-app.get('/', serveStatic({ path: './public/new-landing.html' }));
+// Frontend Routes - Serve landing page inline (compatible with Cloudflare Workers)
+app.get('/', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validate | Product Validation Marketplace</title>
+    <meta name="description" content="Connect with expert validators. Get real feedback, validate your product faster, and launch with confidence.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: '#4F46E5',
+              secondary: '#7C3AED',
+              accent: '#F59E0B',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; }
+      .gradient-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+      .gradient-secondary { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+      .hover-lift { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+      .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+      .animate-fade-in { animation: fadeIn 0.6s ease-in; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      .card-hover { transition: all 0.3s ease; }
+      .card-hover:hover { transform: translateY(-8px); box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-white to-gray-50">
+    <nav class="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-2">
+                        <div class="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
+                            <i class="fas fa-check-double text-white text-xl"></i>
+                        </div>
+                        <span class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                            Validate
+                        </span>
+                    </a>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="/marketplace" class="px-6 py-2.5 gradient-primary text-white rounded-lg font-semibold hover:shadow-lg transition transform hover:scale-105">
+                        Get Started
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <section class="relative overflow-hidden pt-20 pb-32">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/5 via-purple-50 to-secondary/5"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div class="text-center animate-fade-in">
+                <h1 class="text-5xl md:text-7xl font-extrabold text-gray-900 mb-6 leading-tight">
+                    Get Real Feedback<br>
+                    <span class="bg-gradient-to-r from-primary via-purple-600 to-secondary bg-clip-text text-transparent">
+                        From Expert Validators
+                    </span>
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
+                    Connect with experienced product validators who provide honest feedback to help you build products people actually want.
+                </p>
+                <a href="/marketplace" class="inline-block px-8 py-4 gradient-primary text-white rounded-xl font-bold text-lg hover:shadow-2xl transition transform hover:scale-105">
+                    <i class="fas fa-rocket mr-2"></i>Find Validators
+                </a>
+            </div>
+        </div>
+    </section>
+</body>
+</html>`);
+});
 
 // Legacy route (keep for backwards compatibility)
 app.get('/old', (c) => {
