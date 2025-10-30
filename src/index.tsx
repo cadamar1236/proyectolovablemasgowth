@@ -20,6 +20,9 @@ import marketplace from './api/marketplace';
 import plans from './api/plans';
 import stripe from './api/stripe';
 import dashboard from './api/dashboard';
+import validatorRequests from './api/validator-requests';
+import chat from './api/chat';
+import notifications from './api/notifications';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -40,6 +43,9 @@ app.route('/api/beta-users', betaUsers);
 app.route('/api/mvp', mvpGenerator);
 app.route('/api/deploy', deploy);
 app.route('/api/dashboard', dashboard);
+app.route('/api/validator-requests', validatorRequests);
+app.route('/api/chat', chat);
+app.route('/api/notifications', notifications);
 
 // Vote page for QR codes
 app.get('/vote/:projectId', async (c) => {
