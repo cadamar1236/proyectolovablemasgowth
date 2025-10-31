@@ -506,6 +506,10 @@ function updateAuthUI() {
         <span class="text-gray-700">
           <i class="fas fa-user-circle mr-1"></i>${currentUser.name}
         </span>
+        <select onchange="changeUserRole(this.value)" class="text-sm border border-gray-300 rounded px-2 py-1">
+          <option value="founder" ${currentUser.role === 'founder' ? 'selected' : ''}>Founder</option>
+          <option value="validator" ${currentUser.role === 'validator' ? 'selected' : ''}>Validator</option>
+        </select>
         <button onclick="logout()" class="text-gray-600 hover:text-red-600 transition">
           <i class="fas fa-sign-out-alt mr-1"></i>Salir
         </button>
@@ -523,9 +527,7 @@ function updateAuthUI() {
     myDashboardTab.classList.remove('hidden');
     
     // Role-based tab visibility
-    const isValidator = currentUser.validator_id !== null && currentUser.validator_id !== undefined;
-    
-    if (isValidator) {
+    if (currentUser.role === 'validator') {
       // Validators can see: Products and Dashboard
       productsTab.classList.remove('hidden');
       validatorsTab.classList.add('hidden');
@@ -625,7 +627,6 @@ function showAuthModal(mode) {
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Rol</label>
           <select id="register-role" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-            <option value="">Selecciona tu rol</option>
             <option value="founder">Founder (Busco validadores)</option>
             <option value="validator">Validador (Quiero validar productos)</option>
           </select>
@@ -3910,7 +3911,8 @@ function openSelectProductModal(validatorId, validatorName) {
 // Function to load user's products for request
 async function loadUserProductsForRequest(validatorId) {
   try {
-    const response = await axios.get('/api/marketplace/products/my', {
+    // Use existing products endpoint and filter by current user
+    const response = await axios.get('/api/marketplace/products', {
       headers: { Authorization: `Bearer ${authToken}` }
     });
     
@@ -3921,8 +3923,15 @@ async function loadUserProductsForRequest(validatorId) {
         select.remove(1);
       }
       
+      // Filter products to only show those owned by current user
+      const userProducts = response.data.products.filter(product => 
+        product.company_user_id === currentUser.id
+      );
+      
+      console.log('User products found:', userProducts.length, 'for user:', currentUser.id);
+      
       // Add user's products
-      response.data.products.forEach(product => {
+      userProducts.forEach(product => {
         const option = document.createElement('option');
         option.value = product.id;
         option.textContent = product.title;
@@ -3942,7 +3951,7 @@ async function handleSendValidatorRequest(validatorId) {
   try {
     const response = await axios.post('/api/validator-requests/send', {
       validatorId: validatorId,
-      projectId: productId || null,
+      projectId: null, // Temporarily send null since project_id references projects table, not beta_products
       message: message
     }, {
       headers: { Authorization: `Bearer ${authToken}` }
@@ -3979,6 +3988,199 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// Function to change user role
+async function changeUserRole(newRole) {
+  if (!authToken) {
+    showAuthModal('login');
+    return;
+  }
+  
+  try {
+    const response = await axios.put('/api/auth/role', 
+      { newRole }, 
+      { headers: { Authorization: `Bearer ${authToken}` } }
+    );
+    
+    // Update token and user data
+    authToken = response.data.token;
+    currentUser = response.data.user;
+    localStorage.setItem('authToken', authToken);
+    
+    // Update UI
+    updateAuthUI();
+    
+    // Reload the page to show the new dashboard
+    window.location.reload();
+    
+  } catch (error) {
+    console.error('Error changing role:', error);
+    alert('Error: ' + (error.response?.data?.error || 'No se pudo cambiar el rol'));
+  }
+}
+
+// Function to update authentication UI based on user role
+function updateAuthUI() {
+  const roleSelector = document.getElementById('role-selector');
+  const mobileRoleSelector = document.getElementById('mobile-role-selector');
+  
+  if (currentUser) {
+    // Show role selectors
+    if (roleSelector) roleSelector.style.display = 'flex';
+    if (mobileRoleSelector) mobileRoleSelector.style.display = 'block';
+    
+    // Update current role display
+    const currentRoleDisplay = document.getElementById('current-role');
+    const mobileCurrentRoleDisplay = document.getElementById('mobile-current-role');
+    
+    const roleText = currentUser.role === 'founder' ? 'Founder' : 'Validator';
+    if (currentRoleDisplay) currentRoleDisplay.textContent = roleText;
+    if (mobileCurrentRoleDisplay) mobileCurrentRoleDisplay.textContent = roleText;
+    
+    // Update select values
+    const desktopSelect = roleSelector?.querySelector('select');
+    const mobileSelect = mobileRoleSelector?.querySelector('select');
+    
+    if (desktopSelect) desktopSelect.value = currentUser.role;
+    if (mobileSelect) mobileSelect.value = currentUser.role;
+    
+  } else {
+    // Hide role selectors
+    if (roleSelector) roleSelector.style.display = 'none';
+    if (mobileRoleSelector) mobileRoleSelector.style.display = 'none';
+  }
+  
+  // Also update marketplace-specific auth UI
+  updateMarketplaceAuthUI();
+}
+
+// Function to update marketplace-specific authentication UI
+function updateMarketplaceAuthUI() {
+  const authNav = document.getElementById('auth-nav');
+  const mobileAuthNav = document.getElementById('mobile-auth-nav');
+  const createProductBtn = document.getElementById('create-product-btn');
+  const myDashboardTab = document.getElementById('my-dashboard-tab');
+  const productsTab = document.getElementById('products-tab');
+  const validatorsTab = document.getElementById('validators-tab');
+  const internalDashboardTab = document.getElementById('internal-dashboard-tab');
+  const internalDashboardContent = document.getElementById('internal-dashboard-content');
+  
+  if (currentUser) {
+    // Desktop auth nav
+    authNav.innerHTML = `
+      <div class="flex items-center space-x-4">
+        <span class="text-gray-700">
+          <i class="fas fa-user-circle mr-1"></i>${currentUser.name}
+        </span>
+        <select onchange="changeUserRole(this.value)" class="text-sm border border-gray-300 rounded px-2 py-1">
+          <option value="founder" ${currentUser.role === 'founder' ? 'selected' : ''}>Founder</option>
+          <option value="validator" ${currentUser.role === 'validator' ? 'selected' : ''}>Validator</option>
+        </select>
+        <button onclick="logout()" class="text-gray-600 hover:text-red-600 transition">
+          <i class="fas fa-sign-out-alt mr-1"></i>Salir
+        </button>
+      </div>
+    `;
+    
+    // Mobile auth nav
+    mobileAuthNav.innerHTML = `
+      <button onclick="logout()" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-red-600 transition">
+        <i class="fas fa-sign-out-alt mr-2"></i>Salir (${currentUser.name})
+      </button>
+    `;
+    
+    // Show dashboard tab for all authenticated users
+    myDashboardTab.classList.remove('hidden');
+    
+    // Role-based tab visibility
+    if (currentUser.role === 'validator') {
+      // Validators can see: Products and Dashboard
+      productsTab.classList.remove('hidden');
+      validatorsTab.classList.add('hidden');
+    } else if (currentUser.role === 'founder') {
+      // Founders can see: Products, Validators, and Dashboard
+      productsTab.classList.remove('hidden');
+      validatorsTab.classList.remove('hidden');
+    } else {
+      // Other roles: show all tabs
+      productsTab.classList.remove('hidden');
+      validatorsTab.classList.remove('hidden');
+    }
+    
+    // Show create product button for founders
+    if (currentUser.role === 'founder') {
+      createProductBtn.classList.remove('hidden');
+    }
+  } else {
+    // Not authenticated: show all tabs
+    authNav.innerHTML = `
+      <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition mr-4">
+        Iniciar Sesión
+      </button>
+      <button onclick="showAuthModal('register')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
+        Registrarse
+      </button>
+    `;
+    
+    mobileAuthNav.innerHTML = `
+      <button onclick="showAuthModal('login')" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-primary transition">
+        <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
+      </button>
+      <button onclick="showAuthModal('register')" class="block w-full text-left px-3 py-2 mt-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
+        <i class="fas fa-user-plus mr-2"></i>Registrarse
+      </button>
+    `;
+    
+    myDashboardTab.classList.add('hidden');
+    createProductBtn.classList.add('hidden');
+    productsTab.classList.remove('hidden');
+    validatorsTab.classList.remove('hidden');
+  }
+  
+  // Check if user is admin and update internal dashboard visibility
+  if (currentUser && (currentUser.role === 'admin' || currentUser.email === 'cadamar1236@gmail.com')) {
+    internalDashboardTab.classList.remove('hidden');
+    loadInternalDashboard();
+  } else {
+    internalDashboardTab.classList.add('hidden');
+    internalDashboardContent.innerHTML = '';
+  }
+}
+
+// Function to update authentication UI based on user role
+function updateAuthUI() {
+  const roleSelector = document.getElementById('role-selector');
+  const mobileRoleSelector = document.getElementById('mobile-role-selector');
+  
+  if (currentUser) {
+    // Show role selectors
+    if (roleSelector) roleSelector.style.display = 'flex';
+    if (mobileRoleSelector) mobileRoleSelector.style.display = 'block';
+    
+    // Update current role display
+    const currentRoleDisplay = document.getElementById('current-role');
+    const mobileCurrentRoleDisplay = document.getElementById('mobile-current-role');
+    
+    const roleText = currentUser.role === 'founder' ? 'Founder' : 'Validator';
+    if (currentRoleDisplay) currentRoleDisplay.textContent = roleText;
+    if (mobileCurrentRoleDisplay) mobileCurrentRoleDisplay.textContent = roleText;
+    
+    // Update select values
+    const desktopSelect = roleSelector?.querySelector('select');
+    const mobileSelect = mobileRoleSelector?.querySelector('select');
+    
+    if (desktopSelect) desktopSelect.value = currentUser.role;
+    if (mobileSelect) mobileSelect.value = currentUser.role;
+    
+  } else {
+    // Hide role selectors
+    if (roleSelector) roleSelector.style.display = 'none';
+    if (mobileRoleSelector) mobileRoleSelector.style.display = 'none';
+  }
+  
+  // Also update marketplace-specific auth UI
+  updateMarketplaceAuthUI();
+}
+
 // Make functions globally available
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
@@ -3989,3 +4191,6 @@ window.toggleCompensationAmount = toggleCompensationAmount;
 window.openSelectProductModal = openSelectProductModal;
 window.closeSelectProductModal = closeSelectProductModal;
 window.openChatWithValidator = openChatWithValidator;
+window.changeUserRole = changeUserRole;
+window.updateAuthUI = updateAuthUI;
+window.updateMarketplaceAuthUI = updateMarketplaceAuthUI;
