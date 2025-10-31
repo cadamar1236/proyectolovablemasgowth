@@ -1907,8 +1907,30 @@ async function loadMyDashboard() {
   }
   
   try {
+    // Load chat data first
+    const chatRequestsData = await loadChatRequests();
+    const conversationsData = await loadConversations();
+
+    // Render chat sections at the top of dashboard
+    let chatSectionsHTML = '';
+    
+    // For validators: show pending chat requests
+    if (currentUser.role === 'validator' && chatRequestsData.requests.length > 0) {
+      chatSectionsHTML += renderChatRequestsSection(chatRequestsData.requests);
+    }
+
+    // For everyone: show active conversations
+    if (conversationsData.conversations.length > 0) {
+      chatSectionsHTML += renderConversationsSection(conversationsData.conversations);
+    }
+
+    // If there are chat sections, prepend them to dashboard
+    if (chatSectionsHTML) {
+      dashboardContent.innerHTML = chatSectionsHTML;
+    }
+    
     // Always render goals dashboard for all authenticated users
-    renderGoalsDashboard();
+    await renderGoalsDashboard();
     
     // Check if user is admin (cadamar1236@gmail.com) and show internal dashboard
     if (currentUser && currentUser.email === 'cadamar1236@gmail.com') {
@@ -3974,11 +3996,529 @@ function closeSelectProductModal() {
   }
 }
 
+// ============================================
+// CHAT SYSTEM
+// ============================================
+
+// Global chat state
+let unreadChatMessages = 0;
+let chatPollingInterval = null;
+let currentConversationId = null;
+let chatMessages = [];
+
 // Function to open chat with validator
-function openChatWithValidator(validatorId, validatorName) {
-  showToast('Para chatear, primero envía una solicitud al validador', 'info');
-  // Redirect to send request
-  openSelectProductModal(validatorId, validatorName);
+async function openChatWithValidator(validatorId, validatorName) {
+  if (!authToken || !currentUser) {
+    showAuthModal('login');
+    return;
+  }
+
+  // Check if there's an existing conversation
+  try {
+    const response = await axios.get('/api/chat/conversations', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const conversations = response.data.conversations || [];
+    const existingConv = conversations.find(conv => 
+      conv.validator_id == validatorId || conv.other_user_name === validatorName
+    );
+
+    if (existingConv) {
+      // Open existing conversation
+      openChatModal(existingConv.id, validatorName);
+    } else {
+      // Show request modal
+      showChatRequestModal(validatorId, validatorName);
+    }
+  } catch (error) {
+    console.error('Error checking conversations:', error);
+    showChatRequestModal(validatorId, validatorName);
+  }
+}
+
+// Show modal to send chat request
+function showChatRequestModal(validatorId, validatorName) {
+  const modal = document.createElement('div');
+  modal.id = 'chat-request-modal';
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+  modal.onclick = (e) => {
+    if (e.target === modal) closeChatRequestModal();
+  };
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onclick="event.stopPropagation()">
+      <h2 class="text-2xl font-bold mb-4 text-gray-900">
+        <i class="fas fa-comment-dots text-primary mr-2"></i>
+        Solicitar Chat con ${escapeHtml(validatorName)}
+      </h2>
+      <p class="text-gray-600 mb-4">
+        Envía una solicitud de chat a este validador. Podrás chatear una vez que acepte tu solicitud.
+      </p>
+      <form id="chat-request-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Mensaje (opcional)</label>
+          <textarea id="chat-request-message" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Hola, me gustaría hablar contigo sobre..."></textarea>
+        </div>
+        <div class="flex space-x-3">
+          <button type="button" onclick="closeChatRequestModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+            Cancelar
+          </button>
+          <button type="submit" class="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
+            <i class="fas fa-paper-plane mr-2"></i>Enviar Solicitud
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  document.getElementById('chat-request-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await sendChatRequest(validatorId, validatorName);
+  });
+}
+
+function closeChatRequestModal() {
+  const modal = document.getElementById('chat-request-modal');
+  if (modal) modal.remove();
+}
+
+// Send chat request
+async function sendChatRequest(validatorId, validatorName) {
+  const message = document.getElementById('chat-request-message').value || 'Hola, me gustaría chatear contigo.';
+
+  try {
+    const response = await axios.post('/api/validator-requests/send', {
+      validatorId: validatorId,
+      message: message,
+      projectId: null // No project-specific, just general chat request
+    }, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    showToast('¡Solicitud enviada! Te notificaremos cuando el validador responda.', 'success');
+    closeChatRequestModal();
+  } catch (error) {
+    console.error('Error sending chat request:', error);
+    const errorMsg = error.response?.data?.error || 'Error al enviar solicitud';
+    showToast(errorMsg, 'error');
+  }
+}
+
+// Open chat modal with conversation
+async function openChatModal(conversationId, otherUserName) {
+  currentConversationId = conversationId;
+
+  const modal = document.createElement('div');
+  modal.id = 'chat-modal';
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+  modal.onclick = (e) => {
+    if (e.target === modal) closeChatModal();
+  };
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-primary to-secondary p-4 text-white rounded-t-xl flex items-center justify-between">
+        <div class="flex items-center">
+          <i class="fas fa-comment-dots text-2xl mr-3"></i>
+          <div>
+            <h3 class="font-bold text-lg">${escapeHtml(otherUserName)}</h3>
+            <p class="text-sm text-blue-100">Online</p>
+          </div>
+        </div>
+        <button onclick="closeChatModal()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-10 h-10 flex items-center justify-center transition">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+
+      <!-- Messages -->
+      <div id="chat-messages-container" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+        <div class="text-center py-8">
+          <i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i>
+          <p class="text-gray-500 mt-2">Cargando mensajes...</p>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="p-4 border-t border-gray-200 bg-white rounded-b-xl">
+        <form id="chat-send-form" class="flex space-x-2">
+          <input 
+            type="text" 
+            id="chat-message-input" 
+            placeholder="Escribe un mensaje..." 
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            required
+          >
+          <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 transition font-semibold">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Load messages
+  await loadChatMessages(conversationId);
+
+  // Setup send form
+  document.getElementById('chat-send-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await sendChatMessage(conversationId);
+  });
+
+  // Start polling for new messages
+  startChatPolling(conversationId);
+}
+
+function closeChatModal() {
+  const modal = document.getElementById('chat-modal');
+  if (modal) modal.remove();
+  currentConversationId = null;
+  stopChatPolling();
+}
+
+// Load chat messages
+async function loadChatMessages(conversationId) {
+  try {
+    const response = await axios.get(`/api/chat/conversations/${conversationId}/messages`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    chatMessages = response.data.messages || [];
+    renderChatMessages();
+  } catch (error) {
+    console.error('Error loading chat messages:', error);
+    const container = document.getElementById('chat-messages-container');
+    if (container) {
+      container.innerHTML = `
+        <div class="text-center py-8">
+          <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+          <p class="text-gray-600 mt-2">Error al cargar mensajes</p>
+        </div>
+      `;
+    }
+  }
+}
+
+// Render chat messages
+function renderChatMessages() {
+  const container = document.getElementById('chat-messages-container');
+  if (!container) return;
+
+  if (chatMessages.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-8">
+        <i class="fas fa-comments text-4xl text-gray-300 mb-3"></i>
+        <p class="text-gray-500">No hay mensajes aún. ¡Empieza la conversación!</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = chatMessages.map(msg => {
+    const isOwn = msg.sender_id === currentUser.id;
+    return `
+      <div class="flex ${isOwn ? 'justify-end' : 'justify-start'}">
+        <div class="max-w-[70%]">
+          ${!isOwn ? `<p class="text-xs text-gray-500 mb-1 ml-1">${escapeHtml(msg.sender_name)}</p>` : ''}
+          <div class="${isOwn ? 'bg-primary text-white' : 'bg-white text-gray-900 border border-gray-200'} rounded-lg px-4 py-2 shadow-sm">
+            <p class="text-sm">${escapeHtml(msg.message)}</p>
+          </div>
+          <p class="text-xs text-gray-400 mt-1 ${isOwn ? 'text-right' : 'text-left'} px-1">
+            ${formatMessageTime(msg.created_at)}
+          </p>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Scroll to bottom
+  container.scrollTop = container.scrollHeight;
+}
+
+// Send chat message
+async function sendChatMessage(conversationId) {
+  const input = document.getElementById('chat-message-input');
+  const message = input.value.trim();
+
+  if (!message) return;
+
+  try {
+    await axios.post(`/api/chat/conversations/${conversationId}/messages`, {
+      message: message
+    }, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    input.value = '';
+    await loadChatMessages(conversationId);
+  } catch (error) {
+    console.error('Error sending message:', error);
+    showToast('Error al enviar mensaje', 'error');
+  }
+}
+
+// Format message time
+function formatMessageTime(timestamp) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return 'Ahora';
+  if (diffMins < 60) return `Hace ${diffMins}m`;
+  if (diffMins < 1440) return `Hace ${Math.floor(diffMins / 60)}h`;
+  return date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
+}
+
+// Start chat polling
+function startChatPolling(conversationId) {
+  stopChatPolling();
+  chatPollingInterval = setInterval(() => {
+    if (currentConversationId === conversationId) {
+      loadChatMessages(conversationId);
+    }
+  }, 5000); // Poll every 5 seconds
+}
+
+// Stop chat polling
+function stopChatPolling() {
+  if (chatPollingInterval) {
+    clearInterval(chatPollingInterval);
+    chatPollingInterval = null;
+  }
+}
+
+// Load unread chat count
+async function loadUnreadChatCount() {
+  if (!authToken) return;
+
+  try {
+    const response = await axios.get('/api/chat/unread-count', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    unreadChatMessages = response.data.unreadCount || 0;
+    updateChatIcons();
+  } catch (error) {
+    console.error('Error loading unread chat count:', error);
+  }
+}
+
+// Update chat icons with badge
+function updateChatIcons() {
+  // This will be called after rendering validators/products
+  // to update any chat icons with unread badge
+}
+
+// ============================================
+// DASHBOARD CHAT SECTIONS
+// ============================================
+
+// Load chat requests for validators
+async function loadChatRequests() {
+  if (!authToken || !currentUser || currentUser.role !== 'validator') return { requests: [] };
+
+  try {
+    const response = await axios.get('/api/validator-requests/pending', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    return { requests: response.data.requests || [] };
+  } catch (error) {
+    console.error('Error loading chat requests:', error);
+    return { requests: [] };
+  }
+}
+
+// Accept chat request
+async function acceptChatRequest(requestId) {
+  try {
+    const response = await axios.post(`/api/validator-requests/${requestId}/accept`, {}, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    showToast('¡Solicitud aceptada! Ya puedes chatear con el founder.', 'success');
+    
+    // Open the new conversation
+    if (response.data.conversationId) {
+      // Reload dashboard to update UI
+      loadMyDashboard();
+    }
+  } catch (error) {
+    console.error('Error accepting request:', error);
+    showToast(error.response?.data?.error || 'Error al aceptar solicitud', 'error');
+  }
+}
+
+// Reject chat request
+async function rejectChatRequest(requestId) {
+  try {
+    await axios.post(`/api/validator-requests/${requestId}/reject`, {}, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    showToast('Solicitud rechazada', 'info');
+    loadMyDashboard(); // Reload dashboard
+  } catch (error) {
+    console.error('Error rejecting request:', error);
+    showToast('Error al rechazar solicitud', 'error');
+  }
+}
+
+// Load conversations
+async function loadConversations() {
+  if (!authToken || !currentUser) return { conversations: [] };
+
+  try {
+    const response = await axios.get('/api/chat/conversations', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    return { conversations: response.data.conversations || [] };
+  } catch (error) {
+    console.error('Error loading conversations:', error);
+    return { conversations: [] };
+  }
+}
+
+// Render chat requests section (for validators)
+function renderChatRequestsSection(requests) {
+  if (requests.length === 0) {
+    return `
+      <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+          <i class="fas fa-inbox text-primary mr-3"></i>
+          Solicitudes de Chat
+        </h3>
+        <div class="text-center py-8">
+          <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+          <p class="text-gray-500">No tienes solicitudes pendientes</p>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+        <i class="fas fa-inbox text-primary mr-3"></i>
+        Solicitudes de Chat
+        <span class="ml-3 bg-primary text-white text-sm px-3 py-1 rounded-full">${requests.length}</span>
+      </h3>
+      <div class="space-y-3">
+        ${requests.map(req => `
+          <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center mb-2">
+                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold mr-3">
+                    ${req.founder_name?.charAt(0) || 'F'}
+                  </div>
+                  <div>
+                    <h4 class="font-semibold text-gray-900">${escapeHtml(req.founder_name)}</h4>
+                    <p class="text-xs text-gray-500">${escapeHtml(req.founder_email)}</p>
+                  </div>
+                </div>
+                <p class="text-sm text-gray-700 mb-2">${escapeHtml(req.message)}</p>
+                ${req.project_title ? `
+                  <p class="text-xs text-gray-500">
+                    <i class="fas fa-project-diagram mr-1"></i>
+                    Proyecto: ${escapeHtml(req.project_title)}
+                  </p>
+                ` : ''}
+                <p class="text-xs text-gray-400 mt-2">
+                  ${formatMessageTime(req.created_at)}
+                </p>
+              </div>
+              <div class="flex flex-col space-y-2 ml-4">
+                <button onclick="acceptChatRequest(${req.id})" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition text-sm font-semibold whitespace-nowrap">
+                  <i class="fas fa-check mr-1"></i>Aceptar
+                </button>
+                <button onclick="rejectChatRequest(${req.id})" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm font-semibold whitespace-nowrap">
+                  <i class="fas fa-times mr-1"></i>Rechazar
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// Render conversations section
+function renderConversationsSection(conversations) {
+  if (conversations.length === 0) {
+    return `
+      <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+          <i class="fas fa-comments text-primary mr-3"></i>
+          Mis Conversaciones
+        </h3>
+        <div class="text-center py-8">
+          <i class="fas fa-comments text-4xl text-gray-300 mb-3"></i>
+          <p class="text-gray-500">No tienes conversaciones activas</p>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+        <i class="fas fa-comments text-primary mr-3"></i>
+        Mis Conversaciones
+        ${conversations.filter(c => c.unread_count > 0).length > 0 ? `
+          <span class="ml-3 bg-red-500 text-white text-sm px-3 py-1 rounded-full animate-pulse">
+            ${conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0)} nuevos
+          </span>
+        ` : ''}
+      </h3>
+      <div class="space-y-3">
+        ${conversations.map(conv => `
+          <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer ${conv.unread_count > 0 ? 'bg-blue-50 border-primary' : ''}" onclick="openChatModal(${conv.id}, '${escapeHtml(conv.other_user_name)}')">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center flex-1">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold mr-3">
+                  ${conv.other_user_name?.charAt(0) || 'U'}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between mb-1">
+                    <h4 class="font-semibold text-gray-900 truncate">${escapeHtml(conv.other_user_name)}</h4>
+                    ${conv.unread_count > 0 ? `
+                      <span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full ml-2 flex-shrink-0">
+                        ${conv.unread_count}
+                      </span>
+                    ` : ''}
+                  </div>
+                  ${conv.validator_title ? `<p class="text-xs text-gray-500 mb-1">${escapeHtml(conv.validator_title)}</p>` : ''}
+                  ${conv.project_title ? `
+                    <p class="text-xs text-gray-500 mb-2">
+                      <i class="fas fa-project-diagram mr-1"></i>
+                      ${escapeHtml(conv.project_title)}
+                    </p>
+                  ` : ''}
+                  ${conv.last_message ? `
+                    <p class="text-sm text-gray-600 truncate">${escapeHtml(conv.last_message)}</p>
+                  ` : '<p class="text-sm text-gray-400 italic">Sin mensajes aún</p>'}
+                  <p class="text-xs text-gray-400 mt-1">
+                    ${formatMessageTime(conv.last_message_at || conv.created_at)}
+                  </p>
+                </div>
+              </div>
+              <i class="fas fa-chevron-right text-gray-400 ml-3"></i>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
 }
 
 // Helper function to escape HTML
@@ -4194,3 +4734,11 @@ window.openChatWithValidator = openChatWithValidator;
 window.changeUserRole = changeUserRole;
 window.updateAuthUI = updateAuthUI;
 window.updateMarketplaceAuthUI = updateMarketplaceAuthUI;
+window.closeChatRequestModal = closeChatRequestModal;
+window.closeChatModal = closeChatModal;
+window.showChatRequestModal = showChatRequestModal;
+window.openChatModal = openChatModal;
+window.acceptChatRequest = acceptChatRequest;
+window.rejectChatRequest = rejectChatRequest;
+window.loadChatRequests = loadChatRequests;
+window.loadConversations = loadConversations;
