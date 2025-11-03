@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS validator_requests (
   expires_at DATETIME DEFAULT (datetime('now', '+7 days')),
   FOREIGN KEY (founder_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (validator_id) REFERENCES validators(id) ON DELETE CASCADE,
-  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+  FOREIGN KEY (project_id) REFERENCES beta_products(id) ON DELETE SET NULL
 );
 
 -- Chat Conversations table
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS chat_conversations (
   FOREIGN KEY (request_id) REFERENCES validator_requests(id) ON DELETE CASCADE,
   FOREIGN KEY (founder_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (validator_id) REFERENCES validators(id) ON DELETE CASCADE,
-  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+  FOREIGN KEY (project_id) REFERENCES beta_products(id) ON DELETE SET NULL
 );
 
 -- Chat Messages table

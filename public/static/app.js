@@ -1000,72 +1000,94 @@ function showAuthModal(mode) {
   const content = document.getElementById('auth-modal-content');
   
   if (!modal || !content) {
-    console.error('Auth modal elements not found. Modal:', modal, 'Content:', content);
-    // Try to create the modal if it doesn't exist
-    createAuthModalIfNeeded(mode);
+    console.error('Auth modal elements not found');
     return;
   }
   
+  modal.classList.remove('hidden');
+
   if (mode === 'login') {
     content.innerHTML = `
-      <h2 class="text-2xl font-bold mb-6">Iniciar Sesión</h2>
-      <form id="login-form" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" id="login-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-          <input type="password" id="login-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-        </div>
-        <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 transition font-semibold">
-          <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
+      <div class="text-center">
+        <i class="fas fa-sign-in-alt text-5xl mb-4" style="background: linear-gradient(45deg, #FF6154, #FB651E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+        <h2 class="text-3xl font-black text-gray-900 mb-2">Sign In</h2>
+        <p class="text-gray-600 mb-6 font-medium">Access your ValidAI Studio account</p>
+        <button onclick="showRoleSelection(\\'login\\')" class="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3 mb-6">
+          <i class="fab fa-google text-2xl"></i>
+          <span class="text-lg">Continue with Google</span>
         </button>
-        <p class="text-center text-sm text-gray-600">
-          ¿No tienes cuenta? <button type="button" onclick="showAuthModal('register')" class="text-primary hover:underline">Regístrate</button>
+        <p class="text-sm text-gray-600 mt-4">
+          Don\\'t have an account? <a href="#" onclick="showAuthModal(\\'register\\'); return false;" class="text-primary hover:underline font-bold">Sign Up</a>
         </p>
-      </form>
+      </div>
     `;
-    
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    
-  } else {
+  } else if (mode === 'register') {
     content.innerHTML = `
-      <h2 class="text-2xl font-bold mb-6">Crear Cuenta</h2>
-      <form id="register-form" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-          <input type="text" id="register-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+      <div class="text-center">
+        <i class="fas fa-user-plus text-5xl mb-4" style="background: linear-gradient(45deg, #FF6154, #FB651E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+        <h2 class="text-3xl font-black text-gray-900 mb-2">Get Started</h2>
+        <p class="text-gray-600 mb-8 font-medium">Choose your role to register</p>
+        <div class="space-y-4">
+          <button onclick="loginAsFounder()" class="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">
+            <i class="fas fa-lightbulb text-2xl"></i>
+            <span class="text-lg">Founder - Create & Validate</span>
+          </button>
+          <button onclick="loginAsValidator()" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">
+            <i class="fas fa-star text-2xl"></i>
+            <span class="text-lg">Validator - Vote & Rate</span>
+          </button>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" id="register-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-          <input type="password" id="register-password" required minlength="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-          <select id="register-role" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-            <option value="">Selecciona tu rol</option>
-            <option value="founder">Founder (Busco validadores)</option>
-            <option value="validator">Validador (Quiero validar productos)</option>
-          </select>
-        </div>
-        <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 transition font-semibold">
-          <i class="fas fa-user-plus mr-2"></i>Crear Cuenta
-        </button>
-        <p class="text-center text-sm text-gray-600">
-          ¿Ya tienes cuenta? <button type="button" onclick="showAuthModal('login')" class="text-primary hover:underline">Inicia sesión</button>
+        <p class="text-sm text-gray-600 mt-6">
+          Already have an account? <a href="#" onclick="showAuthModal(\\'login\\'); return false;" class="text-primary hover:underline font-bold">Sign In</a>
         </p>
-      </form>
+      </div>
     `;
-    
-    document.getElementById('register-form').addEventListener('submit', handleRegister);
   }
-  
+}
+
+function showRoleSelection(action) {
+  const modal = document.getElementById('auth-modal');
+  const content = document.getElementById('auth-modal-content');
+
+  if (!modal || !content) return;
+
   modal.classList.remove('hidden');
+
+  const title = action === 'login' ? 'Sign In with Google' : 'Sign Up with Google';
+  const description = action === 'login' ? 'Choose your role to continue' : 'Choose your role to register';
+
+  content.innerHTML = `
+    <div class="text-center">
+      <i class="fab fa-google text-5xl mb-4" style="background: linear-gradient(45deg, #FF6154, #FB651E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+      <h2 class="text-3xl font-black text-gray-900 mb-2">${title}</h2>
+      <p class="text-gray-600 mb-8 font-medium">${description}</p>
+      <div class="space-y-4">
+        <button onclick="loginAsFounder()" class="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">
+          <i class="fas fa-lightbulb text-2xl"></i>
+          <span class="text-lg">Founder - Create & Validate Projects</span>
+        </button>
+        <button onclick="loginAsValidator()" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">
+          <i class="fas fa-star text-2xl"></i>
+          <span class="text-lg">Validator - Vote & Rate Projects</span>
+        </button>
+      </div>
+      <button onclick="closeAuthModal()" class="mt-6 text-gray-600 hover:text-primary font-semibold">
+        ← Back
+      </button>
+    </div>
+  `;
+}
+
+function loginAsFounder() {
+  loginWithGoogle('founder');
+}
+
+function loginAsValidator() {
+  loginWithGoogle('validator');
+}
+
+function loginWithGoogle(role) {
+  window.location.href = '/api/auth/google?role=' + role;
 }
 
 function closeAuthModal() {

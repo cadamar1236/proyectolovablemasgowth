@@ -104,14 +104,24 @@ app.get('/', (c) => {
         theme: {
           extend: {
             colors: {
-              primary: '#6366f1',
-              secondary: '#8b5cf6',
+              primary: '#FF6154',
+              secondary: '#FB651E',
+              accent: '#F26522',
+            },
+            fontFamily: {
+              sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
             }
           }
         }
       }
     </script>
     <style>
+      * {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
       .scrollbar-hide {
         -ms-overflow-style: none;
         scrollbar-width: none;
@@ -119,36 +129,83 @@ app.get('/', (c) => {
       .scrollbar-hide::-webkit-scrollbar {
         display: none;
       }
-      .hero-pattern {
-        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      
+      .hero-gradient {
+        background: linear-gradient(135deg, #FF6154 0%, #FB651E 50%, #F26522 100%);
       }
-      .gradient-border {
-        border-image: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) 1;
+      
+      .mesh-gradient {
+        background-image: 
+          radial-gradient(at 27% 37%, hsla(215, 98%, 61%, 0.1) 0px, transparent 50%),
+          radial-gradient(at 97% 21%, hsla(125, 98%, 72%, 0.05) 0px, transparent 50%),
+          radial-gradient(at 52% 99%, hsla(354, 98%, 61%, 0.05) 0px, transparent 50%),
+          radial-gradient(at 10% 29%, hsla(256, 96%, 67%, 0.1) 0px, transparent 50%),
+          radial-gradient(at 97% 96%, hsla(38, 60%, 74%, 0.05) 0px, transparent 50%),
+          radial-gradient(at 33% 50%, hsla(222, 67%, 73%, 0.05) 0px, transparent 50%),
+          radial-gradient(at 79% 53%, hsla(343, 68%, 79%, 0.05) 0px, transparent 50%);
       }
+      
       .card-hover {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      .card-hover:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
+      }
+      
+      .btn-primary {
+        background: linear-gradient(135deg, #FF6154 0%, #FB651E 100%);
         transition: all 0.3s ease;
       }
-      .card-hover:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2);
+      
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px -8px rgba(255, 97, 84, 0.4);
+      }
+      
+      .text-gradient {
+        background: linear-gradient(135deg, #FF6154 0%, #FB651E 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      
+      .feature-icon {
+        background: linear-gradient(135deg, rgba(255, 97, 84, 0.1) 0%, rgba(251, 101, 30, 0.1) 100%);
+        backdrop-filter: blur(10px);
+      }
+      
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-20px); }
+      }
+      
+      .float-animation {
+        animation: float 6s ease-in-out infinite;
+      }
+      
+      .nav-blur {
+        backdrop-filter: blur(12px);
+        background-color: rgba(255, 255, 255, 0.8);
       }
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+<body class="bg-white min-h-screen mesh-gradient">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b border-gray-200">
+    <nav class="nav-blur sticky top-0 z-50 border-b border-gray-200/50 relative">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
+            <div class="flex justify-between h-16 relative">
                 <div class="flex items-center">
-                    <span class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    <span class="text-2xl font-bold text-gradient">
                         ⚡ ValidAI Studio
                     </span>
                 </div>
                 
                 <!-- Desktop Navigation -->
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="#dashboard" class="text-gray-700 hover:text-primary transition">Dashboard</a>
-                    <a href="#validation" onclick="showValidationForm();return false;" class="text-gray-700 hover:text-primary transition">Validación</a>
+                    <a href="#dashboard" class="text-gray-700 hover:text-primary transition font-semibold">How It Works</a>
+                    <a href="#validation" onclick="showValidationForm();return false;" class="text-gray-700 hover:text-primary transition font-semibold">Validation</a>
                     <a href="/leaderboard" class="text-gray-700 hover:text-primary transition font-semibold">
                         <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
                     </a>
@@ -156,133 +213,161 @@ app.get('/', (c) => {
                         <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
                     </a>
                     <a href="/pricing" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-tag mr-1 text-green-500"></i>Planes
+                        <i class="fas fa-tag mr-1 text-green-500"></i>Pricing
                     </a>
-                    <div class="nav-auth-buttons flex items-center space-x-4">
-                        <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition">
-                            Iniciar Sesión
+                    <div class="nav-auth-buttons flex items-center space-x-3">
+                        <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition font-semibold px-4 py-2">
+                            Sign In
                         </button>
-                        <button onclick="showAuthModal('register')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-                            Registrarse
+                        <button onclick="showAuthModal('register')" class="btn-primary text-white px-6 py-2.5 rounded-lg font-semibold shadow-sm">
+                            Get Started
                         </button>
                     </div>
                 </div>
                 
-                <!-- Mobile menu button -->
+                <!-- Mobile menu toggle -->
                 <div class="md:hidden flex items-center">
-                    <button onclick="toggleMobileMenu()" class="text-gray-700 hover:text-primary transition" id="mobile-menu-button">
-                        <i class="fas fa-bars text-xl"></i>
+                    <button id="mobile-menu-button" class="cursor-pointer p-2 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 hover:from-primary hover:to-secondary hover:text-white transition-all duration-200 text-primary font-bold">
+                        <i class="fas fa-bars text-xl" id="menu-icon-bars"></i>
+                        <i class="fas fa-times text-xl hidden" id="menu-icon-close"></i>
                     </button>
                 </div>
             </div>
-            
-            <!-- Mobile Navigation Menu -->
-            <div class="md:hidden hidden" id="mobile-menu">
-                <div class="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
-                    <a href="#dashboard" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
-                    </a>
-                    <a href="#validation" onclick="showValidationForm();return false;" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-check-circle mr-2"></i>Validación
-                    </a>
-                    <a href="/leaderboard" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
-                    </a>
-                    <a href="/marketplace" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
-                    </a>
-                    <a href="/pricing" class="block px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-tag mr-1 text-green-500"></i>Planes
-                    </a>
-                    <div class="nav-auth-buttons border-t pt-2 mt-2">
-                        <button onclick="showAuthModal('login')" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-primary transition">
-                            <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
-                        </button>
-                        <button onclick="showAuthModal('register')" class="block w-full text-left px-3 py-2 mt-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
-                            <i class="fas fa-user-plus mr-2"></i>Registrarse
-                        </button>
-                    </div>
+        </div>
+
+        <!-- Mobile Navigation Menu -->
+        <div class="hidden md:hidden bg-white border-t border-gray-200 shadow-lg" id="mobile-menu-container">
+            <div class="max-w-7xl mx-auto px-4 py-4 space-y-3 max-h-[calc(100vh-4rem)] overflow-y-auto">
+                <a href="#dashboard" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
+                    <i class="fas fa-tachometer-alt mr-3 text-lg"></i>How It Works
+                </a>
+                <a href="#validation" onclick="showValidationForm();return false;" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
+                    <i class="fas fa-check-circle mr-3 text-lg"></i>Validation
+                </a>
+                <a href="/leaderboard" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
+                    <i class="fas fa-trophy mr-3 text-yellow-500 text-lg"></i>Leaderboard
+                </a>
+                <a href="/marketplace" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
+                    <i class="fas fa-star mr-3 text-yellow-500 text-lg"></i>Marketplace
+                </a>
+                <a href="/pricing" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
+                    <i class="fas fa-tag mr-3 text-green-500 text-lg"></i>Pricing
+                </a>
+                <div class="border-t pt-3 mt-3 space-y-2">
+                    <button onclick="showAuthModal('login');" class="w-full flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold text-left">
+                        <i class="fas fa-sign-in-alt mr-3 text-lg"></i>Sign In
+                    </button>
+                    <button onclick="showAuthModal('register');" class="w-full flex items-center px-4 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg hover:shadow-lg transition font-bold text-left">
+                        <i class="fas fa-user-plus mr-3 text-lg"></i>Get Started
+                    </button>
                 </div>
             </div>
         </div>
     </nav>
 
+    <script>
+        // Mobile menu toggle
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenuContainer = document.getElementById('mobile-menu-container');
+        const menuIconBars = document.getElementById('menu-icon-bars');
+        const menuIconClose = document.getElementById('menu-icon-close');
+        
+        if (mobileMenuButton && mobileMenuContainer) {
+            mobileMenuButton.addEventListener('click', function() {
+                mobileMenuContainer.classList.toggle('hidden');
+                menuIconBars.classList.toggle('hidden');
+                menuIconClose.classList.toggle('hidden');
+            });
+            
+            // Close menu when clicking on a link
+            const menuLinks = mobileMenuContainer.querySelectorAll('a, button');
+            menuLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    mobileMenuContainer.classList.add('hidden');
+                    menuIconBars.classList.remove('hidden');
+                    menuIconClose.classList.add('hidden');
+                });
+            });
+        }
+    </script>
+
     <!-- Hero Section -->
-    <div class="relative overflow-hidden bg-gradient-to-r from-primary via-secondary to-purple-600 text-white hero-pattern">
-        <div class="max-w-7xl mx-auto px-4 py-16 sm:py-20 md:py-24 sm:px-6 lg:px-8">
+    <div class="relative overflow-hidden bg-white">
+        <div class="max-w-7xl mx-auto px-4 py-20 sm:py-24 md:py-32 sm:px-6 lg:px-8">
             <div class="text-center relative z-10">
                 <div class="inline-block mb-6">
-                    <span class="bg-yellow-400/20 text-yellow-300 px-4 py-2 rounded-full text-sm font-semibold border border-yellow-400/30">
-                        🚀 +500 Validadores Expertos Disponibles
+                    <span class="bg-orange-50 text-primary px-4 py-2 rounded-full text-sm font-bold border border-primary/20">
+                        🚀 500+ Expert Validators Available
                     </span>
                 </div>
-                <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
-                    Validamos y lanzamos startups exitosas
-                    <span class="block text-yellow-300 mt-2">10x más rápido</span>
+                <h1 class="text-5xl sm:text-6xl md:text-7xl font-black mb-6 leading-tight text-gray-900 tracking-tight">
+                    Build & Validate<br/>
+                    <span class="text-gradient">Winning Startups 10x Faster</span>
                 </h1>
-                <p class="text-lg sm:text-xl md:text-2xl mb-6 text-purple-100 font-medium">
-                    Plataforma IA + Venture Studio + Marketplace de Validadores
+                <p class="text-xl sm:text-2xl mb-4 text-gray-600 font-semibold max-w-3xl mx-auto">
+                    AI Platform + Venture Studio + Expert Validator Marketplace
                 </p>
-                <p class="text-base sm:text-lg mb-10 max-w-3xl mx-auto text-purple-50">
-                    De la idea a datos accionables en 48 horas. Conecta con validadores expertos, obtén feedback real y escala con confianza.
+                <p class="text-base sm:text-lg mb-10 max-w-2xl mx-auto text-gray-500">
+                    From idea to actionable insights in 48 hours. Connect with expert validators, get real feedback, and scale with confidence.
                 </p>
-                <div class="flex flex-col sm:flex-row justify-center gap-4">
-                    <button onclick="showValidationForm()" class="bg-white text-primary px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition transform hover:scale-105 shadow-2xl">
-                        <i class="fas fa-rocket mr-2"></i>Validar Mi Idea Ahora
+                <div class="flex flex-col sm:flex-row justify-center gap-4 mb-12">
+                    <button onclick="showValidationForm()" class="btn-primary text-white px-8 py-4 rounded-xl font-black text-lg shadow-lg inline-flex items-center justify-center">
+                        <i class="fas fa-rocket mr-2"></i>Validate My Idea Now
                     </button>
-                    <a href="/marketplace" class="bg-transparent border-2 border-white text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/10 transition">
-                        <i class="fas fa-users mr-2"></i>Ver Validadores
+                    <a href="/marketplace" class="bg-gray-900 text-white px-8 py-4 rounded-xl font-black text-lg hover:bg-gray-800 transition inline-flex items-center justify-center">
+                        <i class="fas fa-users mr-2"></i>Browse Validators
                     </a>
                 </div>
-                <div class="mt-12 flex flex-wrap justify-center items-center gap-6 text-sm">
+                <div class="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-600 font-semibold">
                     <div class="flex items-center">
-                        <i class="fas fa-check-circle text-green-400 mr-2 text-xl"></i>
-                        <span class="text-purple-100">Validación en 48h</span>
+                        <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>48h Validation</span>
                     </div>
                     <div class="flex items-center">
-                        <i class="fas fa-star text-yellow-400 mr-2 text-xl"></i>
-                        <span class="text-purple-100">10K+ Productos Validados</span>
+                        <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>10K+ Products Validated</span>
                     </div>
                     <div class="flex items-center">
-                        <i class="fas fa-shield-alt text-blue-400 mr-2 text-xl"></i>
-                        <span class="text-purple-100">Garantía 100%</span>
+                        <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>100% Guarantee</span>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="absolute bottom-0 left-0 right-0">
-            <svg viewBox="0 0 1440 120" class="fill-gray-50">
-                <path d="M0,64L80,69.3C160,75,320,85,480,80C640,75,800,53,960,48C1120,43,1280,53,1360,58.7L1440,64L1440,120L0,120Z"></path>
-            </svg>
         </div>
     </div>
 
     <!-- Stats Section -->
-    <div class="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
-        <div class="text-center mb-12">
-            <h2 class="text-3xl font-bold text-gray-900 mb-2">Resultados que Hablan por Sí Mismos</h2>
-            <p class="text-gray-600">Únete a miles de fundadores que confían en ValidAI Studio</p>
+    <div class="max-w-7xl mx-auto px-4 py-20 sm:px-6 lg:px-8 bg-gray-50">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-black text-gray-900 mb-3">Results That Speak for Themselves</h2>
+            <p class="text-xl text-gray-600 font-medium">Join thousands of founders who trust ValidAI Studio</p>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div class="bg-white rounded-2xl shadow-lg p-8 card-hover border-t-4 border-primary">
-                <div class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-3">48h</div>
-                <div class="text-gray-700 font-semibold">Validación completa</div>
-                <div class="text-gray-500 text-sm mt-1">Resultados garantizados</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div class="text-center">
+                <div class="text-6xl font-black text-gradient mb-2">48h</div>
+                <div class="text-gray-900 font-bold text-lg">Full Validation</div>
+                <div class="text-gray-500 text-sm mt-1 font-medium">Guaranteed results</div>
             </div>
-            <div class="bg-white rounded-2xl shadow-lg p-8 card-hover border-t-4 border-green-500">
-                <div class="text-5xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 bg-clip-text text-transparent mb-3">90%</div>
-                <div class="text-gray-700 font-semibold">Más rápido</div>
-                <div class="text-gray-500 text-sm mt-1">vs. métodos tradicionales</div>
+            <div class="text-center">
+                <div class="text-6xl font-black text-gradient mb-2">90%</div>
+                <div class="text-gray-900 font-bold text-lg">Faster</div>
+                <div class="text-gray-500 text-sm mt-1 font-medium">vs. traditional methods</div>
             </div>
-            <div class="bg-white rounded-2xl shadow-lg p-8 card-hover border-t-4 border-yellow-500">
-                <div class="text-5xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent mb-3">500+</div>
-                <div class="text-gray-700 font-semibold">Validadores</div>
-                <div class="text-gray-500 text-sm mt-1">Expertos certificados</div>
+            <div class="text-center">
+                <div class="text-6xl font-black text-gradient mb-2">500+</div>
+                <div class="text-gray-900 font-bold text-lg">Validators</div>
+                <div class="text-gray-500 text-sm mt-1 font-medium">Certified experts</div>
             </div>
-            <div class="bg-white rounded-2xl shadow-lg p-8 card-hover border-t-4 border-blue-500">
-                <div class="text-5xl font-bold bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent mb-3">10K+</div>
-                <div class="text-gray-700 font-semibold">Productos</div>
-                <div class="text-gray-500 text-sm mt-1">Validados exitosamente</div>
+            <div class="text-center">
+                <div class="text-6xl font-black text-gradient mb-2">10K+</div>
+                <div class="text-gray-900 font-bold text-lg">Products</div>
+                <div class="text-gray-500 text-sm mt-1 font-medium">Successfully validated</div>
             </div>
         </div>
     </div>
@@ -290,81 +375,81 @@ app.get('/', (c) => {
     <!-- Main Content -->
     <div id="app" class="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <!-- Features Section -->
-        <div id="dashboard" class="mb-20">
-            <h2 class="text-4xl font-bold text-gray-900 mb-4 text-center">¿Cómo Funciona?</h2>
-            <p class="text-xl text-gray-600 mb-12 text-center max-w-3xl mx-auto">
-                De idea a datos accionables en 5 pasos automáticos con validadores expertos
+        <div id="dashboard" class="mb-20 bg-white py-20">
+            <h2 class="text-5xl font-black text-gray-900 mb-4 text-center">How It Works</h2>
+            <p class="text-xl text-gray-600 mb-16 text-center max-w-3xl mx-auto font-medium">
+                From idea to actionable data in 5 automated steps with expert validators
             </p>
             
             <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div class="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl shadow-lg p-6 card-hover border-l-4 border-primary">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                        <span class="text-3xl font-bold text-white">1</span>
+                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
+                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                        <span class="text-2xl font-bold text-white">1</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Input de Idea</h3>
-                    <p class="text-gray-600">Completa el formulario con los detalles de tu idea y mercado objetivo</p>
-                    <div class="mt-4 text-primary font-semibold text-sm">
-                        <i class="fas fa-clock mr-1"></i>5 minutos
-                    </div>
-                </div>
-                
-                <div class="bg-gradient-to-br from-secondary/5 to-secondary/10 rounded-2xl shadow-lg p-6 card-hover border-l-4 border-secondary">
-                    <div class="w-16 h-16 bg-gradient-to-br from-secondary to-purple-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                        <span class="text-3xl font-bold text-white">2</span>
-                    </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Análisis IA</h3>
-                    <p class="text-gray-600">Nuestra IA analiza competidores, tendencias y oportunidades en tiempo real</p>
-                    <div class="mt-4 text-secondary font-semibold text-sm">
-                        <i class="fas fa-robot mr-1"></i>Instant\u00e1neo
+                    <h3 class="text-xl font-bold mb-3 text-gray-900">Idea Input</h3>
+                    <p class="text-gray-600 mb-4">Fill out the form with your idea details and target market</p>
+                    <div class="text-primary font-semibold text-sm">
+                        <i class="fas fa-clock mr-1"></i>5 minutes
                     </div>
                 </div>
                 
-                <div class="bg-gradient-to-br from-purple-500/5 to-purple-500/10 rounded-2xl shadow-lg p-6 card-hover border-l-4 border-purple-500">
-                    <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                        <span class="text-3xl font-bold text-white">3</span>
+                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
+                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                        <span class="text-2xl font-bold text-white">2</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Validadores</h3>
-                    <p class="text-gray-600">Conecta con expertos del marketplace para recibir feedback especializado</p>
-                    <div class="mt-4 text-purple-600 font-semibold text-sm">
+                    <h3 class="text-xl font-bold mb-3 text-gray-900">AI Analysis</h3>
+                    <p class="text-gray-600 mb-4">Our AI analyzes competitors, trends, and opportunities in real-time</p>
+                    <div class="text-primary font-semibold text-sm">
+                        <i class="fas fa-robot mr-1"></i>Instant
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
+                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                        <span class="text-2xl font-bold text-white">3</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-gray-900">Validators</h3>
+                    <p class="text-gray-600 mb-4">Connect with marketplace experts to receive specialized feedback</p>
+                    <div class="text-primary font-semibold text-sm">
                         <i class="fas fa-users mr-1"></i>24-48h
                     </div>
                 </div>
                 
-                <div class="bg-gradient-to-br from-pink-500/5 to-pink-500/10 rounded-2xl shadow-lg p-6 card-hover border-l-4 border-pink-500">
-                    <div class="w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                        <span class="text-3xl font-bold text-white">4</span>
+                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
+                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                        <span class="text-2xl font-bold text-white">4</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Testing Beta</h3>
-                    <p class="text-gray-600">Panel pre-seleccionado prueba tu producto y proporciona feedback detallado</p>
-                    <div class="mt-4 text-pink-600 font-semibold text-sm">
-                        <i class="fas fa-vial mr-1"></i>1 semana
+                    <h3 class="text-xl font-bold mb-3 text-gray-900">Beta Testing</h3>
+                    <p class="text-gray-600 mb-4">Pre-selected panel tests your product and provides detailed feedback</p>
+                    <div class="text-primary font-semibold text-sm">
+                        <i class="fas fa-vial mr-1"></i>1 week
                     </div>
                 </div>
                 
-                <div class="bg-gradient-to-br from-green-500/5 to-green-500/10 rounded-2xl shadow-lg p-6 card-hover border-l-4 border-green-500">
-                    <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                        <span class="text-3xl font-bold text-white">5</span>
+                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
+                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                        <span class="text-2xl font-bold text-white">5</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Resultados</h3>
-                    <p class="text-gray-600">Métricas claras, insights de validadores y recomendaciones accionables</p>
-                    <div class="mt-4 text-green-600 font-semibold text-sm">
+                    <h3 class="text-xl font-bold mb-3 text-gray-900">Results</h3>
+                    <p class="text-gray-600 mb-4">Clear metrics, validator insights, and actionable recommendations</p>
+                    <div class="text-primary font-semibold text-sm">
                         <i class="fas fa-chart-line mr-1"></i>Dashboard
                     </div>
                 </div>
             </div>
             
             <!-- Marketplace CTA -->
-            <div class="mt-12 bg-gradient-to-r from-primary/10 via-secondary/10 to-purple-500/10 rounded-2xl p-8 border border-primary/20">
+            <div class="mt-16 bg-gradient-to-r from-primary to-secondary rounded-2xl p-10 text-white shadow-xl">
                 <div class="flex flex-col md:flex-row items-center justify-between">
-                    <div class="mb-4 md:mb-0">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">
-                            <i class="fas fa-star text-yellow-500 mr-2"></i>
-                            Marketplace de Validadores
+                    <div class="mb-6 md:mb-0 text-center md:text-left">
+                        <h3 class="text-3xl font-black mb-2">
+                            <i class="fas fa-star mr-2"></i>
+                            Validator Marketplace
                         </h3>
-                        <p class="text-gray-600">Conecta directamente con 500+ expertos certificados en tu industria</p>
+                        <p class="text-lg opacity-90 font-medium">Connect directly with 500+ certified experts in your industry</p>
                     </div>
-                    <a href="/marketplace" class="bg-gradient-to-r from-primary to-secondary text-white px-8 py-4 rounded-xl font-bold hover:shadow-xl transition transform hover:scale-105 whitespace-nowrap">
-                        Ver Validadores <i class="fas fa-arrow-right ml-2"></i>
+                    <a href="/marketplace" class="bg-white text-primary px-8 py-4 rounded-xl font-black text-lg hover:shadow-2xl transition transform hover:scale-105 whitespace-nowrap">
+                        Browse Validators <i class="fas fa-arrow-right ml-2"></i>
                     </a>
                 </div>
             </div>
@@ -436,9 +521,9 @@ app.get('/', (c) => {
 
         <!-- Beta Users Panel -->
         <div id="beta-panel" class="mb-20">
-            <h2 class="text-3xl font-bold text-gray-900 mb-4 text-center">Panel de Usuarios Beta</h2>
-            <p class="text-xl text-gray-600 mb-8 text-center">
-                Accede a 10,000+ usuarios beta pre-cualificados en tu nicho
+            <h2 class="text-3xl font-bold text-gray-900 mb-4 text-center">Beta User Panel</h2>
+            <p class="text-xl text-gray-600 mb-8 text-center font-medium">
+                Access 10,000+ pre-qualified beta users in your niche
             </p>
             
             <div id="beta-users-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -447,47 +532,47 @@ app.get('/', (c) => {
         </div>
 
         <!-- Pricing Section -->
-        <div id="pricing" class="mb-20">
-            <h2 class="text-4xl font-bold text-gray-900 mb-4 text-center">Planes y Precios</h2>
-            <p class="text-xl text-gray-600 mb-8 text-center">Elige el plan perfecto para tu etapa de crecimiento</p>
+        <div id="pricing" class="mb-20 bg-white py-20">
+            <h2 class="text-5xl font-black text-gray-900 mb-4 text-center">Pricing Plans</h2>
+            <p class="text-xl text-gray-600 mb-12 text-center max-w-3xl mx-auto font-medium">Choose the perfect plan for your growth stage</p>
             
             <!-- Plan Type Selector -->
-            <div class="flex justify-center mb-6">
-                <div class="bg-gradient-to-r from-primary to-secondary rounded-xl shadow-lg p-1 inline-flex">
-                    <button id="platform-plans-btn" onclick="switchPlanType('platform')" class="px-8 py-3 rounded-lg font-semibold transition bg-white text-primary">
-                        🎯 Plataforma Completa
-                        <span class="block text-xs font-normal mt-1">MVP + IA + Marketplace</span>
+            <div class="flex justify-center mb-8">
+                <div class="bg-gray-100 rounded-xl p-1 inline-flex">
+                    <button id="platform-plans-btn" onclick="switchPlanType('platform')" class="px-6 py-3 rounded-lg font-bold transition bg-white shadow-sm text-gray-900">
+                        🎯 Full Platform
+                        <span class="block text-xs font-normal mt-1 text-gray-600">MVP + AI + Marketplace</span>
                     </button>
-                    <button id="marketplace-plans-btn" onclick="switchPlanType('marketplace')" class="px-8 py-3 rounded-lg font-semibold transition text-white hover:bg-white/10">
-                        🏪 Solo Marketplace
-                        <span class="block text-xs font-normal mt-1">Red de Validadores</span>
+                    <button id="marketplace-plans-btn" onclick="switchPlanType('marketplace')" class="px-6 py-3 rounded-lg font-bold transition text-gray-700 hover:bg-white/50">
+                        🏪 Marketplace Only
+                        <span class="block text-xs font-normal mt-1 text-gray-600">Validator Network</span>
                     </button>
                 </div>
             </div>
             
             <!-- Description based on plan type -->
             <div id="platform-description" class="text-center mb-8 max-w-3xl mx-auto">
-                <p class="text-gray-600">
+                <p class="text-gray-600 font-medium">
                     <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                    Incluye: Generador MVP con IA, Validación automatizada, Analytics y acceso completo al Marketplace de validadores
+                    Includes: AI MVP Generator, Automated Validation, Analytics, and full Marketplace access
                 </p>
             </div>
             
             <div id="marketplace-description" class="hidden text-center mb-8 max-w-3xl mx-auto">
-                <p class="text-gray-600">
-                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
-                    Solo acceso al Marketplace de validadores. <strong>Ideal si ya tienes tu producto</strong> y solo necesitas feedback de expertos.
+                <p class="text-gray-600 font-medium">
+                    <i class="fas fa-info-circle text-primary mr-2"></i>
+                    Marketplace access only. <strong>Perfect if you already have your product</strong> and just need expert feedback.
                 </p>
             </div>
             
             <!-- Billing Toggle -->
-            <div class="flex justify-center mb-8">
-                <div class="bg-white rounded-lg shadow-md p-2 inline-flex">
-                    <button id="monthly-billing-btn" onclick="switchBillingCycle('monthly')" class="px-6 py-2 rounded-md font-semibold transition bg-primary text-white">
-                        Mensual
+            <div class="flex justify-center mb-12">
+                <div class="bg-gray-100 rounded-xl p-1 inline-flex">
+                    <button id="monthly-billing-btn" onclick="switchBillingCycle('monthly')" class="px-6 py-2 rounded-lg font-bold transition bg-white shadow-sm text-gray-900">
+                        Monthly
                     </button>
-                    <button id="yearly-billing-btn" onclick="switchBillingCycle('yearly')" class="px-6 py-2 rounded-md font-semibold transition text-gray-700 hover:bg-gray-100">
-                        Anual <span class="text-green-600 text-xs ml-1">(Ahorra 20%)</span>
+                    <button id="yearly-billing-btn" onclick="switchBillingCycle('yearly')" class="px-6 py-2 rounded-lg font-bold transition text-gray-700 hover:bg-white/50">
+                        Annual <span class="text-green-600 text-xs ml-1 font-bold">-20%</span>
                     </button>
                 </div>
             </div>
@@ -496,44 +581,74 @@ app.get('/', (c) => {
             <div id="pricing-plans-grid" class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                 <!-- Loading state -->
                 <div class="col-span-3 text-center py-12">
-                    <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
+                    <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                     <p class="text-gray-600">Cargando planes...</p>
                 </div>
             </div>
 
             <!-- Managed Services -->
-            <div class="mt-16 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-8">
-                <h3 class="text-2xl font-bold text-gray-900 mb-4 text-center">Servicios Managed</h3>
-                <p class="text-gray-600 mb-8 text-center">Nuestros expertos hacen el trabajo por ti</p>
+            <div class="mt-20 bg-gray-50 rounded-2xl p-10">
+                <h3 class="text-3xl font-black text-gray-900 mb-3 text-center">Managed Services</h3>
+                <p class="text-gray-600 mb-12 text-center font-medium">Our experts do the work for you</p>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-xl shadow-md p-6">
-                        <h4 class="text-xl font-bold text-gray-900 mb-2">Validación Express</h4>
-                        <div class="text-3xl font-bold text-primary mb-4">$2,997</div>
-                        <ul class="space-y-2 text-sm text-gray-700">
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Análisis profundo de mercado</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>20+ entrevistas con usuarios</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Entrega en 2 semanas</li>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition">
+                        <h4 class="text-xl font-bold text-gray-900 mb-2">Express Validation</h4>
+                        <div class="text-4xl font-black text-gray-900 mb-6">$2,997</div>
+                        <ul class="space-y-3 text-gray-700 font-medium">
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>Deep market analysis</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>20+ user interviews</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>2-week delivery</span>
+                            </li>
                         </ul>
                     </div>
                     
-                    <div class="bg-white rounded-xl shadow-md p-6">
+                    <div class="bg-white rounded-xl shadow-sm border-2 border-primary p-8 hover:shadow-md transition relative">
+                        <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-primary to-secondary text-white px-4 py-1 rounded-full text-sm font-bold">
+                            Most Popular
+                        </div>
                         <h4 class="text-xl font-bold text-gray-900 mb-2">MVP + Growth Launch</h4>
-                        <div class="text-3xl font-bold text-secondary mb-4">$14,997</div>
-                        <ul class="space-y-2 text-sm text-gray-700">
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>MVP funcional completo</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Growth Marketing Launch</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Entrega en 6-8 semanas</li>
+                        <div class="text-4xl font-black text-gray-900 mb-6">$14,997</div>
+                        <ul class="space-y-3 text-gray-700 font-medium">
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>Full functional MVP</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>Growth Marketing Launch</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>6-8 week delivery</span>
+                            </li>
                         </ul>
                     </div>
                     
-                    <div class="bg-white rounded-xl shadow-md p-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition">
                         <h4 class="text-xl font-bold text-gray-900 mb-2">Growth Retainer</h4>
-                        <div class="text-3xl font-bold text-purple-600 mb-4">Desde $3,997/mes</div>
-                        <ul class="space-y-2 text-sm text-gray-700">
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Startup ($3,997/mes)</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Scale-up ($7,997/mes)</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Enterprise ($14,997/mes)</li>
+                        <div class="text-4xl font-black text-gray-900 mb-6">$3,997<span class="text-xl text-gray-500">/mo</span></div>
+                        <ul class="space-y-3 text-gray-700 font-medium">
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>Startup ($3,997/mo)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>Scale-up ($7,997/mo)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
+                                <span>Enterprise ($14,997/mes)</span>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -554,40 +669,51 @@ app.get('/', (c) => {
     </div>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-white py-12">
+    <footer class="bg-gray-900 text-white py-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
                 <div>
-                    <h3 class="text-xl font-bold mb-4">ValidAI Studio</h3>
-                    <p class="text-gray-400">Validamos y lanzamos startups exitosas 10x más rápido usando IA y el modelo studio.</p>
+                    <h3 class="text-2xl font-black mb-4">ValidAI Studio</h3>
+                    <p class="text-gray-400 leading-relaxed font-medium">We validate and launch successful startups 10x faster using AI and the studio model.</p>
                 </div>
                 <div>
-                    <h4 class="font-semibold mb-4">Producto</h4>
-                    <ul class="space-y-2 text-gray-400">
-                        <li><a href="#" class="hover:text-white">Plataforma</a></li>
-                        <li><a href="#" class="hover:text-white">Venture Studio</a></li>
-                        <li><a href="#pricing" class="hover:text-white">Precios</a></li>
+                    <h4 class="font-bold mb-4 text-white">Product</h4>
+                    <ul class="space-y-3 text-gray-400 font-medium">
+                        <li><a href="#" class="hover:text-white transition">Platform</a></li>
+                        <li><a href="#" class="hover:text-white transition">Venture Studio</a></li>
+                        <li><a href="#pricing" class="hover:text-white transition">Pricing</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-semibold mb-4">Recursos</h4>
-                    <ul class="space-y-2 text-gray-400">
-                        <li><a href="#" class="hover:text-white">Blog</a></li>
-                        <li><a href="#" class="hover:text-white">Casos de Éxito</a></li>
-                        <li><a href="#" class="hover:text-white">Documentación</a></li>
+                    <h4 class="font-bold mb-4 text-white">Resources</h4>
+                    <ul class="space-y-3 text-gray-400 font-medium">
+                        <li><a href="#" class="hover:text-white transition">Blog</a></li>
+                        <li><a href="#" class="hover:text-white transition">Success Stories</a></li>
+                        <li><a href="#" class="hover:text-white transition">Documentation</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-semibold mb-4">Empresa</h4>
-                    <ul class="space-y-2 text-gray-400">
-                        <li><a href="#" class="hover:text-white">Acerca de</a></li>
-                        <li><a href="#" class="hover:text-white">Únete al Equipo</a></li>
-                        <li><a href="#" class="hover:text-white">Contacto</a></li>
+                    <h4 class="font-bold mb-4 text-white">Company</h4>
+                    <ul class="space-y-3 text-gray-400 font-medium">
+                        <li><a href="#" class="hover:text-white transition">About</a></li>
+                        <li><a href="#" class="hover:text-white transition">Join the Team</a></li>
+                        <li><a href="#" class="hover:text-white transition">Contact</a></li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-                <p>&copy; 2025 ValidAI Studio. Todos los derechos reservados.</p>
+            <div class="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-400 text-sm font-medium">&copy; 2025 ValidAI Studio. All rights reserved.</p>
+                <div class="flex gap-6 mt-4 md:mt-0">
+                    <a href="#" class="text-gray-400 hover:text-white transition">
+                        <i class="fab fa-twitter text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition">
+                        <i class="fab fa-linkedin text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
             </div>
         </div>
     </footer>
@@ -595,36 +721,80 @@ app.get('/', (c) => {
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script src="/static/app.js"></script>
     <script>
-      // Mobile menu toggle
+      // Mobile menu functions
       function toggleMobileMenu() {
         const menu = document.getElementById('mobile-menu');
         const button = document.getElementById('mobile-menu-button');
-        const icon = button.querySelector('i');
-        
-        if (menu.classList.contains('hidden')) {
-          menu.classList.remove('hidden');
-          icon.classList.remove('fa-bars');
-          icon.classList.add('fa-times');
-        } else {
+        const icon = button ? button.querySelector('i') : null;
+
+        if (!menu) {
+          console.error('Mobile menu not found');
+          return;
+        }
+
+        const isOpen = !menu.classList.contains('hidden');
+
+        if (isOpen) {
+          // Close menu
           menu.classList.add('hidden');
+          if (icon) {
+            icon.classList.remove('fa-times');
+            icon.classList.add('fa-bars');
+          }
+        } else {
+          // Open menu
+          menu.classList.remove('hidden');
+          if (icon) {
+            icon.classList.remove('fa-bars');
+            icon.classList.add('fa-times');
+          }
+        }
+      }
+
+      function closeMobileMenu() {
+        const menu = document.getElementById('mobile-menu');
+        const button = document.getElementById('mobile-menu-button');
+        const icon = button ? button.querySelector('i') : null;
+
+        if (menu) {
+          menu.classList.add('hidden');
+        }
+        if (icon) {
           icon.classList.remove('fa-times');
           icon.classList.add('fa-bars');
         }
       }
 
-      // Close mobile menu when clicking outside
-      document.addEventListener('click', function(event) {
-        const menu = document.getElementById('mobile-menu');
-        const button = document.getElementById('mobile-menu-button');
-        
-        if (menu && button && !menu.contains(event.target) && !button.contains(event.target)) {
-          menu.classList.add('hidden');
-          const icon = button.querySelector('i');
-          if (icon) {
-            icon.classList.remove('fa-times');
-            icon.classList.add('fa-bars');
-          }
+      // Initialize mobile menu when DOM is ready
+      document.addEventListener('DOMContentLoaded', function() {
+        const mobileButton = document.getElementById('mobile-menu-button');
+        if (mobileButton) {
+          mobileButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleMobileMenu();
+          });
         }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+          const menu = document.getElementById('mobile-menu');
+          const button = document.getElementById('mobile-menu-button');
+
+          if (menu && button &&
+              !menu.contains(event.target) &&
+              !button.contains(event.target) &&
+              !menu.classList.contains('hidden')) {
+            closeMobileMenu();
+          }
+        });
+
+        // Close menu on escape key
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') {
+            closeMobileMenu();
+          }
+        });
       });
 
       // Show validation form
@@ -663,28 +833,28 @@ app.get('/', (c) => {
 
         modal.classList.remove('hidden');
 
-        const title = action === 'login' ? 'Iniciar Sesión con Google' : 'Registro con Google';
-        const description = action === 'login' ? 'Elige tu rol para continuar' : 'Elige tu rol para registrarte';
+        const title = action === 'login' ? 'Sign In with Google' : 'Sign Up with Google';
+        const description = action === 'login' ? 'Choose your role to continue' : 'Choose your role to register';
         const backAction = action === 'login' ? 'login' : 'register';
 
-        modalContent.innerHTML = \`<div class="text-center">
-          <i class="fab fa-google text-4xl text-red-600 mb-4"></i>
-          <h2 class="text-2xl font-bold text-gray-900 mb-4">\${title}</h2>
-          <p class="text-gray-600 mb-6">\${description}</p>
-          <div class="space-y-3">
-          <button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">
-          <i class="fas fa-lightbulb text-xl"></i>
-          <span>Fundador - Crear y validar proyectos</span>
-          </button>
-          <button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">
-          <i class="fas fa-star text-xl"></i>
-          <span>Validador - Votar y calificar proyectos</span>
-          </button>
-          </div>
-          <button onclick="showAuthModal('\` + backAction + \`')" class="mt-4 text-gray-600 hover:text-gray-800 text-sm underline">
-          Volver
-          </button>
-          </div>\`;
+        modalContent.innerHTML = '<div class="text-center">' +
+          '<i class="fab fa-google text-5xl mb-4" style="background: linear-gradient(45deg, #FF6154, #FB651E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>' +
+          '<h2 class="text-3xl font-black text-gray-900 mb-2">' + title + '</h2>' +
+          '<p class="text-gray-600 mb-8 font-medium">' + description + '</p>' +
+          '<div class="space-y-4">' +
+          '<button onclick="loginAsFounder()" class="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">' +
+          '<i class="fas fa-lightbulb text-2xl"></i>' +
+          '<span class="text-lg">Founder - Create & Validate Projects</span>' +
+          '</button>' +
+          '<button onclick="loginAsValidator()" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">' +
+          '<i class="fas fa-star text-2xl"></i>' +
+          '<span class="text-lg">Validator - Vote & Rate Projects</span>' +
+          '</button>' +
+          '</div>' +
+          '<button onclick="closeAuthModal()" class="mt-6 text-gray-600 hover:text-primary font-semibold">' +
+          '← Back' +
+          '</button>' +
+          '</div>';
       }
 
       // Show auth modal
@@ -697,56 +867,38 @@ app.get('/', (c) => {
         modal.classList.remove('hidden');
 
         if (mode === 'login') {
-          const loginHtml = \`<div class="text-center">
-            <i class="fas fa-sign-in-alt text-4xl text-primary mb-4"></i>
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Iniciar Sesión</h2>
-            <button onclick="showRoleSelection('login')" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3 mb-4">
-              <i class="fab fa-google text-xl"></i>
-              <span>Continuar con Google</span>
-            </button>
-            <div class="relative mb-6">
-              <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-gray-300"></div>
-              </div>
-              <div class="relative flex justify-center text-sm">
-                <span class="px-2 bg-white text-gray-500">O inicia sesión con email</span>
-              </div>
-            </div>
-            <form onsubmit="handleTraditionalLogin(event)" class="space-y-4">
-              <div class="text-left">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input type="email" id="login-email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="tu@email.com" />
-              </div>
-              <div class="text-left">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                <input type="password" id="login-password" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Tu contraseña" />
-              </div>
-              <button type="submit" class="w-full bg-primary text-white font-semibold py-3 px-6 rounded-lg transition-colors hover:bg-primary/90">Iniciar Sesión</button>
-            </form>
-            <p class="text-sm text-gray-600 mt-4">
-              ¿No tienes cuenta? <a href="#" onclick="showRoleSelection('register')" class="text-primary hover:underline">Regístrate</a>
-            </p>
-          </div>\`;
+          const loginHtml = '<div class="text-center">' +
+            '<i class="fas fa-sign-in-alt text-5xl mb-4" style="background: linear-gradient(45deg, #FF6154, #FB651E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>' +
+            '<h2 class="text-3xl font-black text-gray-900 mb-2">Sign In</h2>' +
+            '<p class="text-gray-600 mb-6 font-medium">Access your ValidAI Studio account</p>' +
+            '<button onclick="showRoleSelection(\\\'login\\\')" class="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3 mb-6">' +
+              '<i class="fab fa-google text-2xl"></i>' +
+              '<span class="text-lg">Continue with Google</span>' +
+            '</button>' +
+            '<p class="text-sm text-gray-600 mt-4">' +
+              'Don&apos;t have an account? <a href="#" onclick="showAuthModal(\\\'register\\\')" class="text-primary hover:underline font-bold">Sign Up</a>' +
+            '</p>' +
+          '</div>';
           modalContent.innerHTML = loginHtml;
         } else if (mode === 'register') {
-          const registerHtml = \`<div class="text-center">
-            <i class="fas fa-user-plus text-4xl text-primary mb-4"></i>
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Crear Cuenta</h2>
-            <p class="text-gray-600 mb-6">Elige tu rol para continuar con el registro</p>
-            <div class="space-y-3">
-              <button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">
-                <i class="fas fa-lightbulb text-xl"></i>
-                <span>Fundador - Crear y validar proyectos</span>
-              </button>
-              <button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">
-                <i class="fas fa-star text-xl"></i>
-                <span>Validador - Votar y calificar proyectos</span>
-              </button>
-            </div>
-            <p class="text-sm text-gray-600 mt-4">
-              ¿Ya tienes cuenta? <a href="#" onclick="showAuthModal('login')" class="text-primary hover:underline">Inicia sesión</a>
-            </p>
-          </div>\`;
+          const registerHtml = '<div class="text-center">' +
+            '<i class="fas fa-user-plus text-5xl mb-4" style="background: linear-gradient(45deg, #FF6154, #FB651E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>' +
+            '<h2 class="text-3xl font-black text-gray-900 mb-2">Get Started</h2>' +
+            '<p class="text-gray-600 mb-8 font-medium">Choose your role to register</p>' +
+            '<div class="space-y-4">' +
+              '<button onclick="loginAsFounder()" class="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">' +
+                '<i class="fas fa-lightbulb text-2xl"></i>' +
+                '<span class="text-lg">Founder - Create & Validate</span>' +
+              '</button>' +
+              '<button onclick="loginAsValidator()" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">' +
+                '<i class="fas fa-star text-2xl"></i>' +
+                '<span class="text-lg">Validator - Vote & Rate</span>' +
+              '</button>' +
+            '</div>' +
+            '<p class="text-sm text-gray-600 mt-6">' +
+              'Already have an account? <a href="#" onclick="showAuthModal(\\\'login\\\')" class="text-primary hover:underline font-bold">Sign In</a>' +
+            '</p>' +
+          '</div>';
           modalContent.innerHTML = registerHtml;
         }
       }
@@ -837,20 +989,20 @@ app.get('/', (c) => {
 
         if (authToken) {
           // User is logged in - show logout option
-          const logoutHtml = \`<button onclick="logout()" class="text-gray-700 hover:text-primary transition">
-            <i class="fas fa-sign-out-alt mr-1"></i>Cerrar Sesión
-            </button>\`;
+          const logoutHtml = '<button onclick="logout()" class="text-gray-700 hover:text-primary transition">' +
+            '<i class="fas fa-sign-out-alt mr-1"></i>Cerrar Sesión' +
+            '</button>';
           navButtons.forEach(btn => {
             btn.innerHTML = logoutHtml;
           });
         } else {
           // User is not logged in - show login/register options
-          const loginHtml = \`<button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition">
-            <i class="fas fa-sign-in-alt mr-1"></i>Iniciar Sesión
-            </button>
-            <button onclick="showAuthModal('register')" class="ml-4 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-            <i class="fas fa-user-plus mr-1"></i>Registrarse
-            </button>\`;
+          const loginHtml = '<button onclick="showAuthModal(\\\'login\\\')" class="text-gray-700 hover:text-primary transition">' +
+            '<i class="fas fa-sign-in-alt mr-1"></i>Iniciar Sesión' +
+            '</button>' +
+            '<button onclick="showAuthModal(\\\'register\\\')" class="ml-4 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">' +
+            '<i class="fas fa-user-plus mr-1"></i>Registrarse' +
+            '</button>';
           navButtons.forEach(btn => {
             btn.innerHTML = loginHtml;
           });
@@ -910,6 +1062,13 @@ app.get('/', (c) => {
       document.addEventListener('DOMContentLoaded', () => {
         const urlParams = new URLSearchParams(window.location.search);
         
+        // Handle product parameter redirect FIRST
+        const productId = urlParams.get('product');
+        if (productId && /^\d+$/.test(productId)) {
+          window.location.href = '/marketplace?product=' + productId;
+          return; // Don't process other parameters
+        }
+        
         // Handle OAuth callback token
         const token = urlParams.get('token');
         const role = urlParams.get('role');
@@ -934,12 +1093,6 @@ app.get('/', (c) => {
           updateAuthUI();
           
           return; // Don't process other parameters if we just logged in
-        }
-        
-        // Handle product parameter redirect
-        const productId = urlParams.get('product');
-        if (productId && /^\d+$/.test(productId)) {
-          window.location.href = '/marketplace?product=' + productId;
         }
         
         // Handle show_auth parameter to automatically show auth modal
@@ -1028,7 +1181,7 @@ app.get('/project/:id', async (c) => {
                 
                 <!-- Mobile menu button -->
                 <div class="md:hidden flex items-center">
-                    <button id="mobile-menu-button" onclick="toggleMobileMenu()" class="text-gray-700 hover:text-primary transition">
+                    <button id="mobile-menu-button" onclick="toggleMobileMenu()" class="p-2 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 hover:from-primary hover:to-secondary hover:text-white transition-all duration-200 text-primary font-bold">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
                 </div>
@@ -1099,11 +1252,11 @@ app.get('/project/:id', async (c) => {
 app.get('/marketplace', (c) => {
   return c.html(`
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marketplace de Validadores Beta - ValidAI Studio</title>
+    <title>Beta Validator Marketplace - ValidAI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1113,25 +1266,28 @@ app.get('/marketplace', (c) => {
         theme: {
           extend: {
             colors: {
-              primary: '#6366f1',
-              secondary: '#8b5cf6',
+              primary: '#FF6154',
+              secondary: '#FB651E',
             }
           }
         }
       }
     </script>
     <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
       .badge {
         display: inline-block;
         padding: 0.25rem 0.75rem;
         border-radius: 9999px;
         font-size: 0.75rem;
-        font-weight: 600;
+        font-weight: 700;
       }
-      .tab-active {
-        border-bottom-color: #6366f1;
-        color: #6366f1;
-      }
+      
       .scrollbar-hide {
         -ms-overflow-style: none;
         scrollbar-width: none;
@@ -1139,51 +1295,59 @@ app.get('/marketplace', (c) => {
       .scrollbar-hide::-webkit-scrollbar {
         display: none;
       }
-      .hero-pattern {
-        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      
+      .text-gradient {
+        background: linear-gradient(135deg, #FF6154 0%, #FB651E 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
       }
-      .gradient-border {
-        border-image: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) 1;
-      }
+      
       .card-hover {
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .card-hover:hover {
         transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2);
+        box-shadow: 0 20px 40px rgba(255, 97, 84, 0.2);
+      }
+      
+      .nav-blur {
+        backdrop-filter: blur(12px);
+        background-color: rgba(255, 255, 255, 0.8);
       }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-white">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b">
+    <nav class="nav-blur sticky top-0 z-50 border-b border-gray-200/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/" class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                        ⚡ ValidAI Studio
+                    <a href="/" class="text-2xl font-black text-gradient">
+                        <i class="fas fa-rocket mr-2"></i>
+                        ValidAI Studio
                     </a>
                 </div>
                 
                 <!-- Desktop Navigation -->
-                <div class="hidden md:flex items-center space-x-6">
-                    <a href="/" class="text-gray-700 hover:text-primary transition">Inicio</a>
-                    <a href="/marketplace" class="text-primary font-semibold">
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="/" class="text-gray-700 hover:text-primary transition font-semibold">Home</a>
+                    <a href="/marketplace" class="text-primary font-bold">
                         <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
                     </a>
                     <div id="auth-nav">
-                        <button onclick="window.location.href='/?show_auth=login'" class="text-gray-700 hover:text-primary transition mr-4">
-                            Iniciar Sesión
+                        <button onclick="window.location.href='/?show_auth=login'" class="text-gray-700 hover:text-primary transition font-semibold mr-4">
+                            Sign In
                         </button>
-                        <button onclick="window.location.href='/?show_auth=register'" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-                            Registrarse
+                        <button onclick="window.location.href='/?show_auth=register'" class="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2.5 rounded-lg font-bold hover:shadow-lg transition">
+                            Get Started
                         </button>
                     </div>
                 </div>
                 
                 <!-- Mobile menu button -->
                 <div class="md:hidden flex items-center">
-                    <button onclick="toggleMobileMenu()" class="text-gray-700 hover:text-primary transition" id="mobile-menu-button">
+                    <button onclick="toggleMobileMenu()" class="p-2 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 hover:from-primary hover:to-secondary hover:text-white transition-all duration-200 text-primary font-bold" id="mobile-menu-button">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
                 </div>
@@ -1194,7 +1358,7 @@ app.get('/marketplace', (c) => {
                 <div class="absolute inset-0 bg-black bg-opacity-50" onclick="toggleMobileMenu()"></div>
                 <div class="relative bg-white w-80 max-w-[85vw] h-full ml-auto shadow-xl transform transition-transform duration-300 ease-in-out">
                     <div class="flex items-center justify-between p-4 border-b">
-                        <span class="text-lg font-semibold text-gray-900">Menú</span>
+                        <span class="text-lg font-black text-gray-900">Menu</span>
                         <button onclick="toggleMobileMenu()" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100">
                             <i class="fas fa-times text-xl"></i>
                         </button>
@@ -1212,11 +1376,11 @@ app.get('/marketplace', (c) => {
                         <div id="mobile-auth-nav">
                             <button onclick="window.location.href='/?show_auth=login'" class="flex items-center w-full px-6 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition">
                                 <i class="fas fa-sign-in-alt mr-3 text-lg"></i>
-                                <span class="font-medium">Iniciar Sesión</span>
+                                <span class="font-bold">Sign In</span>
                             </button>
-                            <button onclick="window.location.href='/?show_auth=register'" class="flex items-center w-full px-6 py-3 mx-6 mt-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition font-semibold">
+                            <button onclick="window.location.href='/?show_auth=register'" class="flex items-center w-full px-6 py-3 mx-6 mt-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg hover:shadow-lg transition font-bold">
                                 <i class="fas fa-user-plus mr-3 text-lg"></i>
-                                <span>Registrarse</span>
+                                <span>Get Started</span>
                             </button>
                         </div>
                     </div>
@@ -1224,50 +1388,73 @@ app.get('/marketplace', (c) => {
             </div>
         </div>
     </nav>
+    
+    <script>
+      function toggleMobileMenu() {
+        const menu = document.getElementById('mobile-menu');
+        const button = document.getElementById('mobile-menu-button');
+        if (menu && button) {
+          const icon = button.querySelector('i');
+          if (menu.classList.contains('hidden')) {
+            menu.classList.remove('hidden');
+            if (icon) {
+              icon.classList.remove('fa-bars');
+              icon.classList.add('fa-times');
+            }
+          } else {
+            menu.classList.add('hidden');
+            if (icon) {
+              icon.classList.remove('fa-times');
+              icon.classList.add('fa-bars');
+            }
+          }
+        }
+      }
+    </script>
 
     <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-primary via-secondary to-purple-600 text-white py-12 sm:py-16">
+    <div class="bg-gradient-to-r from-primary to-secondary text-white py-16 sm:py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <div class="inline-flex items-center bg-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 mb-4 sm:mb-6">
                 <i class="fas fa-star text-yellow-300 mr-2 text-sm sm:text-base"></i>
-                <span class="text-xs sm:text-sm font-semibold">Validadores Profesionales Certificados</span>
+                <span class="text-xs sm:text-sm font-bold">Certified Professional Validators</span>
             </div>
-            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 leading-tight">
-                Marketplace de Validadores Beta
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-black mb-3 sm:mb-4 leading-tight">
+                Beta Validator Marketplace
             </h1>
-            <p class="text-lg sm:text-xl text-purple-100 max-w-3xl mx-auto mb-6 sm:mb-8 px-2">
-                Conectamos empresas con validadores profesionales para obtener feedback real antes del lanzamiento
+            <p class="text-xl sm:text-2xl text-white/90 max-w-3xl mx-auto mb-6 sm:mb-8 px-2 font-medium">
+                Connecting companies with professional validators for real feedback before launch
             </p>
             <div class="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4">
-                <button onclick="scrollToSection('products')" class="bg-white text-primary px-6 py-3 sm:px-8 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-gray-100 transition transform hover:scale-105 min-h-[48px] flex items-center justify-center">
-                    <i class="fas fa-box-open mr-2"></i>Ver Productos Beta
+                <button onclick="scrollToSection('products')" class="bg-white text-primary px-6 py-3 sm:px-8 sm:py-4 rounded-xl font-black text-base sm:text-lg hover:shadow-2xl transition transform hover:scale-105 min-h-[48px] flex items-center justify-center">
+                    <i class="fas fa-box-open mr-2"></i>View Beta Products
                 </button>
-                <button onclick="scrollToSection('validators')" class="bg-purple-800 text-white px-6 py-3 sm:px-8 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-purple-900 transition min-h-[48px] flex items-center justify-center">
-                    <i class="fas fa-users mr-2"></i>Conocer Validadores
+                <button onclick="scrollToSection('validators')" class="bg-gray-900 text-white px-6 py-3 sm:px-8 sm:py-4 rounded-xl font-black text-base sm:text-lg hover:bg-gray-800 transition min-h-[48px] flex items-center justify-center">
+                    <i class="fas fa-users mr-2"></i>Meet Validators
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Stats Section -->
-    <div class="bg-white border-b">
-        <div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="bg-gray-50 border-b">
+        <div class="max-w-7xl mx-auto px-4 py-12">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                 <div>
-                    <div class="text-3xl font-bold text-primary">500+</div>
-                    <div class="text-gray-600 text-sm">Validadores Activos</div>
+                    <div class="text-4xl font-black text-gradient">500+</div>
+                    <div class="text-gray-600 text-sm font-semibold mt-2">Active Validators</div>
                 </div>
                 <div>
-                    <div class="text-3xl font-bold text-primary">1,200+</div>
-                    <div class="text-gray-600 text-sm">Productos Validados</div>
+                    <div class="text-4xl font-black text-gradient">1,200+</div>
+                    <div class="text-gray-600 text-sm font-semibold mt-2">Products Validated</div>
                 </div>
                 <div>
-                    <div class="text-3xl font-bold text-primary">4.8/5</div>
-                    <div class="text-gray-600 text-sm">Rating Promedio</div>
+                    <div class="text-4xl font-black text-gradient">4.8/5</div>
+                    <div class="text-gray-600 text-sm font-semibold mt-2">Average Rating</div>
                 </div>
                 <div>
-                    <div class="text-3xl font-bold text-primary">48h</div>
-                    <div class="text-gray-600 text-sm">Tiempo Respuesta</div>
+                    <div class="text-4xl font-black text-gradient">48h</div>
+                    <div class="text-gray-600 text-sm font-semibold mt-2">Response Time</div>
                 </div>
             </div>
         </div>
@@ -1279,21 +1466,26 @@ app.get('/marketplace', (c) => {
         <!-- Tabs -->
         <div class="border-b mb-4 sm:mb-6">
             <div class="flex overflow-x-auto scrollbar-hide space-x-3 sm:space-x-4 md:space-x-6 lg:space-x-8 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-                <button onclick="showTab('products')" class="tab tab-active pb-2 sm:pb-3 px-2 font-semibold transition whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center" id="products-tab">
+                <button onclick="showTab('products')" class="tab tab-active pb-2 sm:pb-3 px-2 font-bold transition whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center" id="products-tab">
                     <i class="fas fa-box-open mr-1 sm:mr-2 text-sm sm:text-base"></i>
-                    <span class="text-sm sm:text-base">Productos</span>
+                    <span class="text-sm sm:text-base">Products</span>
                 </button>
-                <button onclick="showTab('validators')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center" id="validators-tab">
+                <button onclick="showTab('validators')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center font-bold" id="validators-tab">
                     <i class="fas fa-users mr-1 sm:mr-2 text-sm sm:text-base"></i>
-                    <span class="text-sm sm:text-base">Validadores</span>
+                    <span class="text-sm sm:text-base">Validators</span>
                 </button>
-                <button onclick="showTab('my-dashboard')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition hidden whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center" id="my-dashboard-tab">
+                <button onclick="showTab('chat')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center font-bold" id="chat-tab">
+                    <i class="fas fa-comments mr-1 sm:mr-2 text-sm sm:text-base"></i>
+                    <span class="text-sm sm:text-base">Chat</span>
+                    <span id="chat-notification-badge" class="hidden ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center font-bold">0</span>
+                </button>
+                <button onclick="showTab('my-dashboard')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition hidden whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center font-bold" id="my-dashboard-tab">
                     <i class="fas fa-tachometer-alt mr-1 sm:mr-2 text-sm sm:text-base"></i>
                     <span class="text-sm sm:text-base">Dashboard</span>
                 </button>
-                <button onclick="showTab('internal-dashboard')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition hidden whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center" id="internal-dashboard-tab">
+                <button onclick="showTab('internal-dashboard')" class="tab pb-2 sm:pb-3 px-2 text-gray-600 hover:text-primary transition hidden whitespace-nowrap flex-shrink-0 min-w-0 min-h-[44px] flex items-center justify-center font-bold" id="internal-dashboard-tab">
                     <i class="fas fa-cogs mr-1 sm:mr-2 text-sm sm:text-base"></i>
-                    <span class="text-sm sm:text-base">Dashboard Interno</span>
+                    <span class="text-sm sm:text-base">Internal Dashboard</span>
                 </button>
             </div>
         </div>
@@ -1301,25 +1493,25 @@ app.get('/marketplace', (c) => {
         <!-- Products Tab -->
         <div id="products-content" class="tab-content">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-900">Productos Beta Disponibles</h2>
-                <button onclick="showCreateProductModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition hidden" id="create-product-btn">
-                    <i class="fas fa-plus mr-2"></i>Publicar Producto
+                <h2 class="text-3xl font-black text-gray-900">Available Beta Products</h2>
+                <button onclick="showCreateProductModal()" class="bg-gradient-to-r from-primary to-secondary text-white px-4 py-2 rounded-lg hover:shadow-lg transition hidden font-bold" id="create-product-btn">
+                    <i class="fas fa-plus mr-2"></i>Publish Product
                 </button>
             </div>
             
             <!-- Filters -->
-            <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+            <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-100">
                 <div class="flex items-center justify-between mb-3 sm:mb-4">
-                    <h3 class="text-base sm:text-lg font-semibold text-gray-900">Filtros</h3>
-                    <button onclick="resetProductFilters()" class="text-sm text-primary hover:text-primary/80 font-medium sm:hidden min-h-[44px] flex items-center">
-                        <i class="fas fa-undo mr-1"></i>Limpiar
+                    <h3 class="text-base sm:text-lg font-black text-gray-900">Filters</h3>
+                    <button onclick="resetProductFilters()" class="text-sm text-primary hover:text-primary/80 font-bold sm:hidden min-h-[44px] flex items-center">
+                        <i class="fas fa-undo mr-1"></i>Clear
                     </button>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <div>
-                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Categoría</label>
-                        <select id="category-filter" onchange="loadProducts()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm min-h-[44px] px-3">
-                            <option value="">Todas</option>
+                        <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1 sm:mb-2">Category</label>
+                        <select id="category-filter" onchange="loadProducts()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm min-h-[44px] px-3 font-medium">
+                            <option value="">All</option>
                             <option value="SaaS">SaaS</option>
                             <option value="Mobile">Mobile</option>
                             <option value="Web3">Web3</option>
@@ -1329,34 +1521,34 @@ app.get('/marketplace', (c) => {
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Etapa</label>
-                        <select id="stage-filter" onchange="loadProducts()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm min-h-[44px] px-3">
-                            <option value="">Todas</option>
-                            <option value="concept">Concepto</option>
+                        <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1 sm:mb-2">Stage</label>
+                        <select id="stage-filter" onchange="loadProducts()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm min-h-[44px] px-3 font-medium">
+                            <option value="">All</option>
+                            <option value="concept">Concept</option>
                             <option value="alpha">Alpha</option>
                             <option value="beta">Beta</option>
-                            <option value="production">Producción</option>
+                            <option value="production">Production</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Compensación</label>
-                        <select id="compensation-filter" onchange="loadProducts()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm min-h-[44px] px-3">
-                            <option value="">Todas</option>
-                            <option value="paid">Pagada</option>
-                            <option value="free_access">Acceso Gratis</option>
+                        <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1 sm:mb-2">Compensation</label>
+                        <select id="compensation-filter" onchange="loadProducts()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm min-h-[44px] px-3 font-medium">
+                            <option value="">All</option>
+                            <option value="paid">Paid</option>
+                            <option value="free_access">Free Access</option>
                             <option value="equity">Equity</option>
                         </select>
                     </div>
                     <div class="flex items-end">
                         <label class="flex items-center cursor-pointer min-h-[44px]">
                             <input type="checkbox" id="featured-filter" onchange="loadProducts()" class="rounded text-primary focus:ring-primary mr-2 w-5 h-5 sm:w-4 sm:h-4">
-                            <span class="text-xs sm:text-sm font-medium text-gray-700">Solo Destacados</span>
+                            <span class="text-xs sm:text-sm font-bold text-gray-700">Featured Only</span>
                         </label>
                     </div>
                 </div>
                 <div class="hidden sm:flex justify-end mt-3 sm:mt-4">
-                    <button onclick="resetProductFilters()" class="text-sm text-primary hover:text-primary/80 font-medium min-h-[44px] flex items-center px-3 py-2">
-                        <i class="fas fa-undo mr-1"></i>Limpiar filtros
+                    <button onclick="resetProductFilters()" class="text-sm text-primary hover:text-primary/80 font-bold min-h-[44px] flex items-center px-3 py-2">
+                        <i class="fas fa-undo mr-1"></i>Clear Filters
                     </button>
                 </div>
             </div>
@@ -1365,8 +1557,8 @@ app.get('/marketplace', (c) => {
             <div id="products-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 <!-- Products will be loaded here -->
                 <div class="col-span-full text-center py-20">
-                    <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
-                    <p class="text-gray-600">Cargando productos...</p>
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                    <p class="text-gray-600 font-medium">Loading products...</p>
                 </div>
             </div>
         </div>
@@ -1376,8 +1568,8 @@ app.get('/marketplace', (c) => {
             <div id="product-detail-container">
                 <!-- Product detail will be loaded here -->
                 <div class="text-center py-12">
-                    <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
-                    <p class="text-gray-600">Cargando producto...</p>
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                    <p class="text-gray-600 font-medium">Loading product...</p>
                 </div>
             </div>
         </div>
@@ -1385,22 +1577,22 @@ app.get('/marketplace', (c) => {
         <!-- Validators Tab -->
         <div id="validators-content" class="tab-content hidden">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-900">Validadores Profesionales</h2>
+                <h2 class="text-3xl font-black text-gray-900">Professional Validators</h2>
             </div>
             
             <!-- Filters -->
-            <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
+            <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 border border-gray-100">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Filtros</h3>
-                    <button onclick="resetValidatorFilters()" class="text-sm text-primary hover:text-primary/80 font-medium sm:hidden">
-                        <i class="fas fa-undo mr-1"></i>Limpiar
+                    <h3 class="text-lg font-black text-gray-900">Filters</h3>
+                    <button onclick="resetValidatorFilters()" class="text-sm text-primary hover:text-primary/80 font-bold sm:hidden">
+                        <i class="fas fa-undo mr-1"></i>Clear
                     </button>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     <div>
-                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Especialidad</label>
-                        <select id="expertise-filter" onchange="loadValidators()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm h-10 sm:h-auto">
-                            <option value="">Todas</option>
+                        <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1 sm:mb-2">Expertise</label>
+                        <select id="expertise-filter" onchange="loadValidators()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm h-10 sm:h-auto font-medium">
+                            <option value="">All</option>
                             <option value="SaaS">SaaS</option>
                             <option value="Mobile">Mobile</option>
                             <option value="Design">Design</option>
@@ -1410,26 +1602,26 @@ app.get('/marketplace', (c) => {
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Rating Mínimo</label>
-                        <select id="rating-filter" onchange="loadValidators()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm h-10 sm:h-auto">
-                            <option value="">Todos</option>
+                        <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1 sm:mb-2">Min. Rating</label>
+                        <select id="rating-filter" onchange="loadValidators()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm h-10 sm:h-auto font-medium">
+                            <option value="">All</option>
                             <option value="4.5">4.5+ ⭐⭐⭐⭐⭐</option>
                             <option value="4.0">4.0+ ⭐⭐⭐⭐</option>
                             <option value="3.5">3.5+ ⭐⭐⭐</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Disponibilidad</label>
-                        <select id="availability-filter" onchange="loadValidators()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm h-10 sm:h-auto">
-                            <option value="">Todos</option>
-                            <option value="available">Disponible</option>
-                            <option value="busy">Ocupado</option>
+                        <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1 sm:mb-2">Availability</label>
+                        <select id="availability-filter" onchange="loadValidators()" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm h-10 sm:h-auto font-medium">
+                            <option value="">All</option>
+                            <option value="available">Available</option>
+                            <option value="busy">Busy</option>
                         </select>
                     </div>
                 </div>
                 <div class="hidden sm:flex justify-end mt-4">
-                    <button onclick="resetValidatorFilters()" class="text-sm text-primary hover:text-primary/80 font-medium">
-                        <i class="fas fa-undo mr-1"></i>Limpiar filtros
+                    <button onclick="resetValidatorFilters()" class="text-sm text-primary hover:text-primary/80 font-bold">
+                        <i class="fas fa-undo mr-1"></i>Clear Filters
                     </button>
                 </div>
             </div>
@@ -1438,15 +1630,82 @@ app.get('/marketplace', (c) => {
             <div id="validators-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 <!-- Validators will be loaded here -->
                 <div class="col-span-full text-center py-12">
-                    <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
-                    <p class="text-gray-600">Cargando validadores...</p>
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                    <p class="text-gray-600 font-medium">Loading validators...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Tab Content -->
+        <div id="chat-content" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-black text-gray-900">Messages & Requests</h2>
+            </div>
+
+            <!-- Chat Interface -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Conversations List -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
+                        <h3 class="text-lg font-black text-gray-900 mb-4">Conversations</h3>
+                        <div id="conversations-list" class="space-y-2 max-h-96 overflow-y-auto">
+                            <!-- Conversations will be loaded here -->
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-comments text-3xl mb-2"></i>
+                                <p class="font-medium">Loading conversations...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Area -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-xl shadow-lg p-4 h-96 flex flex-col border border-gray-100">
+                        <div id="chat-header" class="border-b pb-3 mb-3 hidden">
+                            <h4 class="text-lg font-black text-gray-900" id="chat-partner-name"></h4>
+                            <p class="text-sm text-gray-600 font-medium" id="chat-partner-info"></p>
+                        </div>
+
+                        <div id="chat-messages" class="flex-1 overflow-y-auto mb-3 p-2 border rounded-lg bg-gray-50 min-h-0 hidden">
+                            <!-- Messages will be loaded here -->
+                        </div>
+
+                        <div id="chat-input-area" class="hidden">
+                            <div class="flex space-x-2">
+                                <input type="text" id="chat-message-input" placeholder="Type your message..."
+                                       class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary font-medium">
+                                <button onclick="sendChatMessage()" class="bg-gradient-to-r from-primary to-secondary text-white px-4 py-2 rounded-lg hover:shadow-lg transition font-bold">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="chat-empty-state" class="flex-1 flex items-center justify-center text-center">
+                            <div>
+                                <i class="fas fa-comments text-4xl text-gray-300 mb-4"></i>
+                                <h4 class="text-lg font-bold text-gray-900 mb-2">Select a Conversation</h4>
+                                <p class="text-gray-600 font-medium">Choose a conversation to start chatting</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Requests Section (for validators) -->
+            <div id="chat-requests-section" class="mt-8 hidden">
+                <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                    <h3 class="text-xl font-black text-gray-900 mb-4">Pending Requests</h3>
+                    <div id="pending-requests-list" class="space-y-4">
+                        <!-- Pending requests will be loaded here -->
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- My Dashboard Tab (for authenticated users) -->
         <div id="my-dashboard-content" class="tab-content hidden">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6">Mi Dashboard</h2>
+            <h2 class="text-3xl font-black text-gray-900 mb-6">My Dashboard</h2>
             <div id="dashboard-content">
                 <!-- Dashboard content will be loaded here -->
             </div>
@@ -1477,22 +1736,6 @@ app.get('/marketplace', (c) => {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/marketplace.js"></script>
     <script>
-      function toggleMobileMenu() {
-        const menu = document.getElementById('mobile-menu');
-        const button = document.getElementById('mobile-menu-button');
-        const icon = button.querySelector('i');
-        
-        if (menu.classList.contains('hidden')) {
-          menu.classList.remove('hidden');
-          icon.classList.remove('fa-bars');
-          icon.classList.add('fa-times');
-        } else {
-          menu.classList.add('hidden');
-          icon.classList.remove('fa-times');
-          icon.classList.add('fa-bars');
-        }
-      }
-      
       function scrollToSection(sectionId) {
         const section = document.getElementById(sectionId);
         if (section) {
@@ -1516,11 +1759,11 @@ app.get('/marketplace', (c) => {
 app.get('/leaderboard', (c) => {
   return c.html(`
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏆 Leaderboard de Proyectos - ValidAI Studio</title>
+    <title>🏆 Project Leaderboard - ValidAI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -1529,14 +1772,20 @@ app.get('/leaderboard', (c) => {
         theme: {
           extend: {
             colors: {
-              primary: '#6366f1',
-              secondary: '#8b5cf6',
+              primary: '#FF6154',
+              secondary: '#FB651E',
             }
           }
         }
       }
     </script>
     <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
       .scrollbar-hide {
         -ms-overflow-style: none;
         scrollbar-width: none;
@@ -1544,49 +1793,57 @@ app.get('/leaderboard', (c) => {
       .scrollbar-hide::-webkit-scrollbar {
         display: none;
       }
-      .hero-pattern {
-        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      
+      .text-gradient {
+        background: linear-gradient(135deg, #FF6154 0%, #FB651E 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
       }
-      .gradient-border {
-        border-image: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) 1;
-      }
+      
       .card-hover {
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .card-hover:hover {
         transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2);
+        box-shadow: 0 20px 40px rgba(255, 97, 84, 0.2);
+      }
+      
+      .nav-blur {
+        backdrop-filter: blur(12px);
+        background-color: rgba(255, 255, 255, 0.8);
       }
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+<body class="bg-white min-h-screen">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b border-gray-200">
+    <nav class="nav-blur sticky top-0 z-50 border-b border-gray-200/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/" class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                        ⚡ ValidAI Studio
+                    <a href="/" class="text-2xl font-black text-gradient">
+                        <i class="fas fa-rocket mr-2"></i>
+                        ValidAI Studio
                     </a>
                 </div>
                 
                 <!-- Desktop Navigation -->
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="/" class="text-gray-700 hover:text-primary transition">Inicio</a>
-                    <a href="/leaderboard" class="text-primary font-semibold">
+                    <a href="/" class="text-gray-700 hover:text-primary transition font-semibold">Home</a>
+                    <a href="/leaderboard" class="text-primary font-bold">
                         <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
                     </a>
-                    <a href="/marketplace" class="text-gray-700 hover:text-primary transition">
+                    <a href="/marketplace" class="text-gray-700 hover:text-primary transition font-semibold">
                         <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
                     </a>
-                    <a href="/pricing" class="text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-tag mr-1 text-green-500"></i>Planes
+                    <a href="/pricing" class="text-gray-700 hover:text-primary transition font-semibold">
+                        <i class="fas fa-tag mr-1 text-green-500"></i>Pricing
                     </a>
                 </div>
                 
                 <!-- Mobile menu button -->
                 <div class="md:hidden flex items-center">
-                    <button id="mobile-menu-button" onclick="toggleMobileMenu()" class="text-gray-700 hover:text-primary transition">
+                    <button id="mobile-menu-button" onclick="toggleMobileMenu()" class="p-2 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 hover:from-primary hover:to-secondary hover:text-white transition-all duration-200 text-primary font-bold">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
                 </div>
@@ -1595,31 +1852,54 @@ app.get('/leaderboard', (c) => {
             <!-- Mobile Navigation Menu -->
             <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-200">
                 <div class="px-2 pt-2 pb-3 space-y-1">
-                    <a href="/" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-home mr-2"></i>Inicio
+                    <a href="/" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition font-semibold">
+                        <i class="fas fa-home mr-2"></i>Home
                     </a>
-                    <a href="/leaderboard" class="flex items-center px-3 py-2 text-primary font-semibold">
+                    <a href="/leaderboard" class="flex items-center px-3 py-2 text-primary font-bold">
                         <i class="fas fa-trophy mr-2 text-yellow-500"></i>Leaderboard
                     </a>
-                    <a href="/marketplace" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
+                    <a href="/marketplace" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition font-semibold">
                         <i class="fas fa-star mr-2 text-yellow-500"></i>Marketplace
                     </a>
-                    <a href="/pricing" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-tag mr-2 text-green-500"></i>Planes
+                    <a href="/pricing" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition font-semibold">
+                        <i class="fas fa-tag mr-2 text-green-500"></i>Pricing
                     </a>
                 </div>
             </div>
         </div>
     </nav>
+    
+    <script>
+      function toggleMobileMenu() {
+        const menu = document.getElementById('mobile-menu');
+        const button = document.getElementById('mobile-menu-button');
+        if (menu && button) {
+          const icon = button.querySelector('i');
+          if (menu.classList.contains('hidden')) {
+            menu.classList.remove('hidden');
+            if (icon) {
+              icon.classList.remove('fa-bars');
+              icon.classList.add('fa-times');
+            }
+          } else {
+            menu.classList.add('hidden');
+            if (icon) {
+              icon.classList.remove('fa-times');
+              icon.classList.add('fa-bars');
+            }
+          }
+        }
+      }
+    </script>
 
     <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white py-12 sm:py-16">
+    <div class="bg-gradient-to-r from-primary to-secondary text-white py-16 sm:py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 class="text-4xl sm:text-5xl font-bold mb-4">
-                🏆 Leaderboard de Proyectos
+            <h1 class="text-5xl sm:text-6xl font-black mb-4">
+                🏆 Project Leaderboard
             </h1>
-            <p class="text-lg sm:text-xl opacity-90 mb-8">
-                Descubre los proyectos mejor valorados por la comunidad
+            <p class="text-xl sm:text-2xl opacity-90 mb-8 font-medium">
+                Discover the highest-rated projects by our community
             </p>
         </div>
     </div>
@@ -1629,29 +1909,26 @@ app.get('/leaderboard', (c) => {
         <!-- Category Filter -->
         <div class="mb-8">
             <div class="flex flex-wrap justify-center gap-2 sm:gap-4">
-                <button onclick="filterByCategory('all')" class="category-btn active px-3 sm:px-6 py-2 sm:py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition text-sm sm:text-base">
-                    Todos los Proyectos
+                <button onclick="filterByCategory('all')" class="category-btn active px-3 sm:px-6 py-2 sm:py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary/90 transition text-sm sm:text-base">
+                    All Projects
                 </button>
-                <button onclick="filterByCategory('healthcare')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm sm:text-base">
-                    🏥 Salud
+                <button onclick="filterByCategory('SaaS')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
+                    💻 SaaS
                 </button>
-                <button onclick="filterByCategory('education')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm sm:text-base">
-                    📚 Educación
+                <button onclick="filterByCategory('Mobile')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
+                    � Mobile
                 </button>
-                <button onclick="filterByCategory('smart-city')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm sm:text-base">
-                    🏙️ Smart City
+                <button onclick="filterByCategory('Web3')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
+                    🔗 Web3
                 </button>
-                <button onclick="filterByCategory('finance')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm sm:text-base">
-                    💰 Finanzas
+                <button onclick="filterByCategory('Healthcare')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
+                    🏥 Healthcare
                 </button>
-                <button onclick="filterByCategory('energy')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm sm:text-base">
-                    ⚡ Energía
+                <button onclick="filterByCategory('Fintech')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
+                    💰 Fintech
                 </button>
-                <button onclick="filterByCategory('agriculture')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm sm:text-base">
-                    🌾 Agricultura
-                </button>
-                <button onclick="filterByCategory('retail')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm sm:text-base">
-                    🛍️ Retail
+                <button onclick="filterByCategory('E-commerce')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
+                    � E-commerce
                 </button>
             </div>
         </div>
@@ -1659,12 +1936,12 @@ app.get('/leaderboard', (c) => {
         <!-- Leaderboard Table -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden">
             <div class="px-4 sm:px-6 py-4 bg-gradient-to-r from-primary to-secondary text-white">
-                <h2 class="text-xl sm:text-2xl font-bold">🏅 Ranking de Proyectos</h2>
+                <h2 class="text-xl sm:text-2xl font-black">🏅 Project Rankings</h2>
             </div>
             
             <div id="leaderboard-loading" class="p-12 text-center">
-                <i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
-                <p class="text-gray-600">Cargando leaderboard...</p>
+                <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-gray-600 font-medium">Loading leaderboard...</p>
             </div>
             
             <div id="leaderboard-content" class="hidden">
@@ -1672,21 +1949,21 @@ app.get('/leaderboard', (c) => {
                     <table class="w-full min-w-[800px]">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Posición</th>
-                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Proyecto</th>
-                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Categoría</th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">
+                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Position</th>
+                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Project</th>
+                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Category</th>
+                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
                                     <i class="fas fa-star text-yellow-500 mr-1"></i>Rating
                                 </th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">
-                                    <i class="fas fa-users text-blue-500 mr-1"></i>Votos
+                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                    <i class="fas fa-users text-blue-500 mr-1"></i>Votes
                                 </th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">
-                                    Acción
+                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                    Action
                                 </th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">QR</th>
-                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Creador</th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-semibold text-gray-900">Acciones</th>
+                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">QR</th>
+                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Creator</th>
+                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="leaderboard-table-body" class="divide-y divide-gray-200">
@@ -1774,7 +2051,7 @@ app.get('/leaderboard', (c) => {
                 return;
             }
             
-            tbody.innerHTML = filteredData.map((project, index) => {
+            tbody.innerHTML = filteredData.map(function(project, index) {
                 const escapedTitle = project.title.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const escapedDescription = project.description.substring(0, 100).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 return '<tr class="hover:bg-gray-50 transition">' +
@@ -2058,22 +2335,18 @@ app.get('/leaderboard', (c) => {
                 alert('URL copiada al portapapeles');
             });
         }
+    </script>
+    
+    <!-- Chart.js for dashboard visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        function toggleMobileMenu() {
-            const menu = document.getElementById('mobile-menu');
-            const button = document.getElementById('mobile-menu-button');
-            const icon = button.querySelector('i');
-            
-            if (menu.classList.contains('hidden')) {
-                menu.classList.remove('hidden');
-                icon.classList.remove('fa-bars');
-                icon.classList.add('fa-times');
-            } else {
-                menu.classList.add('hidden');
-                icon.classList.remove('fa-times');
-                icon.classList.add('fa-bars');
-            }
-        }
+    <!-- jsPDF for PDF export functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+    <script>
+      // Ensure jsPDF is globally available
+      if (typeof window.jspdf !== 'undefined' && window.jspdf.jsPDF) {
+        window.jsPDF = window.jspdf.jsPDF;
+      }
     </script>
 </body>
 </html>

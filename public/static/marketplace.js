@@ -45,27 +45,13 @@ function generateProductStars(rating) {
 function generateProductVoteButtons(item) {
   const productId = item.id;
   if (!currentUser) {
-    return '<p class="text-sm text-gray-500">Inicia sesión para votar</p>';
+    return `<button onclick="event.stopPropagation(); showAuthModal('login')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition text-sm">Iniciar sesión para votar</button>`;
   }
 
   // Check if user is a validator
   const isValidator = currentUser.validator_id !== null && currentUser.validator_id !== undefined;
 
-  if (isValidator) {
-    // For validators: show apply button instead of vote buttons
-    return `
-      <div class="flex items-center justify-between">
-        <button onclick="event.stopPropagation(); applyToProduct(${productId})" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition text-sm font-semibold flex items-center">
-          <i class="fas fa-plus mr-2"></i>Aplicar para validar
-        </button>
-        <div class="text-center">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(`${window.location.origin}/marketplace?product=${productId}`)}" alt="QR para compartir producto" class="inline-block">
-          <p class="text-xs text-gray-500">Comparte este producto</p>
-        </div>
-      </div>
-    `;
-  }
-
+  // For validators and regular users: show vote buttons (validators can vote too)
   const voteUrl = `${window.location.origin}/marketplace?product=${productId}`;
   if (item.user_vote) {
     // Already voted, show their vote
@@ -217,6 +203,7 @@ window.addEventListener('hashchange', () => {
 
 // Load product detail
 async function loadProductDetail(productId) {
+  currentProductId = productId;
   try {
     const response = await axios.get(`/api/marketplace/products/${productId}`);
     const product = response.data;
@@ -414,10 +401,18 @@ function checkProductHash() {
   const productId = urlParams.get('product');
   
   if (productId && /^\d+$/.test(productId)) {
-    showTab('product-detail');
-    loadProductDetail(parseInt(productId));
-    // Clean up the URL
-    history.replaceState(null, null, window.location.pathname);
+    if (currentUser) {
+      // User is logged in, show product detail
+      showTab('product-detail');
+      loadProductDetail(parseInt(productId));
+      // Clean up the URL
+      history.replaceState(null, null, window.location.pathname);
+    } else {
+      // User not logged in, show login prompt in product detail tab
+      showTab('product-detail');
+      loadProductDetail(parseInt(productId));
+      // Keep the URL parameter for post-login redirect
+    }
   }
 }
 
@@ -455,10 +450,37 @@ document.addEventListener('click', (e) => {
 
 // Check authentication on load
 document.addEventListener('DOMContentLoaded', async () => {
-  authToken = localStorage.getItem('authToken');
-  if (authToken) {
+  // Handle OAuth callback token first
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+  const role = urlParams.get('role');
+  const newUser = urlParams.get('new_user');
+  
+  if (token) {
+    // Store the token
+    authToken = token;
+    localStorage.setItem('authToken', token);
+    
+    // Clean URL by removing the token parameters
+    const newUrl = window.location.pathname + (urlParams.get('product') ? `?product=${urlParams.get('product')}` : '');
+    window.history.replaceState({}, document.title, newUrl);
+    
+    // Show success message for new users
+    if (newUser === 'true') {
+      setTimeout(() => {
+        alert('¡Bienvenido! Tu cuenta ha sido creada exitosamente.');
+      }, 500);
+    }
+    
+    // Load user data
     loadCurrentUser();
     startNotificationsPolling();
+  } else {
+    authToken = localStorage.getItem('authToken');
+    if (authToken) {
+      loadCurrentUser();
+      startNotificationsPolling();
+    }
   }
   
   // Check for product parameter immediately
@@ -588,6 +610,28 @@ function showAuthModal(mode) {
   if (mode === 'login') {
     content.innerHTML = `
       <h2 class="text-2xl font-bold mb-6">Iniciar Sesión</h2>
+      
+      <!-- Google Login Options -->
+      <div class="space-y-3 mb-6">
+        <button onclick="loginWithGoogle('founder')" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+          <i class="fab fa-google text-red-600 mr-3"></i>
+          <span>Continuar como Founder</span>
+        </button>
+        <button onclick="loginWithGoogle('validator')" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+          <i class="fab fa-google text-blue-600 mr-3"></i>
+          <span>Continuar como Validador</span>
+        </button>
+      </div>
+      
+      <div class="relative mb-6">
+        <div class="absolute inset-0 flex items-center">
+          <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center text-sm">
+          <span class="px-2 bg-white text-gray-500">O con email</span>
+        </div>
+      </div>
+      
       <form id="login-form" class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -665,6 +709,19 @@ async function handleLogin(e) {
     
     closeAuthModal();
     updateAuthUI();
+    
+    // Check if there was a product parameter to redirect to
+    const urlParams = new URLSearchParams(window.location.search);
+    const productId = urlParams.get('product');
+    if (productId && /^\d+$/.test(productId)) {
+      showTab('product-detail');
+      loadProductDetail(parseInt(productId));
+      // Clean up the URL
+      history.replaceState(null, null, window.location.pathname);
+    } else if (document.getElementById('product-detail-content').classList.contains('hidden') === false && currentProductId) {
+      // If already on product detail page, reload it to show voting options
+      loadProductDetail(currentProductId);
+    }
     
     alert('¡Bienvenido de nuevo!');
     
@@ -755,6 +812,32 @@ function showTab(tabName) {
     if (validators.length === 0) {
       loadValidators();
     }
+  } else if (tabName === 'chat') {
+    if (currentUser) {
+      loadChatInterface();
+    } else {
+      // Show loading message while waiting for user to load
+      const chatContent = document.getElementById('chat-content');
+      if (chatContent) {
+        chatContent.innerHTML = `
+          <div class="flex items-center justify-center h-64">
+            <div class="text-center">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p class="text-gray-600">Loading chat...</p>
+            </div>
+          </div>
+        `;
+      }
+      // Wait for user to load, then initialize chat
+      const checkUserAndLoadChat = () => {
+        if (currentUser) {
+          loadChatInterface();
+        } else {
+          setTimeout(checkUserAndLoadChat, 100);
+        }
+      };
+      checkUserAndLoadChat();
+    }
   } else if (tabName === 'my-dashboard' && currentUser) {
     loadMyDashboard();
   } else if (tabName === 'internal-dashboard' && currentUser) {
@@ -769,6 +852,7 @@ function showTab(tabName) {
 
 let products = [];
 let projects = [];
+let currentProductId = null;
 
 async function loadMarketplaceItems() {
   try {
@@ -1348,8 +1432,8 @@ function stopNotificationsPolling() {
 // Check network connectivity
 async function checkConnectivity() {
   try {
-    // Try to fetch a small resource from the same domain
-    const response = await fetch('/favicon.ico', { 
+    // Try to ping the API instead of looking for favicon
+    const response = await fetch('/api/marketplace/products?limit=1', { 
       method: 'HEAD',
       cache: 'no-cache'
     });
@@ -3973,7 +4057,7 @@ async function handleSendValidatorRequest(validatorId) {
   try {
     const response = await axios.post('/api/validator-requests/send', {
       validatorId: validatorId,
-      projectId: null, // Temporarily send null since project_id references projects table, not beta_products
+      projectId: productId, // Send the selected product ID
       message: message
     }, {
       headers: { Authorization: `Bearer ${authToken}` }
@@ -4184,6 +4268,11 @@ function closeChatModal() {
 
 // Load chat messages
 async function loadChatMessages(conversationId) {
+  if (!authToken) {
+    console.warn('Cannot load chat messages: no auth token');
+    return;
+  }
+  
   try {
     const response = await axios.get(`/api/chat/conversations/${conversationId}/messages`, {
       headers: { Authorization: `Bearer ${authToken}` }
@@ -4243,6 +4332,11 @@ function renderChatMessages() {
 
 // Send chat message
 async function sendChatMessage(conversationId) {
+  if (!authToken) {
+    console.warn('Cannot send message: no auth token');
+    return;
+  }
+  
   const input = document.getElementById('chat-message-input');
   const message = input.value.trim();
 
@@ -4522,12 +4616,6 @@ function renderConversationsSection(conversations) {
 }
 
 // Helper function to escape HTML
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
 // Function to change user role
 async function changeUserRole(newRole) {
   if (!authToken) {
@@ -4556,41 +4644,6 @@ async function changeUserRole(newRole) {
     console.error('Error changing role:', error);
     alert('Error: ' + (error.response?.data?.error || 'No se pudo cambiar el rol'));
   }
-}
-
-// Function to update authentication UI based on user role
-function updateAuthUI() {
-  const roleSelector = document.getElementById('role-selector');
-  const mobileRoleSelector = document.getElementById('mobile-role-selector');
-  
-  if (currentUser) {
-    // Show role selectors
-    if (roleSelector) roleSelector.style.display = 'flex';
-    if (mobileRoleSelector) mobileRoleSelector.style.display = 'block';
-    
-    // Update current role display
-    const currentRoleDisplay = document.getElementById('current-role');
-    const mobileCurrentRoleDisplay = document.getElementById('mobile-current-role');
-    
-    const roleText = currentUser.role === 'founder' ? 'Founder' : 'Validator';
-    if (currentRoleDisplay) currentRoleDisplay.textContent = roleText;
-    if (mobileCurrentRoleDisplay) mobileCurrentRoleDisplay.textContent = roleText;
-    
-    // Update select values
-    const desktopSelect = roleSelector?.querySelector('select');
-    const mobileSelect = mobileRoleSelector?.querySelector('select');
-    
-    if (desktopSelect) desktopSelect.value = currentUser.role;
-    if (mobileSelect) mobileSelect.value = currentUser.role;
-    
-  } else {
-    // Hide role selectors
-    if (roleSelector) roleSelector.style.display = 'none';
-    if (mobileRoleSelector) mobileRoleSelector.style.display = 'none';
-  }
-  
-  // Also update marketplace-specific auth UI
-  updateMarketplaceAuthUI();
 }
 
 // Function to update marketplace-specific authentication UI
@@ -4686,41 +4739,6 @@ function updateMarketplaceAuthUI() {
   }
 }
 
-// Function to update authentication UI based on user role
-function updateAuthUI() {
-  const roleSelector = document.getElementById('role-selector');
-  const mobileRoleSelector = document.getElementById('mobile-role-selector');
-  
-  if (currentUser) {
-    // Show role selectors
-    if (roleSelector) roleSelector.style.display = 'flex';
-    if (mobileRoleSelector) mobileRoleSelector.style.display = 'block';
-    
-    // Update current role display
-    const currentRoleDisplay = document.getElementById('current-role');
-    const mobileCurrentRoleDisplay = document.getElementById('mobile-current-role');
-    
-    const roleText = currentUser.role === 'founder' ? 'Founder' : 'Validator';
-    if (currentRoleDisplay) currentRoleDisplay.textContent = roleText;
-    if (mobileCurrentRoleDisplay) mobileCurrentRoleDisplay.textContent = roleText;
-    
-    // Update select values
-    const desktopSelect = roleSelector?.querySelector('select');
-    const mobileSelect = mobileRoleSelector?.querySelector('select');
-    
-    if (desktopSelect) desktopSelect.value = currentUser.role;
-    if (mobileSelect) mobileSelect.value = currentUser.role;
-    
-  } else {
-    // Hide role selectors
-    if (roleSelector) roleSelector.style.display = 'none';
-    if (mobileRoleSelector) mobileRoleSelector.style.display = 'none';
-  }
-  
-  // Also update marketplace-specific auth UI
-  updateMarketplaceAuthUI();
-}
-
 // Make functions globally available
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
@@ -4741,4 +4759,345 @@ window.openChatModal = openChatModal;
 window.acceptChatRequest = acceptChatRequest;
 window.rejectChatRequest = rejectChatRequest;
 window.loadChatRequests = loadChatRequests;
+
+// Login with Google OAuth
+function loginWithGoogle(role) {
+  console.log('🚀 loginWithGoogle called with role:', role);
+  
+  // Show loading state
+  const modal = document.getElementById('auth-modal');
+  const content = document.getElementById('auth-modal-content');
+  content.innerHTML = `
+    <div class="text-center py-8">
+      <i class="fab fa-google text-4xl text-red-600 mb-4"></i>
+      <h2 class="text-xl font-bold mb-2">Conectando con Google...</h2>
+      <p class="text-gray-600">Redirigiendo a Google...</p>
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mt-4"></div>
+    </div>
+  `;
+  
+  // Build redirect URL with current product if on product page
+  let redirectUrl = `/api/auth/google?role=${role}`;
+  if (currentProductId) {
+    redirectUrl += `&redirect=/marketplace?product=${currentProductId}`;
+  }
+  
+  // Redirect to Google OAuth
+  console.log('🌐 Redirecting to:', redirectUrl);
+  window.location.href = redirectUrl;
+}
+
+// ============================================
+// CHAT INTERFACE FOR MARKETPLACE TAB
+// ============================================
+
+// Global variables for chat interface
+
+async function loadChatInterface() {
+  if (!currentUser) {
+    console.warn('Cannot load chat interface: user not loaded yet');
+    return;
+  }
+  
+  try {
+    // Load conversations
+    await loadConversationsList();
+    
+    // Load pending requests if user is validator
+    if (currentUser.role === 'validator') {
+      await loadPendingRequests();
+    }
+    
+    // Update notification badge
+    updateChatNotificationBadge();
+    
+  } catch (error) {
+    console.error('Error loading chat interface:', error);
+    showError('Error al cargar la interfaz de chat');
+  }
+}
+
+async function loadConversationsList() {
+  if (!authToken) {
+    console.warn('Cannot load conversations: no auth token');
+    return;
+  }
+  
+  try {
+    const response = await axios.get('/api/chat/conversations', {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const conversations = response.data.conversations || [];
+    renderConversationsList(conversations);
+    
+  } catch (error) {
+    console.error('Error loading conversations:', error);
+    document.getElementById('conversations-list').innerHTML = `
+      <div class="text-center py-8 text-gray-500">
+        <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
+        <p>Error al cargar conversaciones</p>
+      </div>
+    `;
+  }
+}
+
+function renderConversationsList(conversations) {
+  const container = document.getElementById('conversations-list');
+  
+  if (conversations.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-8 text-gray-500">
+        <i class="fas fa-comments text-3xl mb-2"></i>
+        <p>No tienes conversaciones activas</p>
+        <p class="text-sm mt-2">Las conversaciones aparecerán aquí cuando contactes con validadores</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = conversations.map(conv => `
+    <div onclick="selectConversation('${conv.id}', '${escapeHtml(conv.other_user_name)}', '${escapeHtml(conv.project_title || 'Sin proyecto')}', '${conv.other_user_avatar || ''}')"
+         class="p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition ${currentConversationId === conv.id ? 'bg-primary/10 border-primary' : 'border-gray-200'}">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold">
+          ${conv.other_user_avatar ? `<img src="${conv.other_user_avatar}" class="w-10 h-10 rounded-full object-cover" alt="${conv.other_user_name}">` : conv.other_user_name.charAt(0).toUpperCase()}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h4 class="font-medium text-gray-900 truncate">${escapeHtml(conv.other_user_name)}</h4>
+            ${conv.unread_count > 0 ? `<span class="bg-red-500 text-white text-xs rounded-full px-2 py-1">${conv.unread_count}</span>` : ''}
+          </div>
+          <p class="text-sm text-gray-600 truncate">${escapeHtml(conv.project_title || 'Sin proyecto')}</p>
+          ${conv.last_message ? `<p class="text-xs text-gray-500 truncate mt-1">${escapeHtml(conv.last_message)}</p>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectConversation(conversationId, partnerName, projectTitle, partnerAvatar) {
+  currentConversationId = conversationId;
+  
+  // Update UI
+  document.getElementById('chat-partner-name').textContent = partnerName;
+  document.getElementById('chat-partner-info').textContent = `Proyecto: ${projectTitle}`;
+  
+  // Show chat areas
+  document.getElementById('chat-header').classList.remove('hidden');
+  document.getElementById('chat-messages').classList.remove('hidden');
+  document.getElementById('chat-input-area').classList.remove('hidden');
+  document.getElementById('chat-empty-state').classList.add('hidden');
+  
+  // Load messages
+  loadConversationMessages(conversationId);
+  
+  // Update conversations list styling
+  renderConversationsListStyle();
+}
+
+function renderConversationsListStyle() {
+  const conversations = document.querySelectorAll('#conversations-list > div');
+  conversations.forEach(conv => {
+    const convId = conv.getAttribute('onclick').match(/'([^']+)'/)[1];
+    if (convId === currentConversationId) {
+      conv.classList.add('bg-primary/10', 'border-primary');
+      conv.classList.remove('border-gray-200');
+    } else {
+      conv.classList.remove('bg-primary/10', 'border-primary');
+      conv.classList.add('border-gray-200');
+    }
+  });
+}
+
+async function loadConversationMessages(conversationId) {
+  if (!authToken) {
+    console.warn('Cannot load conversation messages: no auth token');
+    return;
+  }
+  
+  try {
+    const response = await axios.get(`/api/chat/conversations/${conversationId}/messages`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    const messages = response.data.messages || [];
+    renderConversationMessages(messages);
+    
+    // Mark messages as read
+    await markMessagesAsRead(conversationId);
+    
+    // Update notification badge
+    updateChatNotificationBadge();
+    
+  } catch (error) {
+    console.error('Error loading messages:', error);
+    document.getElementById('chat-messages').innerHTML = `
+      <div class="text-center py-8 text-gray-500">
+        <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
+        <p>Error al cargar mensajes</p>
+      </div>
+    `;
+  }
+}
+
+function renderConversationMessages(messages) {
+  const container = document.getElementById('chat-messages');
+  
+  if (messages.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-8 text-gray-500">
+        <i class="fas fa-comments text-3xl mb-2"></i>
+        <p>No hay mensajes en esta conversación</p>
+        <p class="text-sm mt-2">Envía el primer mensaje para comenzar</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = messages.map(msg => {
+    const isOwnMessage = msg.sender_id === currentUser.id;
+    return `
+      <div class="flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-3">
+        <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+          isOwnMessage 
+            ? 'bg-primary text-white' 
+            : 'bg-white border border-gray-200 text-gray-900'
+        }">
+          <p class="text-sm">${escapeHtml(msg.message)}</p>
+          <p class="text-xs ${isOwnMessage ? 'text-primary-100' : 'text-gray-500'} mt-1">
+            ${new Date(msg.created_at).toLocaleString('es-ES')}
+          </p>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Scroll to bottom
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendCurrentChatMessage() {
+  if (!authToken) {
+    console.warn('Cannot send message: no auth token');
+    return;
+  }
+  
+  const input = document.getElementById('chat-message-input');
+  const message = input.value.trim();
+  
+  if (!message || !currentConversationId) return;
+  
+  try {
+    await axios.post(`/api/chat/conversations/${currentConversationId}/messages`, {
+      message: message
+    }, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    
+    // Clear input
+    input.value = '';
+    
+    // Reload messages
+    await loadConversationMessages(currentConversationId);
+    
+  } catch (error) {
+    console.error('Error sending message:', error);
+    showError('Error al enviar mensaje');
+  }
+}
+
+async function markMessagesAsRead(conversationId) {
+  if (!authToken) {
+    console.warn('Cannot mark messages as read: no auth token');
+    return;
+  }
+  
+  try {
+    await axios.put(`/api/chat/conversations/${conversationId}/read`, {}, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+  }
+}
+
+async function loadPendingRequests() {
+  try {
+    const chatRequestsData = await loadChatRequests();
+    const requests = chatRequestsData.requests || [];
+    
+    if (requests.length > 0) {
+      document.getElementById('chat-requests-section').classList.remove('hidden');
+      renderPendingRequests(requests);
+    } else {
+      document.getElementById('chat-requests-section').classList.add('hidden');
+    }
+    
+  } catch (error) {
+    console.error('Error loading pending requests:', error);
+  }
+}
+
+function renderPendingRequests(requests) {
+  const container = document.getElementById('pending-requests-list');
+  
+  container.innerHTML = requests.map(request => `
+    <div class="border border-gray-200 rounded-lg p-4">
+      <div class="flex items-start justify-between">
+        <div class="flex-1">
+          <h4 class="font-medium text-gray-900">${escapeHtml(request.founder_name)}</h4>
+          <p class="text-sm text-gray-600 mt-1">${escapeHtml(request.message)}</p>
+          <p class="text-xs text-gray-500 mt-2">
+            Proyecto: ${escapeHtml(request.project_title)}
+          </p>
+          <p class="text-xs text-gray-500">
+            ${new Date(request.created_at).toLocaleString('es-ES')}
+          </p>
+        </div>
+        <div class="flex space-x-2 ml-4">
+          <button onclick="acceptChatRequest('${request.id}')" 
+                  class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition">
+            Aceptar
+          </button>
+          <button onclick="rejectChatRequest('${request.id}')" 
+                  class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition">
+            Rechazar
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateChatNotificationBadge() {
+  loadUnreadChatCount().then(count => {
+    const badge = document.getElementById('chat-notification-badge');
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  });
+}
+
+// Handle Enter key in chat input
+document.addEventListener('DOMContentLoaded', function() {
+  const chatInput = document.getElementById('chat-message-input');
+  if (chatInput) {
+    chatInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        sendCurrentChatMessage();
+      }
+    });
+  }
+});
+
+// Export functions to window
+window.loadChatInterface = loadChatInterface;
+window.selectConversation = selectConversation;
+window.sendChatMessage = sendCurrentChatMessage;
 window.loadConversations = loadConversations;
+window.showTab = showTab;
+window.loginWithGoogle = loginWithGoogle;

@@ -840,31 +840,100 @@ marketplace.delete('/products/:id', requireAuth, async (c) => {
       WHERE id = ?
     `).bind(productIdNum).first() as any;
     
-    console.log('Product found:', product, 'company_user_id type:', typeof product?.company_user_id);
+    console.log('DELETE product - Product found:', product);
+    console.log('DELETE product - company_user_id:', product?.company_user_id, 'type:', typeof product?.company_user_id);
+    console.log('DELETE product - userId from token:', userId, 'type:', typeof userId);
     
     if (!product) {
+      console.log('DELETE product - Product not found');
       return c.json({ error: 'Product not found' }, 404);
+    }
+    
+    if (product.company_user_id === null || product.company_user_id === undefined) {
+      console.log('DELETE product - Product has null company_user_id');
+      return c.json({ error: 'Product ownership not set' }, 500);
     }
     
     const productOwnerId = product.company_user_id.toString();
     const requestUserId = userId.toString();
     
-    console.log('Ownership check:', { 
+    console.log('DELETE product - Ownership check:', { 
       productOwnerId, 
       requestUserId, 
-      areEqual: productOwnerId === requestUserId,
-      productOwnerType: typeof product.company_user_id,
-      requestUserType: typeof userId
+      areEqual: productOwnerId === requestUserId
     });
     
-    // TEMPORARILY DISABLE OWNERSHIP CHECK FOR DEBUGGING
-    // if (productOwnerId !== requestUserId) {
-    //   console.log('Ownership check failed');
-    //   return c.json({ error: 'Unauthorized - You do not own this product' }, 403);
-    // }
+    if (productOwnerId !== requestUserId) {
+      console.log('DELETE product - Ownership check failed');
+      return c.json({ error: 'Unauthorized - You do not own this product' }, 403);
+    }
+    
+    // Check what related records exist before deleting
+    console.log('DELETE product - Checking related records for product:', productIdNum);
+    
+    const votesCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM product_votes WHERE product_id = ?').bind(productIdNum).first();
+    console.log('DELETE product - Product votes count:', votesCount);
+    
+    const applicationsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM validator_applications WHERE product_id = ?').bind(productIdNum).first();
+    console.log('DELETE product - Validator applications count:', applicationsCount);
+    
+    const sessionsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM validation_sessions WHERE product_id = ?').bind(productIdNum).first();
+    console.log('DELETE product - Validation sessions count:', sessionsCount);
+    
+    const reportsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM validation_reports WHERE product_id = ?').bind(productIdNum).first();
+    console.log('DELETE product - Validation reports count:', reportsCount);
+    
+    const messagesCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM messages WHERE product_id = ? OR session_id IN (SELECT id FROM validation_sessions WHERE product_id = ?)').bind(productIdNum, productIdNum).first();
+    console.log('DELETE product - Messages count:', messagesCount);
+    
+    // Delete related records first to avoid foreign key constraints
+    console.log('DELETE product - Deleting related records...');
+    
+    try {
+      // Delete validation reports first (depends on sessions)
+      const reportsResult = await c.env.DB.prepare('DELETE FROM validation_reports WHERE product_id = ?').bind(productIdNum).run();
+      console.log('DELETE product - Validation reports deleted:', reportsResult);
+    } catch (error) {
+      console.error('DELETE product - Error deleting validation reports:', error);
+    }
+    
+    try {
+      // Delete messages (both types - direct product reference and session reference)
+      const messagesResult = await c.env.DB.prepare('DELETE FROM messages WHERE product_id = ? OR session_id IN (SELECT id FROM validation_sessions WHERE product_id = ?)').bind(productIdNum, productIdNum).run();
+      console.log('DELETE product - Messages deleted:', messagesResult);
+    } catch (error) {
+      console.error('DELETE product - Error deleting messages:', error);
+    }
+    
+    try {
+      // Delete validation sessions (depends on applications)
+      const sessionsResult = await c.env.DB.prepare('DELETE FROM validation_sessions WHERE product_id = ?').bind(productIdNum).run();
+      console.log('DELETE product - Validation sessions deleted:', sessionsResult);
+    } catch (error) {
+      console.error('DELETE product - Error deleting validation sessions:', error);
+    }
+    
+    try {
+      // Delete validator applications
+      const applicationsResult = await c.env.DB.prepare('DELETE FROM validator_applications WHERE product_id = ?').bind(productIdNum).run();
+      console.log('DELETE product - Validator applications deleted:', applicationsResult);
+    } catch (error) {
+      console.error('DELETE product - Error deleting validator applications:', error);
+    }
+    
+    try {
+      // Delete votes (has CASCADE but delete explicitly for safety)
+      const votesResult = await c.env.DB.prepare('DELETE FROM product_votes WHERE product_id = ?').bind(productIdNum).run();
+      console.log('DELETE product - Votes deleted:', votesResult);
+    } catch (error) {
+      console.error('DELETE product - Error deleting votes:', error);
+    }
+    
+    console.log('DELETE product - Related records deleted, now deleting product...');
     
     // Delete the product
-    await c.env.DB.prepare('DELETE FROM beta_products WHERE id = ?').bind(productIdNum).run();
+    const productResult = await c.env.DB.prepare('DELETE FROM beta_products WHERE id = ?').bind(productIdNum).run();
+    console.log('DELETE product - Product deleted successfully:', productResult);
     
     // Decrement usage counters (handle errors gracefully)
     try {
@@ -880,7 +949,14 @@ marketplace.delete('/products/:id', requireAuth, async (c) => {
     return c.json({ message: 'Product deleted successfully' });
   } catch (error) {
     console.error('Error deleting product:', error);
-    return c.json({ error: 'Internal server error' }, 500);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error('Error stack:', errorStack);
+    return c.json({ 
+      error: 'Internal server error', 
+      details: errorMessage,
+      productId: productId 
+    }, 500);
   }
 });
 

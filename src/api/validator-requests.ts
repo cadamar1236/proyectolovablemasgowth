@@ -4,45 +4,25 @@
  */
 
 import { Hono } from 'hono';
-import { verify } from 'hono/jwt';
-import type { Bindings } from '../types';
+import type { Bindings, AuthContext } from '../types';
+import { requireAuth, requireRole } from './auth';
 
-const validatorRequests = new Hono<{ Bindings: Bindings }>();
-
-const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
-
-// Middleware: Verify authentication
-async function requireAuth(c: any, next: any) {
-  try {
-    const authHeader = c.req.header('Authorization');
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: 'Unauthorized - No token provided' }, 401);
-    }
-    
-    const token = authHeader.substring(7);
-    const payload = await verify(token, JWT_SECRET) as any;
-    
-    c.set('userId', payload.userId);
-    c.set('userRole', payload.role);
-    c.set('userEmail', payload.email);
-    
-    await next();
-  } catch (error) {
-    return c.json({ error: 'Unauthorized - Invalid token' }, 401);
-  }
-}
+const validatorRequests = new Hono<{ Bindings: Bindings; Variables: AuthContext }>();
 
 // Apply auth middleware to all routes
 validatorRequests.use('*', requireAuth);
 
 // POST /api/validator-requests/send - Founder sends request to validator
 validatorRequests.post('/send', async (c) => {
+  console.log('Starting validator request send');
   try {
     const founderId = c.get('userId');
-    const userRole = c.get('userRole');
+    const userRole = c.get('userRole') as string;
+    
+    console.log('User info:', { founderId, userRole });
     
     if (userRole !== 'founder') {
+      console.log('User is not a founder');
       return c.json({ error: 'Only founders can send validator requests' }, 403);
     }
     
@@ -52,46 +32,71 @@ validatorRequests.post('/send', async (c) => {
       return c.json({ error: 'Validator ID and message are required' }, 400);
     }
     
+    const validatorIdNum = parseInt(validatorId);
+    const founderIdNum = founderId;
+    const productIdNum = projectId ? parseInt(projectId) : null;
+    
+    if (isNaN(validatorIdNum) || isNaN(founderIdNum) || (projectId && (productIdNum === null || isNaN(productIdNum)))) {
+      return c.json({ error: 'Invalid ID format' }, 400);
+    }
+    
+    // Check if founder exists
+    const founder = await c.env.DB.prepare(`
+      SELECT id, name FROM users WHERE id = ?
+    `).bind(founderIdNum).first();
+    
+    if (!founder) {
+      return c.json({ error: 'Founder account not found' }, 404);
+    }
+    
     // Check if validator exists
     const validator = await c.env.DB.prepare(`
       SELECT v.id, v.user_id, u.name, u.email
       FROM validators v
       JOIN users u ON v.user_id = u.id
-      WHERE v.id = ? AND v.available = 1
-    `).bind(validatorId).first();
+      WHERE v.id = ?
+    `).bind(validatorIdNum).first();
     
     if (!validator) {
-      return c.json({ error: 'Validator not found or unavailable' }, 404);
+      console.log('Validator not found:', validatorIdNum);
+      return c.json({ error: 'Validator not found' }, 404);
     }
     
     // Check if there's already a pending request
     const existingRequest = await c.env.DB.prepare(`
       SELECT id FROM validator_requests
       WHERE founder_id = ? AND validator_id = ? AND status = 'pending'
-    `).bind(founderId, validatorId).first();
+    `).bind(founderIdNum, validatorIdNum).first();
     
     if (existingRequest) {
       return c.json({ error: 'You already have a pending request to this validator' }, 400);
     }
     
     // Create the request
+    console.log('Creating validator request with:', { founderIdNum, validatorIdNum, projectId });
     const result = await c.env.DB.prepare(`
       INSERT INTO validator_requests (founder_id, validator_id, project_id, message, status)
-      VALUES (?, ?, ?, ?, 'pending')
-    `).bind(founderId, validatorId, projectId || null, message).run();
+      VALUES (?, ?, NULL, ?, 'pending')
+    `).bind(founderIdNum, validatorIdNum, message).run();
     
     const requestId = result.meta.last_row_id;
+    console.log('Validator request created with ID:', requestId);
     
     // Create notification for validator
-    await c.env.DB.prepare(`
-      INSERT INTO notifications (user_id, type, title, message, link)
-      VALUES (?, 'validator_request', ?, ?, ?)
-    `).bind(
-      validator.user_id,
-      'New Validation Request',
-      `A founder wants your opinion on their project`,
-      `/marketplace?tab=my-dashboard&section=requests&request=${requestId}`
-    ).run();
+    try {
+      await c.env.DB.prepare(`
+        INSERT INTO notifications (user_id, type, title, message, link)
+        VALUES (?, 'validator_request', ?, ?, ?)
+      `).bind(
+        validator.user_id,
+        'New Validation Request',
+        `A founder wants your opinion on their project`,
+        `/marketplace?tab=my-dashboard&section=requests&request=${requestId}`
+      ).run();
+    } catch (notificationError) {
+      console.error('Error creating notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
     
     return c.json({
       success: true,
@@ -101,7 +106,9 @@ validatorRequests.post('/send', async (c) => {
     
   } catch (error) {
     console.error('Error sending validator request:', error);
-    return c.json({ error: 'Failed to send request' }, 500);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error details:', errorMessage);
+    return c.json({ error: 'Failed to send request', details: errorMessage }, 500);
   }
 });
 

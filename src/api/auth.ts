@@ -225,6 +225,79 @@ auth.put('/profile', async (c) => {
   }
 });
 
+// Change user role
+auth.put('/role', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    const token = authHeader.substring(7);
+    const payload = await verify(token, JWT_SECRET) as any;
+    
+    const { newRole } = await c.req.json();
+    
+    if (!newRole) {
+      return c.json({ error: 'New role is required' }, 400);
+    }
+    
+    // Validate role
+    const validRoles = ['founder', 'validator', 'admin'];
+    if (!validRoles.includes(newRole)) {
+      return c.json({ error: 'Invalid role' }, 400);
+    }
+    
+    // Update user role
+    await c.env.DB.prepare(`
+      UPDATE users 
+      SET role = ?
+      WHERE id = ?
+    `).bind(newRole, payload.userId).run();
+    
+    // If changing to validator, create validator profile if it doesn't exist
+    if (newRole === 'validator') {
+      const existingValidator = await c.env.DB.prepare(
+        'SELECT id FROM validators WHERE user_id = ?'
+      ).bind(payload.userId).first();
+      
+      if (!existingValidator) {
+        await c.env.DB.prepare(`
+          INSERT INTO validators (user_id, title, expertise)
+          VALUES (?, ?, ?)
+        `).bind(payload.userId, 'New Validator', '[]').run();
+      }
+    }
+    
+    // Generate new JWT token with updated role
+    const newToken = await sign(
+      {
+        userId: payload.userId,
+        email: payload.email,
+        role: newRole,
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
+      },
+      JWT_SECRET
+    );
+    
+    // Get updated user data
+    const updatedUser = await c.env.DB.prepare(
+      'SELECT id, email, name, role FROM users WHERE id = ?'
+    ).bind(payload.userId).first() as any;
+    
+    return c.json({
+      message: 'Role updated successfully',
+      token: newToken,
+      user: updatedUser
+    });
+    
+  } catch (error) {
+    console.error('Role update error:', error);
+    return c.json({ error: 'Role update failed' }, 500);
+  }
+});
+
 // Change password
 auth.post('/change-password', async (c) => {
   try {
@@ -297,8 +370,9 @@ auth.get('/google', async (c) => {
     return c.json({ error: 'Google OAuth not configured' }, 500);
   }
 
-  // Get role from query parameter (for validator registration)
+  // Get role and redirect from query parameters
   const role = c.req.query('role') || 'founder';
+  const redirect = c.req.query('redirect') || '';
 
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     new URLSearchParams({
@@ -306,7 +380,7 @@ auth.get('/google', async (c) => {
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: 'openid email profile',
-      state: role, // Pass role in state parameter
+      state: JSON.stringify({ role, redirect }), // Pass role and redirect in state parameter
       access_type: 'offline',
       prompt: 'consent'
     });
@@ -317,11 +391,21 @@ auth.get('/google', async (c) => {
 auth.get('/google/callback', async (c) => {
   try {
     const code = c.req.query('code');
-    const state = c.req.query('state') || 'founder'; // Get role from state
+    const stateParam = c.req.query('state') || '{"role":"founder"}';
 
     if (!code) {
       return c.json({ error: 'Authorization code not provided' }, 400);
     }
+
+    // Parse state parameter (contains role and redirect)
+    let state;
+    try {
+      state = JSON.parse(stateParam);
+    } catch (e) {
+      state = { role: 'founder', redirect: '' };
+    }
+    let userRole = state.role || 'founder';
+    const redirectPath = state.redirect || '';
 
     const clientId = c.env.GOOGLE_CLIENT_ID;
     const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
@@ -378,7 +462,6 @@ auth.get('/google/callback', async (c) => {
     ).bind(userData.email).first() as any;
 
     let userId: number;
-    let userRole: string;
 
     if (existingUser) {
       // User exists, update their info if needed
@@ -394,7 +477,7 @@ auth.get('/google/callback', async (c) => {
       `).bind(userData.name, userData.picture, userId).run();
     } else {
       // Create new user
-      userRole = state; // Use role from OAuth state
+      userRole = state.role; // Use role from OAuth state
 
       // Validate role
       const validRoles = ['founder', 'validator', 'admin'];
@@ -431,7 +514,9 @@ auth.get('/google/callback', async (c) => {
 
     // Redirect to frontend with token
     const frontendUrl = new URL(c.req.url).origin;
-    return c.redirect(`${frontendUrl}/?token=${token}&role=${userRole}&new_user=${!existingUser}`);
+    const baseUrl = redirectPath ? `${frontendUrl}${redirectPath}` : `${frontendUrl}/`;
+    const separator = redirectPath.includes('?') ? '&' : '?';
+    return c.redirect(`${baseUrl}${separator}token=${token}&role=${userRole}&new_user=${!existingUser}`);
 
   } catch (error) {
     console.error('Google OAuth callback error:', error);

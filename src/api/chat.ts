@@ -368,4 +368,51 @@ chat.post('/conversations/:id/close', async (c) => {
   }
 });
 
+// PUT /api/chat/conversations/:id/read - Mark messages as read
+chat.put('/conversations/:id/read', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const conversationId = c.req.param('id');
+    
+    // Verify user has access to this conversation
+    const conversation = await c.env.DB.prepare(`
+      SELECT founder_id, validator_id
+      FROM chat_conversations 
+      WHERE id = ?
+    `).bind(conversationId).first() as any;
+    
+    if (!conversation) {
+      return c.json({ error: 'Conversation not found' }, 404);
+    }
+    
+    // Check if user is participant
+    const validator = await c.env.DB.prepare(`
+      SELECT user_id FROM validators WHERE id = ?
+    `).bind(conversation.validator_id).first() as any;
+    
+    const isParticipant = conversation.founder_id === userId || 
+                          (validator && validator.user_id === userId);
+    
+    if (!isParticipant) {
+      return c.json({ error: 'Unauthorized to access this conversation' }, 403);
+    }
+    
+    // Mark messages as read for current user
+    await c.env.DB.prepare(`
+      UPDATE chat_messages
+      SET is_read = 1, read_at = CURRENT_TIMESTAMP
+      WHERE conversation_id = ? AND sender_id != ? AND is_read = 0
+    `).bind(conversationId, userId).run();
+    
+    return c.json({
+      success: true,
+      message: 'Messages marked as read'
+    });
+    
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    return c.json({ error: 'Failed to mark messages as read' }, 500);
+  }
+});
+
 export default chat;
