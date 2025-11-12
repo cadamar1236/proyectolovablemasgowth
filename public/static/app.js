@@ -631,8 +631,7 @@ function renderProjects() {
       <div class="flex items-center justify-between text-sm text-gray-500 mb-4">
         <span><i class="far fa-calendar mr-2"></i>${formatDate(project.created_at)}</span>
         <div class="flex items-center">
-          ${project.rating_average ? `<span class="text-yellow-500 mr-2"><i class="fas fa-star"></i> ${project.rating_average.toFixed(1)}</span>` : ''}
-          ${project.votes_count ? `<span class="text-gray-500">(${project.votes_count} votos)</span>` : ''}
+          ${project.votes_count ? `<span class="text-red-500 mr-2"><i class="fas fa-heart"></i> ${project.votes_count}</span>` : ''}
         </div>
       </div>
       <div class="flex items-center justify-between">
@@ -1364,7 +1363,7 @@ function renderLeaderboardTable(projects) {
   tbody.innerHTML = projects.map((project, index) => {
     const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`;
     const score = project.leaderboard_score || 0;
-    const breakdown = project.score_breakdown || { rating: 0, growth: 0, goals: 0 };
+    const breakdown = project.score_breakdown || { likes: 0, growth: 0, goals: 0 };
     const completedGoals = project.completed_goals || 0;
     const totalGoals = project.total_goals || 0;
     const goalsPercent = totalGoals > 0 ? (completedGoals / totalGoals * 100) : 0;
@@ -1388,9 +1387,9 @@ function renderLeaderboardTable(projects) {
             <div class="text-2xl sm:text-3xl font-black text-primary">${score.toFixed(1)}</div>
             <div class="text-xs text-gray-500 mt-2 space-y-1">
               <div class="flex items-center justify-center space-x-2 sm:space-x-3">
-                <span title="Rating Score (40%)" class="flex items-center text-xs">
-                  <i class="fas fa-star text-yellow-400 mr-1"></i>
-                  <span class="hidden sm:inline">${breakdown.rating?.toFixed(0) || 0}</span>
+                <span title="Likes Score (40%)" class="flex items-center text-xs">
+                  <i class="fas fa-heart text-red-500 mr-1"></i>
+                  <span class="hidden sm:inline">${breakdown.likes?.toFixed(0) || 0}</span>
                 </span>
                 <span title="Growth Score (35%)" class="flex items-center text-xs">
                   <i class="fas fa-chart-line text-green-500 mr-1"></i>
@@ -1406,9 +1405,9 @@ function renderLeaderboardTable(projects) {
         </td>
         <td class="px-2 sm:px-6 py-4">
           <div class="flex items-center justify-center">
-            <span class="text-yellow-400 mr-1">★</span>
-            <span class="font-semibold">${(project.rating_average || 0).toFixed(1)}</span>
-            <span class="text-gray-400 text-sm ml-1">(${project.votes_count || 0})</span>
+            <span class="text-red-500 mr-1">❤️</span>
+            <span class="font-semibold">${project.votes_count || 0}</span>
+            <span class="text-gray-400 text-sm ml-1">likes</span>
           </div>
         </td>
         <td class="px-2 sm:px-6 py-4 text-center">

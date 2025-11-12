@@ -250,7 +250,7 @@ projects.get('/leaderboard/top', async (c) => {
   }
 
   // Ordenar inicialmente por rating y votos
-  const finalQuery = query + ' ORDER BY bp.rating_average DESC, bp.votes_count DESC';
+  const finalQuery = query + ' ORDER BY bp.votes_count DESC, bp.rating_average DESC';
 
   try {
     const { results } = await c.env.DB.prepare(finalQuery).bind(...params).all();
@@ -300,38 +300,37 @@ projects.get('/leaderboard/top', async (c) => {
 
 // Helper function to calculate composite leaderboard score
 function calculateLeaderboardScore(project: any) {
-  // 1. Rating Score (40% weight) - Convert 0-5 rating to 0-100 scale
-  const ratingScore = (project.rating_average || 0) * 20;
-  
+  // 1. Likes Score (40% weight) - Number of likes (votes_count)
+  const likesScore = (project.votes_count || 0) * 2; // Each like = 2 points (max 100 points for 50 likes)
+  const normalizedLikesScore = Math.min(likesScore, 100);
+
   // 2. Growth Score (35% weight) - Based on users and revenue
   const currentUsers = project.current_users || 0;
   const currentRevenue = project.current_revenue || 0;
-  
+
   // Normalize growth metrics (adjust thresholds based on your marketplace)
   const userScore = Math.min((currentUsers / 10000) * 100, 100); // 10k users = 100 points
   const revenueScore = Math.min((currentRevenue / 100000) * 100, 100); // $100k = 100 points
-  
+
   const growthScore = (userScore + revenueScore) / 2;
-  
+
   // 3. Goals Score (25% weight) - Percentage of goals completed
   const totalGoals = project.total_goals || 0;
   const completedGoals = project.completed_goals || 0;
   const goalsScore = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
-  
+
   // Calculate weighted final score
-  const finalScore = (ratingScore * 0.40) + (growthScore * 0.35) + (goalsScore * 0.25);
-  
+  const finalScore = (normalizedLikesScore * 0.40) + (growthScore * 0.35) + (goalsScore * 0.25);
+
   return {
     finalScore: Math.round(finalScore * 10) / 10, // Round to 1 decimal
     breakdown: {
-      rating: Math.round(ratingScore * 10) / 10,
+      likes: Math.round(normalizedLikesScore * 10) / 10,
       growth: Math.round(growthScore * 10) / 10,
       goals: Math.round(goalsScore * 10) / 10
     }
   };
-}
-
-// Get leaderboard by category
+}// Get leaderboard by category
 projects.get('/leaderboard/categories', async (c) => {
   try {
     const { results } = await c.env.DB.prepare(`

@@ -16,53 +16,36 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Generate star display for product rating
-// Version: 1.2 - Added debug logging
-function generateProductStars(rating) {
-  console.log('generateProductStars called with rating:', rating);
-  let stars = '';
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 >= 0.5;
-
-  for (let i = 0; i < fullStars; i++) {
-    stars += '<i class="fas fa-star text-yellow-400 text-sm"></i>';
-  }
-
-  if (hasHalfStar) {
-    stars += '<i class="fas fa-star-half-alt text-yellow-400 text-sm"></i>';
-  }
-
-  const emptyStars = 5 - Math.ceil(rating);
-  for (let i = 0; i < emptyStars; i++) {
-    stars += '<i class="far fa-star text-gray-300 text-sm"></i>';
-  }
-
-  console.log('generateProductStars returning:', stars);
-  return stars;
+// Generate likes display for product
+function generateProductLikes(likesCount) {
+  const count = likesCount || 0;
+  return `<div class="flex items-center space-x-1 text-red-500">
+    <i class="fas fa-heart text-red-500"></i>
+    <span class="text-sm font-medium">${count}</span>
+  </div>`;
 }
 
-// Generate product vote buttons
+// Generate product like buttons
 function generateProductVoteButtons(item) {
   const productId = item.id;
   if (!currentUser) {
-    return `<button onclick="event.stopPropagation(); showAuthModal('login')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition text-sm">Login to vote</button>`;
+    return `<button onclick="event.stopPropagation(); showAuthModal('login')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition text-sm">Login to like</button>`;
   }
 
   // Check if user is a validator
   const isValidator = currentUser.validator_id !== null && currentUser.validator_id !== undefined;
 
-  // For validators and regular users: show vote buttons (validators can vote too)
+  // For validators and regular users: show like button
   const voteUrl = `${window.location.origin}/marketplace?product=${productId}`;
   if (item.user_vote) {
-    // Already voted, show their vote
+    // Already liked, show liked state
     return `
       <div class="flex items-center space-x-2">
-        <div class="text-sm text-green-600">Your vote: ${item.user_vote} star${item.user_vote > 1 ? 's' : ''}</div>
-        <div class="flex space-x-1">
-          ${[1,2,3,4,5].map(r => `
-            <span class="${r <= item.user_vote ? 'text-yellow-400' : 'text-gray-300'} text-lg">★</span>
-          `).join('')}
-        </div>
+        <div class="text-sm text-red-600 font-medium">You liked this!</div>
+        <button onclick="event.stopPropagation(); unlikeProduct(${productId})" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition text-sm flex items-center space-x-2">
+          <i class="fas fa-heart text-white"></i>
+          <span>Liked</span>
+        </button>
         <div class="text-center">
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(voteUrl)}" alt="QR to share product" class="inline-block">
           <p class="text-xs text-gray-500">Share this product</p>
@@ -70,16 +53,13 @@ function generateProductVoteButtons(item) {
       </div>
     `;
   } else {
-    // Hasn't voted, show stars to vote
+    // Hasn't liked, show like button
     return `
       <div class="flex items-center space-x-2">
-        <div class="flex space-x-1">
-          ${[1,2,3,4,5].map(rating => `
-            <span onclick="event.stopPropagation(); voteForProduct(${productId}, ${rating})" class="cursor-pointer text-gray-300 hover:text-yellow-400 text-lg" title="Vote ${rating} star${rating > 1 ? 's' : ''}">
-              ★
-            </span>
-          `).join('')}
-        </div>
+        <button onclick="event.stopPropagation(); likeProduct(${productId})" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-red-500 hover:text-white transition text-sm flex items-center space-x-2 group">
+          <i class="far fa-heart group-hover:text-white"></i>
+          <span>Like</span>
+        </button>
         <div class="text-center">
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(voteUrl)}" alt="QR to share product" class="inline-block">
           <p class="text-xs text-gray-500">Share this product</p>
@@ -89,19 +69,39 @@ function generateProductVoteButtons(item) {
   }
 }
 
-// Vote for product function
-async function voteForProduct(productId, rating = 1) {
+// Like product function
+async function likeProduct(productId) {
   try {
-    const response = await axios.post(`/api/marketplace/products/${productId}/vote`, { rating }, {
+    const response = await axios.post(`/api/marketplace/products/${productId}/vote`, { rating: 1 }, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
     // Show success notification
-    showToast(`✅ You just voted! You rated this product ${rating} star${rating !== 1 ? 's' : ''}`, 'success');
-    // Reload marketplace items to update vote counts
-    loadMarketplaceItems();
+    showToast(`❤️ You liked this product!`, 'success');
+    // Reload marketplace items to update like counts
+    await loadMarketplaceItems();
   } catch (error) {
-    console.error('Failed to vote for product:', error);
-    showToast('❌ Error voting for product. Please try again.', 'error');
+    console.error('Error liking product:', error);
+    if (error.response?.status === 400 && error.response?.data?.error?.includes('already voted')) {
+      showToast('❌ You already liked this product', 'error');
+    } else {
+      showToast('❌ Error liking product. Please try again.', 'error');
+    }
+  }
+}
+
+// Unlike product function
+async function unlikeProduct(productId) {
+  try {
+    const response = await axios.delete(`/api/marketplace/products/${productId}/vote`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    // Show success notification
+    showToast(`💔 You unliked this product`, 'info');
+    // Reload marketplace items to update like counts
+    await loadMarketplaceItems();
+  } catch (error) {
+    console.error('Error unliking product:', error);
+    showToast('❌ Error unliking product. Please try again.', 'error');
   }
 }
 
@@ -248,7 +248,7 @@ async function loadProductDetail(productId) {
 
                 ${product.rating_average > 0 ? `
                   <div class="flex items-center mb-6">
-                    ${generateProductStars(product.rating_average)}
+                    ${generateProductLikes(product.votes_count)}
                     <span class="ml-2 text-lg font-semibold text-gray-900">${product.rating_average.toFixed(1)}</span>
                     <span class="ml-2 text-sm text-gray-600">(${product.votes_count || 0} votos)</span>
                   </div>
@@ -1008,7 +1008,7 @@ function renderMarketplaceItems() {
         ${item.rating > 0 ? `
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 sm:mb-4 pt-2 sm:pt-3 border-t border-gray-100">
             <div class="flex items-center">
-              ${generateProductStars(item.rating)}
+              ${generateProductLikes(item.votes_count)}
               <span class="ml-2 text-sm font-semibold text-gray-700">${item.rating_average ? item.rating_average.toFixed(1) : item.rating.toFixed(1)}</span>
             </div>
             <span class="text-xs text-gray-500">${item.votes_count || 0} votes</span>
