@@ -4,6 +4,24 @@ let projects = [];
 let betaUsers = [];
 let authToken = null;
 
+// Initialize authToken from localStorage or cookie
+function initAuthToken() {
+  // Try localStorage first
+  authToken = localStorage.getItem('authToken');
+  
+  // If not in localStorage, check cookie
+  if (!authToken) {
+    const cookieMatch = document.cookie.match(/authToken=([^;]+)/);
+    if (cookieMatch) {
+      authToken = cookieMatch[1];
+      // Sync to localStorage
+      localStorage.setItem('authToken', authToken);
+    }
+  }
+  
+  return authToken;
+}
+
 // Load current user
 async function loadCurrentUser() {
   try {
@@ -27,8 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return; // Don't initialize app.js on marketplace
   }
   
-  // Check for existing auth token
-  authToken = localStorage.getItem('authToken');
+  // Initialize auth token
+  initAuthToken();
   if (authToken) {
     loadCurrentUser();
   }
@@ -1238,7 +1256,7 @@ function generateProjectVoteButtons(projectId) {
 // Vote for a project
 async function voteForProject(projectId, rating) {
   if (!authToken) {
-    // Show login modal or something
+    showNotification('Please login to vote', 'error');
     return;
   }
 
@@ -1252,10 +1270,197 @@ async function voteForProject(projectId, rating) {
     });
 
     if (response.status === 200) {
+      // Show success notification
+      showNotification(`✅ Vote submitted! You rated this project ${rating} stars`, 'success');
+      
       // Reload projects to show updated ratings
       await loadProjects();
     }
   } catch (error) {
     console.error('Error voting for project:', error);
+    
+    // Handle rate limit specifically
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.data?.retryAfter || 5;
+      showNotification(`⏱️ Please wait ${retryAfter} seconds before voting again`, 'error');
+    } else {
+      const errorMsg = error.response?.data?.error || 'Failed to submit vote';
+      showNotification(errorMsg, 'error');
+    }
   }
+}
+
+// Show notification toast
+function showNotification(message, type = 'success') {
+  // Remove any existing notification
+  const existing = document.getElementById('toast-notification');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'toast-notification';
+  toast.className = `fixed top-20 right-4 z-50 px-6 py-4 rounded-lg shadow-2xl transform transition-all duration-300 max-w-md ${
+    type === 'success' 
+      ? 'bg-green-500 text-white' 
+      : 'bg-red-500 text-white'
+  }`;
+  toast.style.transform = 'translateX(400px)';
+  toast.innerHTML = `
+    <div class="flex items-center space-x-3">
+      <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} text-xl"></i>
+      <span class="font-medium">${message}</span>
+    </div>
+  `;
+  
+  document.body.appendChild(toast);
+  
+  // Animate in
+  setTimeout(() => {
+    toast.style.transform = 'translateX(0)';
+  }, 10);
+  
+  // Auto hide after 3 seconds
+  setTimeout(() => {
+    toast.style.transform = 'translateX(400px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ============================================
+// LEADERBOARD FUNCTIONS
+// ============================================
+
+async function loadLeaderboard(category = 'all', timeframe = 'all') {
+  try {
+    const response = await axios.get(`/api/projects/leaderboard/top?category=${category}&timeframe=${timeframe}&limit=50`);
+    const projects = response.data.leaderboard || [];
+    renderLeaderboardTable(projects);
+  } catch (error) {
+    console.error('Error loading leaderboard:', error);
+  }
+}
+
+function renderLeaderboardTable(projects) {
+  const tbody = document.getElementById('leaderboard-tbody');
+  const loadingDiv = document.getElementById('leaderboard-loading');
+  const contentDiv = document.getElementById('leaderboard-content');
+  
+  if (!tbody) return;
+  
+  if (loadingDiv) loadingDiv.classList.add('hidden');
+  if (contentDiv) contentDiv.classList.remove('hidden');
+  
+  if (!projects || projects.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" class="text-center py-12 text-gray-500">
+          <i class="fas fa-trophy text-4xl mb-4 block"></i>
+          <p class="font-medium">No projects found in this category</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = projects.map((project, index) => {
+    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`;
+    const score = project.leaderboard_score || 0;
+    const breakdown = project.score_breakdown || { rating: 0, growth: 0, goals: 0 };
+    const completedGoals = project.completed_goals || 0;
+    const totalGoals = project.total_goals || 0;
+    const goalsPercent = totalGoals > 0 ? (completedGoals / totalGoals * 100) : 0;
+    
+    return `
+      <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="viewProjectDetail(${project.id})">
+        <td class="px-2 sm:px-6 py-4">
+          <span class="text-2xl font-bold">${medal}</span>
+        </td>
+        <td class="px-2 sm:px-6 py-4">
+          <div class="flex items-center space-x-3">
+            <div>
+              <div class="font-bold text-gray-900">${escapeHtml(project.title)}</div>
+              <div class="text-sm text-gray-500">${escapeHtml(project.category)}</div>
+              <div class="text-xs text-gray-400 mt-1">by ${escapeHtml(project.creator_name || 'Anonymous')}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-2 sm:px-6 py-4">
+          <div class="text-center">
+            <div class="text-2xl sm:text-3xl font-black text-primary">${score.toFixed(1)}</div>
+            <div class="text-xs text-gray-500 mt-2 space-y-1">
+              <div class="flex items-center justify-center space-x-2 sm:space-x-3">
+                <span title="Rating Score (40%)" class="flex items-center text-xs">
+                  <i class="fas fa-star text-yellow-400 mr-1"></i>
+                  <span class="hidden sm:inline">${breakdown.rating?.toFixed(0) || 0}</span>
+                </span>
+                <span title="Growth Score (35%)" class="flex items-center text-xs">
+                  <i class="fas fa-chart-line text-green-500 mr-1"></i>
+                  <span class="hidden sm:inline">${breakdown.growth?.toFixed(0) || 0}</span>
+                </span>
+                <span title="Goals Score (25%)" class="flex items-center text-xs">
+                  <i class="fas fa-check-circle text-blue-500 mr-1"></i>
+                  <span class="hidden sm:inline">${breakdown.goals?.toFixed(0) || 0}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </td>
+        <td class="px-2 sm:px-6 py-4">
+          <div class="flex items-center justify-center">
+            <span class="text-yellow-400 mr-1">★</span>
+            <span class="font-semibold">${(project.rating_average || 0).toFixed(1)}</span>
+            <span class="text-gray-400 text-sm ml-1">(${project.votes_count || 0})</span>
+          </div>
+        </td>
+        <td class="px-2 sm:px-6 py-4 text-center">
+          <div class="font-semibold text-gray-900">${formatNumber(project.current_users || 0)}</div>
+          <div class="text-xs text-gray-500">users</div>
+        </td>
+        <td class="px-2 sm:px-6 py-4 text-center">
+          <div class="font-semibold text-green-600">$${formatNumber(project.current_revenue || 0)}</div>
+          <div class="text-xs text-gray-500">revenue</div>
+        </td>
+        <td class="px-2 sm:px-6 py-4 text-center">
+          <div class="flex flex-col items-center">
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-1" style="max-width: 80px;">
+              <div class="bg-blue-500 h-2 rounded-full transition-all" style="width: ${goalsPercent}%"></div>
+            </div>
+            <span class="text-xs font-medium">${completedGoals}/${totalGoals}</span>
+          </div>
+        </td>
+        <td class="px-2 sm:px-6 py-4 text-gray-500 text-sm hidden md:table-cell">
+          ${formatDate(project.created_at)}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function formatNumber(num) {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+}
+
+function viewProjectDetail(projectId) {
+  window.location.href = `/project/${projectId}`;
+}
+
+// Category filter for leaderboard
+function filterByCategory(category) {
+  // Update active button
+  document.querySelectorAll('.category-btn').forEach(btn => {
+    btn.classList.remove('active', 'bg-primary', 'text-white');
+    btn.classList.add('bg-gray-200', 'text-gray-700');
+  });
+  
+  event.target.classList.remove('bg-gray-200', 'text-gray-700');
+  event.target.classList.add('active', 'bg-primary', 'text-white');
+  
+  // Reload leaderboard with filter
+  loadLeaderboard(category);
+}
+
+// Initialize leaderboard on page load
+if (document.getElementById('leaderboard-tbody')) {
+  loadLeaderboard();
 }

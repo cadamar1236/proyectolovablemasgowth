@@ -1,22 +1,28 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webapp",
-  "compatibility_date": "2025-10-21",
-  "pages_build_output_dir": "./dist",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "webapp-production",
-      "database_id": "5cb67508-cc61-4194-886b-05cf6f1c00fa"
-    }
-  ],
-  "ai": {
-    "binding": "AI"
-  },
-  "vars": {
-    "STRIPE_PUBLISHABLE_KEY": "pk_live_51QhutTGCWzoDsbCNXa5c3FfzM3eW4aUWkQ2Lb3YEtMTcZw3g8kaKkXreV71LgiD0XOLLT82uQwoYo11SXDJrcki600xkgQ3zND"
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "webapp",
+	"compatibility_date": "2025-10-21",
+	"pages_build_output_dir": "./dist",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "webapp-production",
+			"database_id": "5cb67508-cc61-4194-886b-05cf6f1c00fa"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "CACHE",
+			"id": "b2ccf7c25cbf4b40afd69de9aeadeb51"
+		}
+	],
+	"ai": {
+		"binding": "AI"
+	},
+	"vars": {
+		"STRIPE_PUBLISHABLE_KEY": "pk_live_51QhutTGCWzoDsbCNXa5c3FfzM3eW4aUWkQ2Lb3YEtMTcZw3g8kaKkXreV71LgiD0XOLLT82uQwoYo11SXDJrcki600xkgQ3zND"
+	}
 }

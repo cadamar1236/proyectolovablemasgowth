@@ -23,6 +23,7 @@ import dashboard from './api/dashboard';
 import validatorRequests from './api/validator-requests';
 import chat from './api/chat';
 import notifications from './api/notifications';
+import quickPitch from './api/quick-pitch';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -46,6 +47,7 @@ app.route('/api/dashboard', dashboard);
 app.route('/api/validator-requests', validatorRequests);
 app.route('/api/chat', chat);
 app.route('/api/notifications', notifications);
+app.route('/api/quick-pitch', quickPitch);
 
 // Vote page for QR codes
 app.get('/vote/:projectId', async (c) => {
@@ -312,10 +314,15 @@ app.get('/', (c) => {
                 </p>
                 <div class="flex flex-col sm:flex-row justify-center gap-4 mb-12">
                     <button onclick="showValidationForm()" class="btn-primary text-white px-8 py-4 rounded-xl font-black text-lg shadow-lg inline-flex items-center justify-center">
-                        <i class="fas fa-rocket mr-2"></i>Validate My Idea Now
+                        <i class="fas fa-lightbulb mr-2"></i>Pitch your Idea
+                    </button>
+                    <button onclick="showUploadProductForm()" class="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-4 rounded-xl font-black text-lg shadow-lg hover:shadow-2xl transition-all inline-flex items-center justify-center">
+                        <i class="fas fa-upload mr-2"></i>Upload My Product
                     </button>
                     <a href="/marketplace" class="bg-gray-900 text-white px-8 py-4 rounded-xl font-black text-lg hover:bg-gray-800 transition inline-flex items-center justify-center">
                         <i class="fas fa-users mr-2"></i>Browse Validators
+                    </a>
+                </div>
                     </a>
                 </div>
                 <div class="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-600 font-semibold">
@@ -456,61 +463,403 @@ app.get('/', (c) => {
         </div>
 
         <!-- Validation Form (Hidden by default) -->
+        <!-- Quick Pitch Section - Simplified Customer Journey -->
         <div id="validation-form-section" class="mb-20 hidden">
-            <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl p-8">
-                <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">Validación Express</h2>
-                <p class="text-gray-600 mb-4 text-center">Completa el formulario y obtén resultados en 48 horas</p>
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <div class="max-w-4xl mx-auto">
+                <!-- Step Indicator -->
+                <div class="flex justify-center items-center mb-8 space-x-4">
                     <div class="flex items-center">
-                        <i class="fas fa-check-circle text-green-600 mr-2"></i>
-                        <span class="text-green-800 font-medium">¡Validación básica gratuita!</span>
+                        <div id="step-indicator-1" class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold">1</div>
+                        <span class="ml-2 font-semibold text-gray-900">Pitch</span>
                     </div>
-                    <p class="text-green-700 text-sm mt-1">Análisis de mercado con IA, prototipo MVP y estrategias de crecimiento incluidas.</p>
+                    <div class="w-12 h-1 bg-gray-300"></div>
+                    <div class="flex items-center">
+                        <div id="step-indicator-2" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">2</div>
+                        <span class="ml-2 font-semibold text-gray-600">AI Analysis</span>
+                    </div>
+                    <div class="w-12 h-1 bg-gray-300"></div>
+                    <div class="flex items-center">
+                        <div id="step-indicator-3" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">3</div>
+                        <span class="ml-2 font-semibold text-gray-600">Marketplace</span>
+                    </div>
+                    <div class="w-12 h-1 bg-gray-300"></div>
+                    <div class="flex items-center">
+                        <div id="step-indicator-4" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">4</div>
+                        <span class="ml-2 font-semibold text-gray-600">Dashboard</span>
+                    </div>
                 </div>
-                
-                <form id="validation-form" class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Título del Proyecto</label>
-                        <input type="text" id="title" required 
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="ej: HealthTrack AI">
+
+                <!-- Step 1: Pitch Form -->
+                <div id="quick-pitch-step-1" class="bg-white rounded-2xl shadow-xl p-8">
+                    <div class="text-center mb-8">
+                        <h2 class="text-4xl font-black text-gray-900 mb-3">🚀 Pitch Your Startup Idea</h2>
+                        <p class="text-xl text-gray-600 font-medium">Get instant AI analysis and join our marketplace</p>
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mt-4 inline-block">
+                            <div class="flex items-center">
+                                <i class="fas fa-magic text-green-600 mr-2"></i>
+                                <span class="text-green-800 font-bold">Free AI Analysis + Auto-publish to Marketplace</span>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Descripción</label>
-                        <textarea id="description" required rows="4"
-                                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                                  placeholder="Describe tu idea en detalle..."></textarea>
+                    <form id="quick-pitch-form" class="space-y-6" onsubmit="event.preventDefault(); submitQuickPitchForm();">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-900 mb-2">
+                                💡 What's your startup idea?
+                            </label>
+                            <textarea id="pitch-idea" required rows="3"
+                                      class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none transition"
+                                      placeholder="Example: A mobile app that connects freelance designers with small businesses..."></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-900 mb-2">
+                                🎯 What problem does it solve?
+                            </label>
+                            <textarea id="pitch-problem" required rows="3"
+                                      class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none transition"
+                                      placeholder="Example: Small businesses struggle to find affordable, quality design services..."></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-900 mb-2">
+                                👥 Who is your target market?
+                            </label>
+                            <input id="pitch-market" type="text" required
+                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none transition"
+                                   placeholder="Example: Small businesses with 10-50 employees in the US" />
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-900 mb-2">
+                                💰 What's your pricing model?
+                            </label>
+                            <select id="pitch-pricing-model" required
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none transition bg-white">
+                                <option value="">Select pricing model...</option>
+                                <option value="free">Free</option>
+                                <option value="freemium">Freemium (Free + Paid tiers)</option>
+                                <option value="one_time">One-time Payment</option>
+                                <option value="subscription_monthly">Monthly Subscription</option>
+                                <option value="subscription_yearly">Yearly Subscription</option>
+                                <option value="usage_based">Usage-based / Pay-as-you-go</option>
+                                <option value="enterprise">Enterprise / Custom Pricing</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit"
+                                class="w-full bg-gradient-to-r from-primary to-secondary text-white px-8 py-5 rounded-xl font-black text-xl hover:shadow-2xl transition-all transform hover:scale-105">
+                            <i class="fas fa-magic mr-2"></i>Analyze with AI - Free
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Step 2: AI Analysis -->
+                <div id="quick-pitch-step-2" class="hidden bg-white rounded-2xl shadow-xl p-8">
+                    <div class="text-center">
+                        <div class="animate-pulse mb-6">
+                            <div class="w-24 h-24 bg-gradient-to-r from-primary to-secondary rounded-full mx-auto flex items-center justify-center mb-4">
+                                <i class="fas fa-brain text-white text-5xl"></i>
+                            </div>
+                            <h3 class="text-3xl font-black text-gray-900 mb-2">🤖 AI is analyzing your idea...</h3>
+                            <p class="text-xl text-gray-600">Creating project, analyzing market fit, generating insights</p>
+                        </div>
+                        
+                        <div class="flex justify-center space-x-2 mt-8">
+                            <div class="w-4 h-4 bg-primary rounded-full animate-bounce" style="animation-delay: 0ms;"></div>
+                            <div class="w-4 h-4 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms;"></div>
+                            <div class="w-4 h-4 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Results & Marketplace -->
+                <div id="quick-pitch-step-3" class="hidden bg-white rounded-2xl shadow-xl p-8">
+                    <div class="text-center mb-6">
+                        <div class="w-20 h-20 bg-green-500 rounded-full mx-auto flex items-center justify-center mb-4">
+                            <i class="fas fa-check text-white text-4xl"></i>
+                        </div>
+                        <h3 class="text-3xl font-black text-gray-900 mb-2">✨ Analysis Complete!</h3>
+                        <p class="text-lg text-gray-600">Your project is now live in the marketplace</p>
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Mercado Objetivo</label>
-                        <input type="text" id="target_market" required
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                               placeholder="ej: Profesionales de la salud en LATAM">
+                    <div id="analysis-results-container" class="space-y-6">
+                        <!-- AI analysis results will be inserted here -->
                     </div>
-                    
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Propuesta de Valor</label>
-                        <textarea id="value_proposition" required rows="3"
-                                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                                  placeholder="¿Qué problema resuelves y cómo?"></textarea>
+
+                    <div class="mt-8 text-center">
+                        <p class="text-lg font-bold text-primary mb-4">
+                            <i class="fas fa-arrow-right mr-2"></i>
+                            Redirecting to your dashboard in <span id="redirect-countdown">5</span> seconds...
+                        </p>
+                        <button onclick="redirectToDashboard()" class="bg-gradient-to-r from-primary to-secondary text-white px-8 py-4 rounded-xl font-bold hover:shadow-xl transition">
+                            Go to Dashboard Now
+                        </button>
                     </div>
-                    
-                    <button type="submit" 
-                            class="w-full bg-gradient-to-r from-primary to-secondary text-white px-8 py-4 rounded-lg font-semibold text-lg hover:opacity-90 transition">
-                        <i class="fas fa-rocket mr-2"></i>Iniciar Validación
-                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Product Form Section -->
+        <div id="upload-product-form-section" class="mb-20 hidden">
+            <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl p-8">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 bg-gradient-to-r from-green-600 to-green-700 rounded-full mx-auto flex items-center justify-center mb-4">
+                        <i class="fas fa-upload text-white text-4xl"></i>
+                    </div>
+                    <h2 class="text-4xl font-black text-gray-900 mb-4">📦 Upload Your Product</h2>
+                    <p class="text-xl text-gray-600">
+                        Already have a product ready? List it directly in the marketplace and get validated by the community!
+                    </p>
+                </div>
+
+                <form id="upload-product-form" class="space-y-6">
+                    <!-- Product Name -->
+                    <div>
+                        <label for="product-name" class="block text-sm font-bold text-gray-700 mb-2">
+                            🏷️ Product Name *
+                        </label>
+                        <input
+                            type="text"
+                            id="product-name"
+                            name="product-name"
+                            required
+                            placeholder="e.g., TaskMaster Pro, FitTracker AI..."
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
+                        />
+                    </div>
+
+                    <!-- Product Description -->
+                    <div>
+                        <label for="product-description" class="block text-sm font-bold text-gray-700 mb-2">
+                            📝 Product Description *
+                        </label>
+                        <textarea
+                            id="product-description"
+                            name="product-description"
+                            required
+                            rows="4"
+                            placeholder="Describe your product, its key features, and what makes it unique..."
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
+                        ></textarea>
+                    </div>
+
+                    <!-- Product URL -->
+                    <div>
+                        <label for="product-url" class="block text-sm font-bold text-gray-700 mb-2">
+                            🔗 Product URL *
+                        </label>
+                        <input
+                            type="url"
+                            id="product-url"
+                            name="product-url"
+                            required
+                            placeholder="https://yourproduct.com"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
+                        />
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Category -->
+                        <div>
+                            <label for="product-category" class="block text-sm font-bold text-gray-700 mb-2">
+                                🎯 Category *
+                            </label>
+                            <select
+                                id="product-category"
+                                name="product-category"
+                                required
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
+                            >
+                                <option value="">Select a category</option>
+                                <option value="saas">SaaS</option>
+                                <option value="marketplace">Marketplace</option>
+                                <option value="ai">AI/ML</option>
+                                <option value="fintech">Fintech</option>
+                                <option value="ecommerce">E-commerce</option>
+                                <option value="education">Education</option>
+                                <option value="health">Health</option>
+                                <option value="productivity">Productivity</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <!-- Product Stage -->
+                        <div>
+                            <label for="product-stage" class="block text-sm font-bold text-gray-700 mb-2">
+                                🚀 Product Stage *
+                            </label>
+                            <select
+                                id="product-stage"
+                                name="product-stage"
+                                required
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
+                            >
+                                <option value="">Select stage</option>
+                                <option value="mvp">MVP</option>
+                                <option value="beta">Beta</option>
+                                <option value="launched">Launched</option>
+                                <option value="growth">Growth Stage</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Model -->
+                    <div>
+                        <label for="product-pricing-model" class="block text-sm font-bold text-gray-700 mb-2">
+                            💰 Pricing Model *
+                        </label>
+                        <select
+                            id="product-pricing-model"
+                            name="product-pricing-model"
+                            required
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
+                        >
+                            <option value="">Select pricing model</option>
+                            <option value="free">Free</option>
+                            <option value="freemium">Freemium</option>
+                            <option value="one_time">One-Time Payment</option>
+                            <option value="subscription_monthly">Monthly Subscription</option>
+                            <option value="subscription_yearly">Yearly Subscription</option>
+                            <option value="usage_based">Usage-Based</option>
+                            <option value="enterprise">Enterprise/Custom</option>
+                        </select>
+                    </div>
+
+                    <!-- Compensation for Validators -->
+                    <div class="bg-blue-50 rounded-xl p-6 space-y-4">
+                        <h3 class="text-lg font-bold text-gray-900">💎 Validator Compensation</h3>
+                        <p class="text-sm text-gray-600">Reward validators who provide feedback on your product</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="compensation-type" class="block text-sm font-bold text-gray-700 mb-2">
+                                    Compensation Type *
+                                </label>
+                                <select
+                                    id="compensation-type"
+                                    name="compensation-type"
+                                    required
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none"
+                                >
+                                    <option value="free_access">Free Access</option>
+                                    <option value="discount">Discount Code</option>
+                                    <option value="cash">Cash Payment</option>
+                                    <option value="equity">Equity</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="compensation-amount" class="block text-sm font-bold text-gray-700 mb-2">
+                                    Amount/Details *
+                                </label>
+                                <input
+                                    type="text"
+                                    id="compensation-amount"
+                                    name="compensation-amount"
+                                    required
+                                    placeholder="e.g., 6 months, $50, 0.1%..."
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Validation Settings -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="max-validators" class="block text-sm font-bold text-gray-700 mb-2">
+                                👥 Max Validators *
+                            </label>
+                            <input
+                                type="number"
+                                id="max-validators"
+                                name="max-validators"
+                                required
+                                min="1"
+                                max="100"
+                                value="10"
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
+                            />
+                        </div>
+
+                        <div>
+                            <label for="duration-days" class="block text-sm font-bold text-gray-700 mb-2">
+                                ⏱️ Duration (days) *
+                            </label>
+                            <input
+                                type="number"
+                                id="duration-days"
+                                name="duration-days"
+                                required
+                                min="1"
+                                max="90"
+                                value="30"
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="flex gap-4">
+                        <button
+                            type="button"
+                            onclick="hideUploadProductForm()"
+                            class="flex-1 bg-gray-300 text-gray-700 px-8 py-4 rounded-xl font-bold hover:bg-gray-400 transition"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-4 rounded-xl font-bold hover:shadow-xl transition"
+                        >
+                            <i class="fas fa-upload mr-2"></i>
+                            Upload Product
+                        </button>
+                    </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Upload Product Success Screen -->
+        <div id="upload-product-success" class="mb-20 hidden">
+            <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl p-8">
+                <div class="text-center mb-6">
+                    <div class="w-20 h-20 bg-green-500 rounded-full mx-auto flex items-center justify-center mb-4">
+                        <i class="fas fa-check text-white text-4xl"></i>
+                    </div>
+                    <h3 class="text-3xl font-black text-gray-900 mb-2">🎉 Product Uploaded Successfully!</h3>
+                    <p class="text-lg text-gray-600">Your product is now live in the marketplace</p>
+                </div>
+
+                <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 mb-6">
+                    <div class="flex items-center justify-center mb-4">
+                        <i class="fas fa-rocket text-4xl text-primary mr-4"></i>
+                        <div class="text-left">
+                            <h4 class="text-xl font-bold text-gray-900">What's Next?</h4>
+                            <p class="text-gray-600">Manage your product and track validator feedback</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 text-center">
+                    <p class="text-lg font-bold text-primary mb-4">
+                        <i class="fas fa-arrow-right mr-2"></i>
+                        Redirecting to your dashboard in <span id="upload-redirect-countdown">5</span> seconds...
+                    </p>
+                    <button onclick="redirectToDashboard()" class="bg-gradient-to-r from-primary to-secondary text-white px-8 py-4 rounded-xl font-bold hover:shadow-xl transition">
+                        Go to Dashboard Now
+                    </button>
+                </div>
             </div>
         </div>
 
         <!-- Projects Dashboard -->
         <div id="projects-section" class="mb-20">
             <div class="flex justify-between items-center mb-8">
-                <h2 class="text-3xl font-bold text-gray-900">Mis Proyectos</h2>
+                <h2 class="text-3xl font-bold text-gray-900">My Projects</h2>
                 <button onclick="showValidationForm()" class="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition">
-                    <i class="fas fa-plus mr-2"></i>Nuevo Proyecto
+                    <i class="fas fa-plus mr-2"></i>New Project
                 </button>
             </div>
             
@@ -1106,6 +1455,324 @@ app.get('/', (c) => {
 
       // Initialize auth UI
       updateAuthUI();
+
+      // ========== QUICK PITCH FUNCTIONS ==========
+      let quickPitchSubmitting = false;
+      let createdProjectId = null;
+
+      async function submitQuickPitchForm() {
+        if (quickPitchSubmitting) return;
+
+        const idea = document.getElementById('pitch-idea').value.trim();
+        const problem = document.getElementById('pitch-problem').value.trim();
+        const market = document.getElementById('pitch-market').value.trim();
+        const pricingModel = document.getElementById('pitch-pricing-model').value;
+
+        if (!idea || !problem || !market || !pricingModel) {
+          alert('Please fill in all fields');
+          return;
+        }
+
+        quickPitchSubmitting = true;
+
+        // Show Step 2: AI Analysis
+        updateStepIndicator(2);
+        document.getElementById('quick-pitch-step-1').classList.add('hidden');
+        document.getElementById('quick-pitch-step-2').classList.remove('hidden');
+
+        try {
+          // Get user info if logged in
+          let userId = null;
+          let userEmail = null;
+          const token = localStorage.getItem('authToken');
+          
+          if (token) {
+            try {
+              const userResponse = await axios.get('/api/auth/me', {
+                headers: { Authorization: 'Bearer ' + token }
+              });
+              console.log('User response:', userResponse.data);
+              if (userResponse.data.user) {
+                userId = userResponse.data.user.id;
+                userEmail = userResponse.data.user.email;
+                console.log('User authenticated:', { userId, userEmail });
+              }
+            } catch (authError) {
+              console.log('Not authenticated:', authError);
+            }
+          } else {
+            console.log('No auth token found');
+          }
+
+          console.log('Submitting pitch with userId:', userId);
+
+          const response = await axios.post('/api/quick-pitch/submit', {
+            idea: idea,
+            problemSolving: problem,
+            targetMarket: market,
+            pricingModel: pricingModel,
+            userId: userId,
+            email: userEmail
+          });
+
+          if (response.data.success) {
+            createdProjectId = response.data.projectId;
+            displayQuickPitchResults(response.data.analysis);
+            
+            // Show Step 3: Results & Marketplace
+            updateStepIndicator(3);
+            document.getElementById('quick-pitch-step-2').classList.add('hidden');
+            document.getElementById('quick-pitch-step-3').classList.remove('hidden');
+
+            // Start countdown for auto-redirect
+            startRedirectCountdown();
+          } else {
+            throw new Error(response.data.error || 'Failed to submit pitch');
+          }
+        } catch (error) {
+          console.error('Error submitting pitch:', error);
+          
+          // Check if authentication is required
+          if (error.response && error.response.status === 401 && error.response.data.requiresAuth) {
+            alert('Please sign up or log in to validate your idea. You will be redirected to the registration page.');
+            window.location.href = '/marketplace#signup';
+            return;
+          }
+          
+          alert('Error analyzing your idea. Please try again.');
+          
+          // Go back to step 1
+          updateStepIndicator(1);
+          document.getElementById('quick-pitch-step-2').classList.add('hidden');
+          document.getElementById('quick-pitch-step-1').classList.remove('hidden');
+        } finally {
+          quickPitchSubmitting = false;
+        }
+      }
+
+      // Upload Product Form Functions
+      function showUploadProductForm() {
+        // Check if user is authenticated
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          alert('Please sign up or log in to upload your product');
+          window.location.href = '/marketplace#signup';
+          return;
+        }
+
+        const section = document.getElementById('upload-product-form-section');
+        if (section) {
+          section.classList.remove('hidden');
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+
+      function hideUploadProductForm() {
+        const section = document.getElementById('upload-product-form-section');
+        if (section) {
+          section.classList.add('hidden');
+        }
+      }
+
+      // Handle Upload Product form submission
+      document.getElementById('upload-product-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          alert('Please sign up or log in first');
+          window.location.href = '/marketplace#signup';
+          return;
+        }
+
+        const productName = document.getElementById('product-name').value.trim();
+        const productDescription = document.getElementById('product-description').value.trim();
+        const productUrl = document.getElementById('product-url').value.trim();
+        const productCategory = document.getElementById('product-category').value;
+        const productStage = document.getElementById('product-stage').value;
+        const pricingModel = document.getElementById('product-pricing-model').value;
+        const compensationType = document.getElementById('compensation-type').value;
+        const compensationAmount = document.getElementById('compensation-amount').value.trim();
+        const maxValidators = parseInt(document.getElementById('max-validators').value);
+        const durationDays = parseInt(document.getElementById('duration-days').value);
+
+        // Validation
+        if (!productName || !productDescription || !productUrl || !productCategory || 
+            !productStage || !pricingModel || !compensationType || !compensationAmount) {
+          alert('Please fill in all required fields');
+          return;
+        }
+
+        try {
+          const response = await axios.post('/api/marketplace/products', {
+            title: productName,
+            description: productDescription,
+            url: productUrl,
+            category: productCategory,
+            stage: productStage,
+            pricing_model: pricingModel,
+            compensation_type: compensationType,
+            compensation_amount: compensationAmount,
+            validators_needed: maxValidators,
+            duration_days: durationDays,
+            status: 'active'
+          }, {
+            headers: {
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.data.success) {
+            // Reset form
+            document.getElementById('upload-product-form').reset();
+            
+            // Hide form
+            hideUploadProductForm();
+            
+            // Show success screen
+            const successScreen = document.getElementById('upload-product-success');
+            if (successScreen) {
+              successScreen.classList.remove('hidden');
+              successScreen.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
+            // Start countdown for auto-redirect
+            startUploadRedirectCountdown();
+          } else {
+            throw new Error(response.data.error || 'Failed to upload product');
+          }
+        } catch (error) {
+          console.error('Error uploading product:', error);
+          
+          if (error.response && error.response.status === 401) {
+            alert('Session expired. Please log in again.');
+            window.location.href = '/marketplace#login';
+            return;
+          }
+          
+          alert('Error uploading product: ' + (error.response?.data?.error || error.message || 'Please try again'));
+        }
+      });
+
+      function updateStepIndicator(activeStep) {
+        for (let i = 1; i <= 4; i++) {
+          const indicator = document.getElementById('step-indicator-' + i);
+          if (!indicator) continue;
+
+          if (i < activeStep) {
+            indicator.className = 'w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold';
+            indicator.innerHTML = '<i class="fas fa-check"></i>';
+          } else if (i === activeStep) {
+            indicator.className = 'w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold';
+            indicator.textContent = i;
+          } else {
+            indicator.className = 'w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold';
+            indicator.textContent = i;
+          }
+        }
+      }
+
+      function displayQuickPitchResults(analysis) {
+        const container = document.getElementById('analysis-results-container');
+        if (!container || !analysis) return;
+
+        const scoreColor = analysis.ai_score >= 80 ? 'text-green-600' : 
+                           analysis.ai_score >= 60 ? 'text-blue-600' : 'text-orange-600';
+
+        container.innerHTML = 
+          '<div class="space-y-6">' +
+            '<div class="text-center p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">' +
+              '<div class="text-7xl font-black ' + scoreColor + ' mb-2">' + analysis.ai_score + '/100</div>' +
+              '<p class="text-gray-600 font-bold text-lg">AI Viability Score</p>' +
+            '</div>' +
+            '<div>' +
+              '<h3 class="text-2xl font-black text-gray-900 mb-2">' + escapeHtml(analysis.title) + '</h3>' +
+              '<p class="text-gray-600 leading-relaxed">' + escapeHtml(analysis.description) + '</p>' +
+            '</div>' +
+            '<div class="p-4 bg-purple-50 rounded-lg border-l-4 border-purple-500">' +
+              '<p class="font-bold text-purple-900 mb-1">💎 Value Proposition</p>' +
+              '<p class="text-purple-700">' + escapeHtml(analysis.value_proposition) + '</p>' +
+            '</div>' +
+            (analysis.strengths && analysis.strengths.length > 0 ? 
+              '<div>' +
+                '<p class="font-bold text-gray-900 mb-2 flex items-center">' +
+                  '<i class="fas fa-check-circle text-green-500 mr-2"></i>Strengths' +
+                '</p>' +
+                '<ul class="space-y-2">' +
+                  analysis.strengths.map(s => 
+                    '<li class="flex items-start">' +
+                      '<i class="fas fa-star text-yellow-500 mr-2 mt-1"></i>' +
+                      '<span class="text-gray-700">' + escapeHtml(s) + '</span>' +
+                    '</li>'
+                  ).join('') +
+                '</ul>' +
+              '</div>' : '') +
+            (analysis.opportunities && analysis.opportunities.length > 0 ? 
+              '<div>' +
+                '<p class="font-bold text-gray-900 mb-2 flex items-center">' +
+                  '<i class="fas fa-lightbulb text-yellow-500 mr-2"></i>Opportunities' +
+                '</p>' +
+                '<ul class="space-y-2">' +
+                  analysis.opportunities.map(o => 
+                    '<li class="flex items-start">' +
+                      '<i class="fas fa-arrow-right text-blue-500 mr-2 mt-1"></i>' +
+                      '<span class="text-gray-700">' + escapeHtml(o) + '</span>' +
+                    '</li>'
+                  ).join('') +
+                '</ul>' +
+              '</div>' : '') +
+            '<div class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-bold">' +
+              '<i class="fas fa-tag mr-2"></i>' + (analysis.category || 'General') +
+            '</div>' +
+          '</div>';
+      }
+
+      function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function startRedirectCountdown() {
+        let countdown = 5;
+        const countdownEl = document.getElementById('redirect-countdown');
+        
+        const interval = setInterval(() => {
+          countdown--;
+          if (countdownEl) {
+            countdownEl.textContent = countdown;
+          }
+          
+          if (countdown <= 0) {
+            clearInterval(interval);
+            redirectToDashboard();
+          }
+        }, 1000);
+      }
+
+      function startUploadRedirectCountdown() {
+        let countdown = 5;
+        const countdownEl = document.getElementById('upload-redirect-countdown');
+        
+        const interval = setInterval(() => {
+          countdown--;
+          if (countdownEl) {
+            countdownEl.textContent = countdown;
+          }
+          
+          if (countdown <= 0) {
+            clearInterval(interval);
+            redirectToDashboard();
+          }
+        }, 1000);
+      }
+
+      function redirectToDashboard() {
+        // Redirect to marketplace personal dashboard with goals
+        window.location.href = '/marketplace#my-dashboard';
+      }
     </script>
 </body>
 </html>
@@ -1125,7 +1792,7 @@ app.get('/project/:id', async (c) => {
     <title>Proyecto - ValidAI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -1175,7 +1842,7 @@ app.get('/project/:id', async (c) => {
                 <!-- Desktop Navigation -->
                 <div class="hidden md:flex items-center space-x-4">
                     <a href="/" class="text-gray-700 hover:text-primary transition">
-                        <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
                     </a>
                 </div>
                 
@@ -1946,27 +2613,45 @@ app.get('/leaderboard', (c) => {
             
             <div id="leaderboard-content" class="hidden">
                 <div class="overflow-x-auto scrollbar-hide">
-                    <table class="w-full min-w-[800px]">
+                    <table class="w-full min-w-[1000px]">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Position</th>
-                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Project</th>
-                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Category</th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
-                                    <i class="fas fa-star text-yellow-500 mr-1"></i>Rating
+                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Rank</th>
+                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Project</th>
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                    <div class="flex flex-col items-center">
+                                        <i class="fas fa-trophy text-primary mr-1"></i>
+                                        <span>Score</span>
+                                    </div>
                                 </th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
-                                    <i class="fas fa-users text-blue-500 mr-1"></i>Votes
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                    <div class="flex flex-col items-center">
+                                        <i class="fas fa-star text-yellow-500 mr-1"></i>
+                                        <span>Rating</span>
+                                    </div>
                                 </th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
-                                    Action
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                    <div class="flex flex-col items-center">
+                                        <i class="fas fa-users text-blue-500 mr-1"></i>
+                                        <span>Users</span>
+                                    </div>
                                 </th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">QR</th>
-                                <th class="px-2 sm:px-6 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Creator</th>
-                                <th class="px-2 sm:px-6 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">Actions</th>
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                    <div class="flex flex-col items-center">
+                                        <i class="fas fa-dollar-sign text-green-500 mr-1"></i>
+                                        <span>Revenue</span>
+                                    </div>
+                                </th>
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                    <div class="flex flex-col items-center">
+                                        <i class="fas fa-bullseye text-purple-500 mr-1"></i>
+                                        <span>Goals</span>
+                                    </div>
+                                </th>
+                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-gray-900 hidden md:table-cell">Created</th>
                             </tr>
                         </thead>
-                        <tbody id="leaderboard-table-body" class="divide-y divide-gray-200">
+                        <tbody id="leaderboard-tbody" class="divide-y divide-gray-200">
                             <!-- Projects will be loaded here -->
                         </tbody>
                     </table>
@@ -1975,8 +2660,8 @@ app.get('/leaderboard', (c) => {
             
             <div id="leaderboard-empty" class="hidden p-12 text-center">
                 <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
-                <h3 class="text-xl font-semibold text-gray-600 mb-2">No hay proyectos en esta categoría</h3>
-                <p class="text-gray-500">Sé el primero en publicar un proyecto en esta categoría.</p>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">No projects in this category</h3>
+                <p class="text-gray-500">Be the first to publish a project in this category.</p>
             </div>
         </div>
     </div>
@@ -2041,7 +2726,7 @@ app.get('/leaderboard', (c) => {
 
         // Render leaderboard
         function renderLeaderboard() {
-            const tbody = document.getElementById('leaderboard-table-body');
+            const tbody = document.getElementById('leaderboard-tbody');
             const filteredData = currentCategory === 'all' 
                 ? leaderboardData 
                 : leaderboardData.filter(project => project.category === currentCategory);
@@ -2053,60 +2738,104 @@ app.get('/leaderboard', (c) => {
             
             tbody.innerHTML = filteredData.map(function(project, index) {
                 const escapedTitle = project.title.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const escapedDescription = project.description.substring(0, 100).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                return '<tr class="hover:bg-gray-50 transition">' +
+                const escapedDescription = (project.description || '').substring(0, 100).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const escapedCreator = (project.creator_name || 'Anonymous').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const escapedCategory = formatCategory(project.category);
+                
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '#' + (index + 1);
+                const score = project.leaderboard_score || 0;
+                const breakdown = project.score_breakdown || { rating: 0, growth: 0, goals: 0 };
+                const completedGoals = project.completed_goals || 0;
+                const totalGoals = project.total_goals || 0;
+                const goalsPercent = totalGoals > 0 ? (completedGoals / totalGoals * 100) : 0;
+                const currentUsers = project.current_users || 0;
+                const currentRevenue = project.current_revenue || 0;
+                
+                return '<tr class="hover:bg-gray-50 transition cursor-pointer" onclick="viewProjectDetail(' + project.id + ')">' +
                     '<td class="px-2 sm:px-6 py-4">' +
-                        '<div class="flex items-center">' +
-                            getPositionBadge(index + 1) +
-                            '<span class="ml-2 sm:ml-3 font-semibold text-gray-900 text-sm sm:text-base">#' + (index + 1) + '</span>' +
-                        '</div>' +
+                        '<span class="text-2xl font-bold">' + medal + '</span>' +
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4">' +
-                        '<div>' +
-                            '<h3 class="font-semibold text-gray-900 text-sm sm:text-base">' + escapedTitle + '</h3>' +
-                            '<p class="text-xs sm:text-sm text-gray-600 mt-1">' + escapedDescription + '...</p>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4">' +
-                        '<span class="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium ' + getCategoryColor(project.category) + '">' +
-                            getCategoryIcon(project.category) + ' ' + formatCategory(project.category) +
-                        '</span>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<div class="flex items-center justify-center">' +
-                            '<div class="flex items-center text-sm sm:text-base">' +
-                                generateStars(project.rating_average) +
+                        '<div class="flex items-center space-x-3">' +
+                            '<div>' +
+                                '<div class="font-bold text-gray-900">' + escapedTitle + '</div>' +
+                                '<div class="text-sm text-gray-500">' + escapedCategory + '</div>' +
+                                '<div class="text-xs text-gray-400 mt-1">by ' + escapedCreator + '</div>' +
                             '</div>' +
-                            '<span class="ml-1 sm:ml-2 font-semibold text-sm sm:text-base">' + project.rating_average.toFixed(1) + '</span>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4">' +
+                        '<div class="text-center">' +
+                            '<div class="text-2xl sm:text-3xl font-black text-primary">' + score.toFixed(1) + '</div>' +
+                            '<div class="text-xs text-gray-500 mt-2 space-y-1">' +
+                                '<div class="flex items-center justify-center space-x-2 sm:space-x-3">' +
+                                    '<span title="Rating Score (40%)" class="flex items-center text-xs">' +
+                                        '<i class="fas fa-star text-yellow-400 mr-1"></i>' +
+                                        '<span class="hidden sm:inline">' + (breakdown.rating ? breakdown.rating.toFixed(0) : 0) + '</span>' +
+                                    '</span>' +
+                                    '<span title="Growth Score (35%)" class="flex items-center text-xs">' +
+                                        '<i class="fas fa-chart-line text-green-500 mr-1"></i>' +
+                                        '<span class="hidden sm:inline">' + (breakdown.growth ? breakdown.growth.toFixed(0) : 0) + '</span>' +
+                                    '</span>' +
+                                    '<span title="Goals Score (25%)" class="flex items-center text-xs">' +
+                                        '<i class="fas fa-check-circle text-blue-500 mr-1"></i>' +
+                                        '<span class="hidden sm:inline">' + (breakdown.goals ? breakdown.goals.toFixed(0) : 0) + '</span>' +
+                                    '</span>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4">' +
+                        '<div class="flex items-center justify-center">' +
+                            '<span class="text-yellow-400 mr-1">★</span>' +
+                            '<span class="font-semibold">' + (project.rating_average || 0).toFixed(1) + '</span>' +
+                            '<span class="text-gray-400 text-sm ml-1">(' + (project.votes_count || 0) + ')</span>' +
                         '</div>' +
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<span class="font-semibold text-blue-600 text-sm sm:text-base">' + project.votes_count + '</span>' +
+                        '<div class="font-semibold text-gray-900">' + formatNumber(currentUsers) + '</div>' +
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<div class="flex items-center justify-center space-x-1">' +
-                            generateVoteButtons(project.id) +
+                        '<div class="font-semibold text-green-600">$' + formatNumber(currentRevenue) + '</div>' +
+                    '</td>' +
+                    '<td class="px-2 sm:px-6 py-4 text-center">' +
+                        '<div class="flex flex-col items-center">' +
+                            '<div class="w-full bg-gray-200 rounded-full h-2 mb-1">' +
+                                '<div class="bg-blue-600 h-2 rounded-full" style="width: ' + goalsPercent + '%"></div>' +
+                            '</div>' +
+                            '<span class="text-xs text-gray-600">' + completedGoals + '/' + totalGoals + '</span>' +
                         '</div>' +
                     '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<button onclick="showQRCodeFromButton(this)" data-project-id="' + project.id + '" data-project-title="' + project.title.replace(/"/g, '&quot;') + '" ' +
-                                'class="text-green-600 hover:text-green-800 font-medium text-sm sm:text-base" ' +
-                                'title="Mostrar código QR para validadores">' +
-                            '<i class="fas fa-qrcode"></i>' +
-                        '</button>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-gray-900 text-sm sm:text-base">' +
-                        project.creator_name +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<button onclick="viewProject(' + project.id + ')" class="text-primary hover:text-primary/80 font-medium text-sm sm:text-base">' +
-                            '<i class="fas fa-eye mr-1"></i>Ver' +
-                        '</button>' +
+                    '<td class="px-2 sm:px-6 py-4 text-gray-500 text-sm hidden md:table-cell">' +
+                        formatDate(project.created_at) +
                     '</td>' +
                 '</tr>';
             }).join('');
             
             showContent();
+        }
+        
+        // Helper function to format numbers
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+        
+        // Helper function to format dates
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffTime = Math.abs(now - date);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return diffDays + ' days ago';
+            if (diffDays < 30) return Math.floor(diffDays / 7) + ' weeks ago';
+            if (diffDays < 365) return Math.floor(diffDays / 30) + ' months ago';
+            return Math.floor(diffDays / 365) + ' years ago';
         }
 
         // Helper functions
@@ -2283,7 +3012,7 @@ app.get('/leaderboard', (c) => {
             const escapedTitle = projectTitle.replace(/'/g, "\\'").replace(/"/g, '\\"');
             const qrHtml = '<div class="text-center">' +
                 '<i class="fas fa-qrcode text-4xl text-green-600 mb-4"></i>' +
-                '<h2 class="text-2xl font-bold text-gray-900 mb-2">Código QR para Validadores</h2>' +
+                '<h2 class="text-2xl font-bold text-gray-900 mb-2">QR Code for Validators</h2>' +
                 '<p class="text-gray-600 mb-4">' + escapedTitle + '</p>' +
                 '<div class="bg-white p-4 rounded-lg border-2 border-gray-200 inline-block mb-6">' +
                     '<div id="qrcode" class="mx-auto"></div>' +

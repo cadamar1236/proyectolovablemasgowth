@@ -227,49 +227,49 @@ const Dashboard = () => {
     setGoalStatuses({ ...goalStatuses, [goalId]: completed });
   };
 
-  // Función para exportar reporte PDF para inversores
+  // Function to export PDF report for investors
   const exportInvestorReport = async () => {
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     let yPosition = 20;
 
-    // Título
+    // Title
     pdf.setFontSize(20);
-    pdf.text('Reporte de Progreso - Emprendedor', pageWidth / 2, yPosition, { align: 'center' });
+    pdf.text('Progress Report - Founder', pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 20;
 
-    // Fecha del reporte
+    // Report date
     pdf.setFontSize(12);
-    pdf.text(`Fecha del reporte: ${new Date().toLocaleDateString('es-ES')}`, 20, yPosition);
+    pdf.text(`Report date: ${new Date().toLocaleDateString('en-US')}`, 20, yPosition);
     yPosition += 15;
 
-    // Estadísticas generales
+    // General statistics
     const totalGoals = goals.length;
     const completedGoals = goals.filter(g => g.status === 'completed').length;
     const totalUpdates = weeklyUpdates.length;
     const totalAchievements = achievements.length;
 
     pdf.setFontSize(14);
-    pdf.text('Estadísticas Generales:', 20, yPosition);
+    pdf.text('General Statistics:', 20, yPosition);
     yPosition += 10;
     pdf.setFontSize(12);
-    pdf.text(`Total de metas: ${totalGoals}`, 30, yPosition);
+    pdf.text(`Total goals: ${totalGoals}`, 30, yPosition);
     yPosition += 8;
-    pdf.text(`Metas completadas: ${completedGoals}`, 30, yPosition);
+    pdf.text(`Completed goals: ${completedGoals}`, 30, yPosition);
     yPosition += 8;
-    pdf.text(`Actualizaciones semanales: ${totalUpdates}`, 30, yPosition);
+    pdf.text(`Weekly updates: ${totalUpdates}`, 30, yPosition);
     yPosition += 8;
-    pdf.text(`Logros registrados: ${totalAchievements}`, 30, yPosition);
+    pdf.text(`Achievements recorded: ${totalAchievements}`, 30, yPosition);
     yPosition += 20;
 
-    // Lista de metas
+    // Goals list
     if (yPosition > pageHeight - 60) {
       pdf.addPage();
       yPosition = 20;
     }
     pdf.setFontSize(14);
-    pdf.text('Metas Actuales:', 20, yPosition);
+    pdf.text('Current Goals:', 20, yPosition);
     yPosition += 10;
     pdf.setFontSize(10);
     goals.forEach((goal, index) => {
@@ -277,13 +277,13 @@ const Dashboard = () => {
         pdf.addPage();
         yPosition = 20;
       }
-      const status = goal.status === 'completed' ? '✓ Completada' : '○ Activa';
+      const status = goal.status === 'completed' ? '✓ Completed' : '○ Active';
       pdf.text(`${index + 1}. ${goal.description} - ${status}`, 25, yPosition);
       yPosition += 8;
     });
     yPosition += 10;
 
-    // Capturar gráfico si existe
+    // Capture chart if exists
     if (chartRef.current && weeklyUpdates.length > 0 && goals.length > 0) {
       try {
         const canvas = await html2canvas(chartRef.current);
@@ -297,22 +297,22 @@ const Dashboard = () => {
         }
 
         pdf.setFontSize(14);
-        pdf.text('Gráfico de Progreso:', 20, yPosition);
+        pdf.text('Progress Chart:', 20, yPosition);
         yPosition += 10;
         pdf.addImage(imgData, 'PNG', 15, yPosition, imgWidth, imgHeight);
         yPosition += imgHeight + 15;
       } catch (error) {
-        console.error('Error capturando gráfico:', error);
+        console.error('Error capturing chart:', error);
       }
     }
 
-    // Logros
+    // Achievements
     if (yPosition > pageHeight - 60) {
       pdf.addPage();
       yPosition = 20;
     }
     pdf.setFontSize(14);
-    pdf.text('Logros Destacados:', 20, yPosition);
+    pdf.text('Key Achievements:', 20, yPosition);
     yPosition += 10;
     pdf.setFontSize(10);
     achievements.slice(0, 10).forEach((achievement, index) => {
@@ -324,15 +324,15 @@ const Dashboard = () => {
       yPosition += 8;
     });
 
-    // Pie de página
+    // Footer
     pdf.setFontSize(8);
-    pdf.text('Reporte generado automáticamente por el sistema de seguimiento de metas', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    pdf.text('Report generated automatically by the goals tracking system', pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-    // Descargar PDF
-    pdf.save(`reporte-progreso-${new Date().toISOString().split('T')[0]}.pdf`);
+    // Download PDF
+    pdf.save(`progress-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  // Función para exportar datos a JSON
+  // Function to export data to JSON
   const exportDataToJSON = () => {
     const data = {
       exportDate: new Date().toISOString(),
@@ -350,14 +350,13 @@ const Dashboard = () => {
     const dataStr = JSON.stringify(data, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
 
-    const exportFileDefaultName = `datos-progreso-${new Date().toISOString().split('T')[0]}.json`;
+    const exportFileDefaultName = `progress-data-${new Date().toISOString().split('T')[0]}.json`;
 
     const linkElement = (globalThis as any).document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
   };
-
   // Prepare chart data
   const prepareChartData = () => {
     const weeks = weeklyUpdates.map(u => u.week).reverse();
@@ -381,50 +380,50 @@ const Dashboard = () => {
   };
 
   if (loading) {
-    return <div>Cargando...</div>;
+    return <div>Loading...</div>;
   }
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Registro de Logros y Metas para Emprendedores</h1>
+      <h1>Goals & Achievements Tracker for Founders</h1>
 
-      {/* Agregar Metas */}
+      {/* Add Goals */}
       <section>
-        <h2>Agregar Metas</h2>
+        <h2>Add Goals</h2>
         <input
           type="text"
           value={newGoal}
           onChange={(e) => setNewGoal((e.target as any).value)}
-          placeholder="Describe tu meta..."
+          placeholder="Describe your goal..."
         />
-        <button onClick={addGoal}>Agregar Meta</button>
+        <button onClick={addGoal}>Add Goal</button>
       </section>
 
-      {/* Lista de Metas */}
+      {/* Goals List */}
       <section>
-        <h2>Mis Metas</h2>
+        <h2>My Goals</h2>
         <ul>
           {goals.map(goal => (
             <li key={goal.id}>
-              {goal.description} - {goal.status === 'active' ? 'Activa' : 'Completada'}
+              {goal.description} - {goal.status === 'active' ? 'Active' : 'Completed'}
               {goal.status === 'active' && (
-                <button onClick={() => markGoalCompleted(goal.id)}>Marcar Completada</button>
+                <button onClick={() => markGoalCompleted(goal.id)}>Mark Complete</button>
               )}
             </li>
           ))}
         </ul>
       </section>
 
-      {/* Actualización Semanal */}
+      {/* Weekly Update */}
       <section>
-        <h2>Actualización Semanal</h2>
+        <h2>Weekly Update</h2>
         <input
           type="text"
           value={currentWeek}
           onChange={(e) => setCurrentWeek((e.target as any).value)}
-          placeholder="Semana (ej: Semana 1 - Oct 2025)"
+          placeholder="Week (e.g: Week 1 - Oct 2025)"
         />
-        <h3>Marcar cumplimiento de metas:</h3>
+        <h3>Mark goal completion:</h3>
         {goals.filter(g => g.status === 'active').map(goal => (
           <div key={goal.id}>
             <label>
@@ -437,12 +436,12 @@ const Dashboard = () => {
             </label>
           </div>
         ))}
-        <button onClick={submitWeeklyUpdate}>Enviar Actualización</button>
+        <button onClick={submitWeeklyUpdate}>Submit Update</button>
       </section>
 
-      {/* Historial de Actualizaciones Semanales */}
+      {/* Weekly Updates History */}
       <section>
-        <h2>Historial de Actualizaciones Semanales</h2>
+        <h2>Weekly Updates History</h2>
         {weeklyUpdates.map((update, index) => (
           <div key={index} style={{ border: '1px solid #ccc', padding: '10px', margin: '10px 0' }}>
             <h3>{update.week}</h3>
@@ -451,7 +450,7 @@ const Dashboard = () => {
                 const goal = goals.find(g => g.id === parseInt(goalId));
                 return (
                   <li key={goalId}>
-                    {goal?.description}: {completed ? 'Cumplida' : 'No cumplida'}
+                    {goal?.description}: {completed ? 'Completed' : 'Not completed'}
                   </li>
                 );
               })}
@@ -460,22 +459,22 @@ const Dashboard = () => {
         ))}
       </section>
 
-      {/* Gráfico de Progreso */}
+      {/* Progress Chart */}
       <section ref={chartRef}>
-        <h2>Progreso de Metas</h2>
+        <h2>Goals Progress</h2>
         {weeklyUpdates.length > 0 && goals.length > 0 ? (
           <div style={{ height: '400px' }}>
             {(LineChart as any)({ data: prepareChartData() })}
           </div>
         ) : (
-          <p>No hay datos suficientes para mostrar el gráfico. Agrega metas y actualizaciones semanales.</p>
+          <p>Not enough data to show chart. Add goals and weekly updates.</p>
         )}
       </section>
 
-      {/* Exportación de Datos para Inversores */}
+      {/* Export Data for Investors */}
       <section style={{ marginTop: '30px', padding: '20px', border: '2px solid #007bff', borderRadius: '10px', backgroundColor: '#f8f9fa' }}>
-        <h2 style={{ color: '#007bff' }}>📊 Exportar Reporte para Inversores</h2>
-        <p>Genera reportes profesionales para compartir tu progreso con potenciales inversores.</p>
+        <h2 style={{ color: '#007bff' }}>📊 Export Report for Investors</h2>
+        <p>Generate professional reports to share your progress with potential investors.</p>
         <div style={{ display: 'flex', gap: '15px', marginTop: '15px' }}>
           <button
             onClick={exportInvestorReport}
@@ -490,7 +489,7 @@ const Dashboard = () => {
               fontWeight: 'bold'
             }}
           >
-            📄 Generar PDF Profesional
+            📄 Generate Professional PDF
           </button>
           <button
             onClick={exportDataToJSON}
@@ -505,12 +504,12 @@ const Dashboard = () => {
               fontWeight: 'bold'
             }}
           >
-            📊 Exportar Datos JSON
+            📊 Export JSON Data
           </button>
         </div>
         <div style={{ marginTop: '15px', fontSize: '14px', color: '#666' }}>
-          <p><strong>PDF Profesional incluye:</strong> Estadísticas, metas, gráfico de progreso, y logros destacados</p>
-          <p><strong>JSON incluye:</strong> Todos los datos crudos para análisis avanzado</p>
+          <p><strong>Professional PDF includes:</strong> Statistics, goals, progress chart, and key achievements</p>
+          <p><strong>JSON includes:</strong> All raw data for advanced analysis</p>
         </div>
       </section>
 

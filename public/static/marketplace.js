@@ -45,7 +45,7 @@ function generateProductStars(rating) {
 function generateProductVoteButtons(item) {
   const productId = item.id;
   if (!currentUser) {
-    return `<button onclick="event.stopPropagation(); showAuthModal('login')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition text-sm">Iniciar sesión para votar</button>`;
+    return `<button onclick="event.stopPropagation(); showAuthModal('login')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition text-sm">Login to vote</button>`;
   }
 
   // Check if user is a validator
@@ -57,15 +57,15 @@ function generateProductVoteButtons(item) {
     // Already voted, show their vote
     return `
       <div class="flex items-center space-x-2">
-        <div class="text-sm text-green-600">Tu voto: ${item.user_vote} estrella${item.user_vote > 1 ? 's' : ''}</div>
+        <div class="text-sm text-green-600">Your vote: ${item.user_vote} star${item.user_vote > 1 ? 's' : ''}</div>
         <div class="flex space-x-1">
           ${[1,2,3,4,5].map(r => `
             <span class="${r <= item.user_vote ? 'text-yellow-400' : 'text-gray-300'} text-lg">★</span>
           `).join('')}
         </div>
         <div class="text-center">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(voteUrl)}" alt="QR para compartir producto" class="inline-block">
-          <p class="text-xs text-gray-500">Comparte este producto</p>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(voteUrl)}" alt="QR to share product" class="inline-block">
+          <p class="text-xs text-gray-500">Share this product</p>
         </div>
       </div>
     `;
@@ -75,14 +75,14 @@ function generateProductVoteButtons(item) {
       <div class="flex items-center space-x-2">
         <div class="flex space-x-1">
           ${[1,2,3,4,5].map(rating => `
-            <span onclick="event.stopPropagation(); voteForProduct(${productId}, ${rating})" class="cursor-pointer text-gray-300 hover:text-yellow-400 text-lg" title="Votar ${rating} estrella${rating > 1 ? 's' : ''}">
+            <span onclick="event.stopPropagation(); voteForProduct(${productId}, ${rating})" class="cursor-pointer text-gray-300 hover:text-yellow-400 text-lg" title="Vote ${rating} star${rating > 1 ? 's' : ''}">
               ★
             </span>
           `).join('')}
         </div>
         <div class="text-center">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(voteUrl)}" alt="QR para compartir producto" class="inline-block">
-          <p class="text-xs text-gray-500">Comparte este producto</p>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(voteUrl)}" alt="QR to share product" class="inline-block">
+          <p class="text-xs text-gray-500">Share this product</p>
         </div>
       </div>
     `;
@@ -95,33 +95,36 @@ async function voteForProduct(productId, rating = 1) {
     const response = await axios.post(`/api/marketplace/products/${productId}/vote`, { rating }, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
+    // Show success notification
+    showToast(`✅ You just voted! You rated this product ${rating} star${rating !== 1 ? 's' : ''}`, 'success');
     // Reload marketplace items to update vote counts
     loadMarketplaceItems();
   } catch (error) {
     console.error('Failed to vote for product:', error);
+    showToast('❌ Error voting for product. Please try again.', 'error');
   }
 }
 
 // Apply to validate product function
 async function applyToProduct(productId) {
   if (!currentUser || !currentUser.validator_id) {
-    showToast('Solo validadores pueden aplicar a productos', 'error');
+    showToast('Only validators can apply to products', 'error');
     return;
   }
 
   try {
     const response = await axios.post(`/api/marketplace/products/${productId}/apply`, {
-      message: 'Estoy interesado en validar este producto.'
+      message: 'I am interested in validating this product.'
     }, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
 
-    showToast('¡Aplicación enviada exitosamente! El fundador revisará tu solicitud.', 'success');
+    showToast('✅ Application sent successfully! The founder will review your request.', 'success');
     // Reload marketplace items to update UI if needed
     loadMarketplaceItems();
   } catch (error) {
     console.error('Failed to apply to product:', error);
-    const errorMessage = error.response?.data?.error || 'Error al aplicar al producto';
+    const errorMessage = error.response?.data?.error || 'Error applying to product';
     showToast(errorMessage, 'error');
   }
 }
@@ -136,11 +139,11 @@ async function showVoteModal(productId) {
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
     modal.innerHTML = `
       <div class="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-        <h2 class="text-xl font-bold mb-4">Votar por ${escapeHtml(product.title)}</h2>
+        <h2 class="text-xl font-bold mb-4">Vote for ${escapeHtml(product.title)}</h2>
         <p class="mb-4">${escapeHtml(product.description)}</p>
-        ${!currentUser ? '<p class="text-red-500 mb-4">Debes iniciar sesión para votar.</p>' : `
+        ${!currentUser ? '<p class="text-red-500 mb-4">You must login to vote.</p>' : `
           <div class="mb-4">
-            <p class="mb-2">Selecciona tu calificación:</p>
+            <p class="mb-2">Select your rating:</p>
             <div class="flex space-x-1" id="star-rating">
               ${[1,2,3,4,5].map(r => `
                 <span onclick="setRating(${r})" class="cursor-pointer text-2xl ${r <= 5 ? 'text-yellow-400' : 'text-gray-300'}" id="star-${r}">★</span>
@@ -149,8 +152,8 @@ async function showVoteModal(productId) {
           </div>
         `}
         <div class="flex justify-end space-x-2">
-          <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-500 text-white rounded">Cancelar</button>
-          ${currentUser ? `<button onclick="voteForProduct(${productId}, getSelectedRating()); this.closest('.fixed').remove()" class="px-4 py-2 bg-blue-500 text-white rounded">Votar</button>` : `<button onclick="showLoginModal(); this.closest('.fixed').remove()" class="px-4 py-2 bg-blue-500 text-white rounded">Iniciar Sesión</button>`}
+          <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-500 text-white rounded">Cancel</button>
+          ${currentUser ? `<button onclick="voteForProduct(${productId}, getSelectedRating()); this.closest('.fixed').remove()" class="px-4 py-2 bg-blue-500 text-white rounded">Vote</button>` : `<button onclick="showLoginModal(); this.closest('.fixed').remove()" class="px-4 py-2 bg-blue-500 text-white rounded">Login</button>`}
         </div>
       </div>
     `;
@@ -228,7 +231,7 @@ async function loadProductDetail(productId) {
       <div class="max-w-4xl mx-auto">
         <div class="mb-6">
           <button onclick="showTab('products')" class="text-primary hover:text-primary/80 font-medium">
-            <i class="fas fa-arrow-left mr-2"></i>Volver al Marketplace
+            <i class="fas fa-arrow-left mr-2"></i>Back to Marketplace
           </button>
         </div>
 
@@ -382,9 +385,9 @@ async function loadProductDetail(productId) {
     container.innerHTML = `
       <div class="text-center py-12">
         <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-        <p class="text-gray-600">Error al cargar el producto</p>
+        <p class="text-gray-600">Error loading product</p>
         <button onclick="showTab('products')" class="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
-          Volver al Marketplace
+          Back to Marketplace
         </button>
       </div>
     `;
@@ -396,6 +399,23 @@ async function loadProductDetail(productId) {
 // ============================================
 
 function checkProductHash() {
+  // Check for hash navigation (signup, login, etc.) - but NOT my-dashboard (handled after auth)
+  const hash = window.location.hash.substring(1); // Remove the #
+  
+  if (hash === 'signup' || hash === 'login') {
+    // Show appropriate auth modal
+    setTimeout(() => {
+      if (hash === 'signup') {
+        showSignupModal();
+      } else {
+        showLoginModal();
+      }
+      // Clear hash after showing modal
+      history.replaceState(null, null, window.location.pathname);
+    }, 300);
+    return;
+  }
+  
   // Check for product parameter in URL query
   const urlParams = new URLSearchParams(window.location.search);
   const productId = urlParams.get('product');
@@ -504,6 +524,20 @@ async function loadCurrentUser() {
     currentUser = response.data.user;
     updateAuthUI();
     
+    // After loading user, check if there's a hash to navigate to
+    const hash = window.location.hash.substring(1);
+    if (hash === 'my-dashboard') {
+      // Reload marketplace items first to show newly created products
+      await loadMarketplaceItems();
+      
+      // Navigate to my dashboard
+      setTimeout(() => {
+        showTab('my-dashboard');
+        // Clear hash after navigation
+        history.replaceState(null, null, window.location.pathname);
+      }, 100);
+    }
+    
   } catch (error) {
     console.error('Failed to load user:', error);
     authToken = null;
@@ -533,7 +567,7 @@ function updateAuthUI() {
           <option value="validator" ${currentUser.role === 'validator' ? 'selected' : ''}>Validator</option>
         </select>
         <button onclick="logout()" class="text-gray-600 hover:text-red-600 transition">
-          <i class="fas fa-sign-out-alt mr-1"></i>Salir
+          <i class="fas fa-sign-out-alt mr-1"></i>Logout
         </button>
       </div>
     `;
@@ -541,7 +575,7 @@ function updateAuthUI() {
     // Mobile auth nav
     mobileAuthNav.innerHTML = `
       <button onclick="logout()" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-red-600 transition">
-        <i class="fas fa-sign-out-alt mr-2"></i>Salir (${currentUser.name})
+        <i class="fas fa-sign-out-alt mr-2"></i>Logout (${currentUser.name})
       </button>
     `;
     
@@ -571,19 +605,19 @@ function updateAuthUI() {
     // Not authenticated: show all tabs
     authNav.innerHTML = `
       <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition mr-4">
-        Iniciar Sesión
+        Login
       </button>
       <button onclick="showAuthModal('register')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-        Registrarse
+        Sign Up
       </button>
     `;
     
     mobileAuthNav.innerHTML = `
       <button onclick="showAuthModal('login')" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-primary transition">
-        <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
+        <i class="fas fa-sign-in-alt mr-2"></i>Login
       </button>
       <button onclick="showAuthModal('register')" class="block w-full text-left px-3 py-2 mt-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
-        <i class="fas fa-user-plus mr-2"></i>Registrarse
+        <i class="fas fa-user-plus mr-2"></i>Sign Up
       </button>
     `;
     
@@ -756,7 +790,7 @@ async function handleRegister(e) {
 }
 
 function logout() {
-  if (confirm('¿Seguro que quieres cerrar sesión?')) {
+  if (confirm('Are you sure you want to log out?')) {
     stopNotificationsPolling();
     authToken = null;
     currentUser = null;
@@ -856,10 +890,19 @@ let currentProductId = null;
 
 async function loadMarketplaceItems() {
   try {
-    // Cargar productos del marketplace
-    const productsRes = await axios.get('/api/marketplace/products');
+    // Cargar productos del marketplace con cache busting
+    const productsRes = await axios.get('/api/marketplace/products', {
+      headers: { 'Cache-Control': 'no-cache' },
+      params: { _t: Date.now() } // Agregar timestamp para evitar cache
+    });
     products = productsRes.data.products || [];
-    console.log('Loaded products:', products.length, products.map(p => ({ id: p.id, title: p.title })));
+    console.log('✅ Loaded products:', products.length);
+    console.log('📦 Product details:', products.map(p => ({ 
+      id: p.id, 
+      title: p.title, 
+      votes: p.votes_count,
+      rating: p.rating_average 
+    })));
 
     // No cargar proyectos - solo mostrar productos en el leaderboard
     projects = [];
@@ -872,7 +915,7 @@ async function loadMarketplaceItems() {
     document.getElementById('products-grid').innerHTML = `
       <div class="col-span-full text-center py-12">
         <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-        <p class="text-gray-600">Error al cargar productos</p>
+        <p class="text-gray-600">Error loading products</p>
       </div>
     `;
   }
@@ -910,13 +953,29 @@ function renderMarketplaceItems() {
     return;
   }
 
-  grid.innerHTML = allItems.map(item => `
+  grid.innerHTML = allItems.map(item => {
+    // Helper function to get pricing model label and color
+    const getPricingBadge = (pricingModel) => {
+      const badges = {
+        'free': { label: 'Free', color: 'bg-green-100 text-green-800', icon: 'fa-gift' },
+        'freemium': { label: 'Freemium', color: 'bg-teal-100 text-teal-800', icon: 'fa-layer-group' },
+        'one_time': { label: 'One-Time', color: 'bg-blue-100 text-blue-800', icon: 'fa-shopping-cart' },
+        'subscription_monthly': { label: 'Monthly', color: 'bg-purple-100 text-purple-800', icon: 'fa-calendar' },
+        'subscription_yearly': { label: 'Yearly', color: 'bg-indigo-100 text-indigo-800', icon: 'fa-calendar-check' },
+        'usage_based': { label: 'Usage', color: 'bg-orange-100 text-orange-800', icon: 'fa-chart-line' },
+        'enterprise': { label: 'Enterprise', color: 'bg-gray-100 text-gray-800', icon: 'fa-building' }
+      };
+      const badge = badges[pricingModel] || badges['subscription_monthly'];
+      return `<span class="badge ${badge.color} text-xs px-2 py-1"><i class="fas ${badge.icon} mr-1"></i>${badge.label}</span>`;
+    };
+
+    return `
     <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-95 transform" onclick="${item.type === 'product' ? `showTab('product-detail'); loadProductDetail(${item.id})` : `window.location.href='${item.url}'`}">
       <div class="flex items-center justify-between mb-2">
         <span class="badge ${item.type === 'product' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'} text-xs font-semibold px-3 py-1">
-          ${item.type === 'product' ? '<i class=\"fas fa-box\"></i> Producto' : '<i class=\"fas fa-lightbulb\"></i> Proyecto'}
+          ${item.type === 'product' ? '<i class=\"fas fa-box\"></i> Product' : '<i class=\"fas fa-lightbulb\"></i> Project'}
         </span>
-        ${item.type === 'product' && item.featured ? '<span class="badge bg-yellow-100 text-yellow-800 text-xs font-semibold px-3 py-1"><i class="fas fa-star mr-1"></i>Destacado</span>' : ''}
+        ${item.type === 'product' && item.featured ? '<span class="badge bg-yellow-100 text-yellow-800 text-xs font-semibold px-3 py-1"><i class="fas fa-star mr-1"></i>Featured</span>' : ''}
       </div>
       <div class="px-4 sm:px-6 pb-4 sm:pb-6">
         <div class="flex items-start justify-between mb-3 sm:mb-4">
@@ -929,18 +988,19 @@ function renderMarketplaceItems() {
         <div class="flex flex-wrap gap-1.5 mb-3 sm:mb-4">
           ${item.category ? `<span class="badge bg-primary/10 text-primary text-xs px-2 py-1">${escapeHtml(item.category)}</span>` : ''}
           ${item.stage ? `<span class="badge bg-purple-100 text-purple-800 text-xs px-2 py-1">${escapeHtml(item.stage)}</span>` : ''}
+          ${item.pricing_model ? getPricingBadge(item.pricing_model) : ''}
           ${item.compensation_type === 'paid' ? `<span class="badge bg-green-100 text-green-800 text-xs px-2 py-1"><i class="fas fa-dollar-sign mr-1"></i>$${item.compensation_amount}</span>` : ''}
         </div>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
-          ${item.duration_days ? `<span class="flex items-center"><i class="far fa-calendar mr-1"></i>${item.duration_days} días</span>` : ''}
+          ${item.duration_days ? `<span class="flex items-center"><i class="far fa-calendar mr-1"></i>${item.duration_days} days</span>` : ''}
           <div class="flex items-center gap-2">
-            <span class="text-primary font-semibold cursor-pointer hover:underline truncate min-h-[24px] flex items-center" onclick="event.stopPropagation(); ${item.type === 'product' ? `showTab('product-detail'); loadProductDetail(${item.id})` : `window.open('${escapeHtml(item.url)}', '_blank')`}">Ver detalles <i class="fas fa-arrow-right ml-1"></i></span>
+            <span class="text-primary font-semibold cursor-pointer hover:underline truncate min-h-[24px] flex items-center" onclick="event.stopPropagation(); ${item.type === 'product' ? `showTab('product-detail'); loadProductDetail(${item.id})` : `window.open('${escapeHtml(item.url)}', '_blank')`}">View details <i class="fas fa-arrow-right ml-1"></i></span>
             ${item.type === 'product' && currentUser && currentUser.id === item.company_user_id ? `
               <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" onclick="event.stopPropagation(); editProduct(${item.id})">
-                <i class="fas fa-edit mr-1"></i>Editar
+                <i class="fas fa-edit mr-1"></i>Edit
               </button>
               <button class="text-red-600 hover:text-red-800 text-xs font-medium" onclick="event.stopPropagation(); deleteProduct(${item.id})">
-                <i class="fas fa-trash mr-1"></i>Borrar
+                <i class="fas fa-trash mr-1"></i>Delete
               </button>
             ` : ''}
           </div>
@@ -951,7 +1011,7 @@ function renderMarketplaceItems() {
               ${generateProductStars(item.rating)}
               <span class="ml-2 text-sm font-semibold text-gray-700">${item.rating_average ? item.rating_average.toFixed(1) : item.rating.toFixed(1)}</span>
             </div>
-            <span class="text-xs text-gray-500">${item.votes_count || 0} votos</span>
+            <span class="text-xs text-gray-500">${item.votes_count || 0} votes</span>
           </div>
         ` : ''}
         
@@ -960,7 +1020,8 @@ function renderMarketplaceItems() {
         </div>
       </div>
     </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // ============================================
@@ -1115,7 +1176,7 @@ function renderProductFilters() {
           <input 
             type="text" 
             id="product-search-input"
-            placeholder="Buscar productos por título, descripción..."
+            placeholder="Search products by title, description..."
             value="${currentFilters.products.q}"
             class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           >
@@ -1123,10 +1184,10 @@ function renderProductFilters() {
       </div>
       
       <!-- Filters Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <!-- Category -->
         <select id="filter-product-category" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-          <option value="">Todas las categorías</option>
+          <option value="">All categories</option>
           <option value="SaaS" ${currentFilters.products.category === 'SaaS' ? 'selected' : ''}>SaaS</option>
           <option value="Fintech" ${currentFilters.products.category === 'Fintech' ? 'selected' : ''}>Fintech</option>
           <option value="E-commerce" ${currentFilters.products.category === 'E-commerce' ? 'selected' : ''}>E-commerce</option>
@@ -1137,16 +1198,28 @@ function renderProductFilters() {
         
         <!-- Stage -->
         <select id="filter-product-stage" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-          <option value="">Todas las etapas</option>
+          <option value="">All stages</option>
           <option value="idea" ${currentFilters.products.stage === 'idea' ? 'selected' : ''}>Idea</option>
-          <option value="prototype" ${currentFilters.products.stage === 'prototype' ? 'selected' : ''}>Prototipo</option>
+          <option value="prototype" ${currentFilters.products.stage === 'prototype' ? 'selected' : ''}>Prototype</option>
           <option value="mvp" ${currentFilters.products.stage === 'mvp' ? 'selected' : ''}>MVP</option>
           <option value="beta" ${currentFilters.products.stage === 'beta' ? 'selected' : ''}>Beta</option>
         </select>
         
+        <!-- Pricing Model -->
+        <select id="filter-product-pricing" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+          <option value="">All pricing models</option>
+          <option value="free" ${currentFilters.products.pricing === 'free' ? 'selected' : ''}>Free</option>
+          <option value="freemium" ${currentFilters.products.pricing === 'freemium' ? 'selected' : ''}>Freemium</option>
+          <option value="one_time" ${currentFilters.products.pricing === 'one_time' ? 'selected' : ''}>One-Time</option>
+          <option value="subscription_monthly" ${currentFilters.products.pricing === 'subscription_monthly' ? 'selected' : ''}>Monthly Sub</option>
+          <option value="subscription_yearly" ${currentFilters.products.pricing === 'subscription_yearly' ? 'selected' : ''}>Yearly Sub</option>
+          <option value="usage_based" ${currentFilters.products.pricing === 'usage_based' ? 'selected' : ''}>Usage-Based</option>
+          <option value="enterprise" ${currentFilters.products.pricing === 'enterprise' ? 'selected' : ''}>Enterprise</option>
+        </select>
+        
         <!-- Budget Range -->
         <select id="filter-product-budget" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-          <option value="">Cualquier presupuesto</option>
+          <option value="">Any budget</option>
           <option value="0-500">$0 - $500</option>
           <option value="500-1000">$500 - $1,000</option>
           <option value="1000-2500">$1,000 - $2,500</option>
@@ -1156,16 +1229,16 @@ function renderProductFilters() {
         
         <!-- Sort -->
         <select id="filter-product-sort" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-          <option value="recent" ${currentFilters.products.sort === 'recent' ? 'selected' : ''}>Más recientes</option>
-          <option value="budget_high" ${currentFilters.products.sort === 'budget_high' ? 'selected' : ''}>Mayor presupuesto</option>
-          <option value="budget_low" ${currentFilters.products.sort === 'budget_low' ? 'selected' : ''}>Menor presupuesto</option>
-          <option value="popular" ${currentFilters.products.sort === 'popular' ? 'selected' : ''}>Más populares</option>
-          <option value="featured" ${currentFilters.products.sort === 'featured' ? 'selected' : ''}>Destacados</option>
+          <option value="recent" ${currentFilters.products.sort === 'recent' ? 'selected' : ''}>Most recent</option>
+          <option value="budget_high" ${currentFilters.products.sort === 'budget_high' ? 'selected' : ''}>Highest budget</option>
+          <option value="budget_low" ${currentFilters.products.sort === 'budget_low' ? 'selected' : ''}>Lowest budget</option>
+          <option value="popular" ${currentFilters.products.sort === 'popular' ? 'selected' : ''}>Most popular</option>
+          <option value="featured" ${currentFilters.products.sort === 'featured' ? 'selected' : ''}>Featured</option>
         </select>
         
         <!-- Clear Button -->
         <button onclick="clearProductFilters()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
-          <i class="fas fa-times mr-2"></i>Limpiar
+          <i class="fas fa-times mr-2"></i>Clear
         </button>
       </div>
       
@@ -1178,6 +1251,7 @@ function renderProductFilters() {
   document.getElementById('product-search-input').addEventListener('input', debounce(applyProductFilters, 500));
   document.getElementById('filter-product-category').addEventListener('change', applyProductFilters);
   document.getElementById('filter-product-stage').addEventListener('change', applyProductFilters);
+  document.getElementById('filter-product-pricing').addEventListener('change', applyProductFilters);
   document.getElementById('filter-product-budget').addEventListener('change', applyProductFilters);
   document.getElementById('filter-product-sort').addEventListener('change', applyProductFilters);
 }
@@ -1267,17 +1341,19 @@ async function applyProductFilters() {
   const searchTerm = document.getElementById('product-search-input')?.value || '';
   const category = document.getElementById('filter-product-category')?.value || '';
   const stage = document.getElementById('filter-product-stage')?.value || '';
+  const pricing = document.getElementById('filter-product-pricing')?.value || '';
   const budget = document.getElementById('filter-product-budget')?.value || '';
   const sort = document.getElementById('filter-product-sort')?.value || 'recent';
   
   // Update current filters
-  currentFilters.products = { q: searchTerm, category, stage, sort };
+  currentFilters.products = { q: searchTerm, category, stage, pricing, sort };
   
   // Build query params
   const params = new URLSearchParams();
   if (searchTerm) params.append('q', searchTerm);
   if (category) params.append('category', category);
   if (stage) params.append('stage', stage);
+  if (pricing) params.append('pricing_model', pricing);
   if (sort) params.append('sort', sort);
   
   if (budget) {
@@ -1287,7 +1363,7 @@ async function applyProductFilters() {
   }
   
   try {
-    const endpoint = searchTerm || category || stage || budget || sort !== 'recent' 
+    const endpoint = searchTerm || category || stage || pricing || budget || sort !== 'recent' 
       ? `/api/marketplace/products/search?${params}` 
       : '/api/marketplace/products';
     
@@ -1300,12 +1376,12 @@ async function applyProductFilters() {
     // Show results count
     const resultsCount = document.getElementById('product-results-count');
     if (resultsCount) {
-      resultsCount.textContent = `Se encontraron ${products.length} producto${products.length !== 1 ? 's' : ''}`;
+      resultsCount.textContent = `Found ${products.length} product${products.length !== 1 ? 's' : ''}`;
     }
     
   } catch (error) {
     console.error('Error applying product filters:', error);
-    showToast('Error al aplicar filtros', 'error');
+    showToast('Error applying filters', 'error');
   }
 }
 
@@ -1347,7 +1423,7 @@ async function applyValidatorFilters() {
     
   } catch (error) {
     console.error('Error applying validator filters:', error);
-    showToast('Error al aplicar filtros', 'error');
+    showToast('Error applying filters', 'error');
   }
 }
 
@@ -1613,7 +1689,7 @@ async function showNotificationsModal() {
     
   } catch (error) {
     console.error('Failed to load notifications:', error);
-    showToast('Error al cargar notificaciones', 'error');
+    showToast('Error loading notifications', 'error');
   }
 }
 
@@ -1641,7 +1717,7 @@ async function markAsRead(notifId) {
     
   } catch (error) {
     console.error('Failed to mark as read:', error);
-    showToast('Error al marcar notificación', 'error');
+    showToast('Error marking notification', 'error');
   }
 }
 
@@ -1663,7 +1739,7 @@ async function markAllAsRead() {
     
   } catch (error) {
     console.error('Failed to mark all as read:', error);
-    showToast('Error al marcar notificaciones', 'error');
+    showToast('Error marking notifications', 'error');
   }
 }
 
@@ -1685,7 +1761,7 @@ async function deleteNotification(notifId) {
     
   } catch (error) {
     console.error('Failed to delete notification:', error);
-    showToast('Error al eliminar notificación', 'error');
+    showToast('Error deleting notification', 'error');
   }
 }
 
@@ -1952,11 +2028,23 @@ async function loadInternalDashboard() {
 // MY DASHBOARD
 // ============================================
 
+// Prevent multiple simultaneous dashboard loads
+let isDashboardLoading = false;
+
 async function loadMyDashboard() {
+  // Prevent multiple simultaneous loads
+  if (isDashboardLoading) {
+    console.log('⚠️ Dashboard already loading, skipping duplicate call');
+    return;
+  }
+  
+  isDashboardLoading = true;
+  
   const dashboardContent = document.getElementById('dashboard-content');
   
   if (!currentUser) {
     dashboardContent.innerHTML = '<p class="text-gray-600">Debes iniciar sesión para ver tu dashboard</p>';
+    isDashboardLoading = false;
     return;
   }
   
@@ -1975,6 +2063,7 @@ async function loadMyDashboard() {
         </button>
       </div>
     `;
+    isDashboardLoading = false;
     return;
   }
   
@@ -2021,6 +2110,9 @@ async function loadMyDashboard() {
       await renderInternalDashboard();
     }
     
+    // Mark loading as complete
+    isDashboardLoading = false;
+    
   } catch (error) {
     console.error('Failed to load dashboard:', error);
     console.error('Error response:', error.response);
@@ -2031,6 +2123,7 @@ async function loadMyDashboard() {
         <p class="text-sm text-gray-500 mt-2">${error.response?.data?.error || 'Error desconocido'}</p>
       </div>
     `;
+    isDashboardLoading = false;
   }
 }
 
@@ -2086,10 +2179,109 @@ async function renderGoalsDashboard(metrics) {
   console.log('Rendering goals dashboard');
   const dashboardContent = document.getElementById('dashboard-content');
 
+  // Setup event delegation ONCE on the parent container that never gets destroyed
+  // This ensures listeners work even after innerHTML replacements
+  if (!dashboardContent.hasAttribute('data-listeners-setup')) {
+    console.log('🎯 Setting up event delegation on dashboard container');
+    dashboardContent.setAttribute('data-listeners-setup', 'true');
+    
+    dashboardContent.addEventListener('click', async (e) => {
+      // Add Goal button
+      if (e.target.id === 'add-goal-btn' || e.target.closest('#add-goal-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('✅ Add Goal clicked via delegation');
+        
+        const input = document.getElementById('new-goal-input');
+        const value = input?.value.trim();
+        
+        if (value) {
+          const btn = e.target.closest('#add-goal-btn') || e.target;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+          await addGoal(value);
+        } else {
+          alert('Por favor ingresa un goal');
+        }
+        return;
+      }
+      
+      // Add Metric button
+      if (e.target.id === 'add-metric-btn' || e.target.closest('#add-metric-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('✅ Add Metric clicked via delegation');
+        
+        const metricName = document.getElementById('new-metric-name')?.value;
+        const metricValueInput = document.getElementById('new-metric-value')?.value;
+        const recordedDate = document.getElementById('new-metric-date')?.value;
+        const metricValue = parseFloat(metricValueInput);
+
+        if (isNaN(metricValue) || metricValue < 0) {
+          alert('Por favor ingresa un valor válido mayor o igual a 0');
+          return;
+        }
+
+        if (!recordedDate) {
+          alert('Por favor selecciona una fecha');
+          return;
+        }
+
+        const btn = e.target.closest('#add-metric-btn') || e.target;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+        await addMetricValue(metricName, metricValue, recordedDate);
+        return;
+      }
+      
+      // Update Primary Metrics button
+      if (e.target.id === 'update-metrics-btn' || e.target.closest('#update-metrics-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const metric1 = document.getElementById('metric1-select')?.value;
+        const metric2 = document.getElementById('metric2-select')?.value;
+
+        if (metric1 === metric2) {
+          alert('Las dos métricas principales deben ser diferentes');
+          return;
+        }
+
+        const success = await updatePrimaryMetrics(metric1, metric2);
+        if (success) {
+          alert('Métricas principales actualizadas correctamente');
+          // Refresh and re-render without reload
+          await fetchPrimaryMetrics();
+          await fetchMetricsHistory();
+          renderDashboard();
+          setTimeout(() => {
+            renderMetricsEvolutionChart(currentPeriod || '1m');
+          }, 300);
+        } else {
+          alert('Error al actualizar las métricas principales');
+        }
+        return;
+      }
+      
+      // Export buttons
+      if (e.target.id === 'export-pdf-btn' || e.target.closest('#export-pdf-btn')) {
+        e.preventDefault();
+        exportInvestorReport();
+        return;
+      }
+      
+      if (e.target.id === 'export-json-btn' || e.target.closest('#export-json-btn')) {
+        e.preventDefault();
+        exportDataToJSON();
+        return;
+      }
+    });
+    
+    console.log('✅ Event delegation setup complete');
+  }
+
   // Initialize state
   let goals = [];
-  let weeklyUpdates = [];
-  let achievements = [];
   let primaryMetrics = { metric1_name: 'users', metric2_name: 'revenue' };
   let metricsHistory = [];
   let loading = true;
@@ -2106,28 +2298,6 @@ async function renderGoalsDashboard(metrics) {
     }
   }
 
-  async function fetchWeeklyUpdates() {
-    try {
-      const response = await axios.get('/api/dashboard/weekly-updates', {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      weeklyUpdates = response.data.weeklyUpdates || [];
-    } catch (error) {
-      console.error('Error fetching weekly updates:', error);
-    }
-  }
-
-  async function fetchAchievements() {
-    try {
-      const response = await axios.get('/api/dashboard/achievements', {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      achievements = response.data.achievements || [];
-    } catch (error) {
-      console.error('Error fetching achievements:', error);
-    }
-  }
-
   async function fetchPrimaryMetricsData() {
     primaryMetrics = await fetchPrimaryMetrics();
     metricsHistory = await fetchMetricsHistory();
@@ -2135,13 +2305,30 @@ async function renderGoalsDashboard(metrics) {
 
   async function addGoal(description) {
     try {
-      await axios.post('/api/dashboard/goals', { description }, {
+      console.log('Adding goal:', description);
+      const response = await axios.post('/api/dashboard/goals', { description }, {
         headers: { Authorization: `Bearer ${authToken}` }
       });
+      console.log('Goal added successfully:', response.data);
+      
+      alert('Goal agregado correctamente');
+      
+      // Refresh goals data first
       await fetchGoals();
+      console.log('Goals refreshed, total:', goals.length);
+      
+      // Re-render dashboard
       renderDashboard();
+      
+      // Wait a bit longer before rendering charts to ensure DOM is ready
+      setTimeout(() => {
+        console.log('Rendering charts after add goal...');
+        renderChart();
+      }, 500);
+      
     } catch (error) {
       console.error('Error adding goal:', error);
+      alert('Error al agregar el goal. Por favor intenta de nuevo.');
     }
   }
 
@@ -2152,30 +2339,24 @@ async function renderGoalsDashboard(metrics) {
       });
 
       if (response.status === 200) {
-        // Refresh data and re-render everything including charts
-        await Promise.all([fetchGoals(), fetchWeeklyUpdates(), fetchAchievements(), fetchPrimaryMetrics(), fetchMetricsHistory()]);
+        console.log('Goal marked as completed');
+        
+        // Refresh goals data
+        await fetchGoals();
+        console.log('Goals refreshed after completion, total:', goals.length);
+        
+        // Re-render dashboard
         renderDashboard();
-
-        // Re-render charts after a short delay to ensure DOM is updated
+        
+        // Wait before rendering charts
         setTimeout(() => {
+          console.log('Rendering charts after mark completed...');
           renderChart();
-        }, 200);
+        }, 500);
       }
     } catch (error) {
       console.error('Error marking goal as completed:', error);
       alert('Error al marcar la meta como completada. Inténtalo de nuevo.');
-    }
-  }
-
-  async function submitWeeklyUpdate(week, goalStatuses) {
-    try {
-      await axios.post('/api/dashboard/weekly-updates', { week, goalStatuses }, {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      await fetchWeeklyUpdates();
-      renderDashboard();
-    } catch (error) {
-      console.error('Error adding weekly update:', error);
     }
   }
 
@@ -2221,35 +2402,25 @@ async function renderGoalsDashboard(metrics) {
 
   async function addMetricValue(metric_name, metric_value, recorded_date) {
     try {
-      await axios.post('/api/dashboard/metrics', { metric_name, metric_value, recorded_date }, {
+      console.log('Adding metric value:', { metric_name, metric_value, recorded_date });
+      const response = await axios.post('/api/dashboard/metrics', { metric_name, metric_value, recorded_date }, {
         headers: { Authorization: `Bearer ${authToken}` }
       });
+      console.log('Metric value added successfully:', response.data);
+      alert('Valor de métrica agregado correctamente');
+      
+      // Refresh and update metrics chart without reload
+      await fetchMetricsHistory();
+      setTimeout(() => {
+        renderMetricsEvolutionChart(currentPeriod || '1m');
+      }, 300);
+      
       return true;
     } catch (error) {
       console.error('Error adding metric value:', error);
+      console.error('Error details:', error.response?.data || error.message);
       return false;
     }
-  }
-
-  function prepareChartData() {
-    const weeks = weeklyUpdates.map(u => u.week).reverse();
-    const goalCompletionData = goals.map(goal => {
-      const data = weeks.map(week => {
-        const update = weeklyUpdates.find(u => u.week === week);
-        return update?.goal_statuses ? (JSON.parse(update.goal_statuses)[goal.id] ? 1 : 0) : 0;
-      });
-      return {
-        label: goal.description.length > 20 ? goal.description.substring(0, 20) + '...' : goal.description,
-        data,
-        borderColor: `hsl(${Math.random() * 360}, 70%, 50%)`,
-        fill: false,
-      };
-    });
-
-    return {
-      labels: weeks,
-      datasets: goalCompletionData,
-    };
   }
 
   async function exportInvestorReport() {
@@ -2286,8 +2457,8 @@ async function renderGoalsDashboard(metrics) {
     // Estadísticas generales
     const totalGoals = goals.length;
     const completedGoals = goals.filter(g => g.status === 'completed').length;
-    const totalUpdates = weeklyUpdates.length;
-    const totalAchievements = achievements.length;
+    const activeGoals = goals.filter(g => g.status === 'active').length;
+    const totalMetrics = metricsHistory.length;
 
     pdf.setFontSize(14);
     pdf.text('Estadísticas Generales:', 20, yPosition);
@@ -2297,9 +2468,9 @@ async function renderGoalsDashboard(metrics) {
     yPosition += 8;
     pdf.text(`Metas completadas: ${completedGoals}`, 30, yPosition);
     yPosition += 8;
-    pdf.text(`Actualizaciones semanales: ${totalUpdates}`, 30, yPosition);
+    pdf.text(`Metas activas: ${activeGoals}`, 30, yPosition);
     yPosition += 8;
-    pdf.text(`Logros registrados: ${totalAchievements}`, 30, yPosition);
+    pdf.text(`Métricas registradas: ${totalMetrics}`, 30, yPosition);
     yPosition += 20;
 
     // Lista de metas
@@ -2322,23 +2493,28 @@ async function renderGoalsDashboard(metrics) {
     });
     yPosition += 10;
 
-    // Logros
+    // Business Metrics
     if (yPosition > pageHeight - 60) {
       pdf.addPage();
       yPosition = 20;
     }
     pdf.setFontSize(14);
-    pdf.text('Logros Destacados:', 20, yPosition);
+    pdf.text('Métricas de Negocio:', 20, yPosition);
     yPosition += 10;
     pdf.setFontSize(10);
-    achievements.slice(0, 10).forEach((achievement, index) => {
-      if (yPosition > pageHeight - 15) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-      pdf.text(`${achievement.date}: ${achievement.description}`, 25, yPosition);
+    
+    // Get latest metrics
+    const latestUserMetric = metricsHistory.filter(m => m.metric_name === 'users').sort((a, b) => new Date(b.recorded_date) - new Date(a.recorded_date))[0];
+    const latestRevenueMetric = metricsHistory.filter(m => m.metric_name === 'revenue').sort((a, b) => new Date(b.recorded_date) - new Date(a.recorded_date))[0];
+    
+    if (latestUserMetric) {
+      pdf.text(`Usuarios actuales: ${latestUserMetric.metric_value}`, 25, yPosition);
       yPosition += 8;
-    });
+    }
+    if (latestRevenueMetric) {
+      pdf.text(`Ingresos actuales: $${latestRevenueMetric.metric_value.toLocaleString()}`, 25, yPosition);
+      yPosition += 8;
+    }
 
     // Pie de página
     pdf.setFontSize(8);
@@ -2352,13 +2528,13 @@ async function renderGoalsDashboard(metrics) {
     const data = {
       exportDate: new Date().toISOString(),
       goals,
-      weeklyUpdates,
-      achievements,
+      metricsHistory,
+      primaryMetrics,
       statistics: {
         totalGoals: goals.length,
         completedGoals: goals.filter(g => g.status === 'completed').length,
-        totalUpdates: weeklyUpdates.length,
-        totalAchievements: achievements.length,
+        activeGoals: goals.filter(g => g.status === 'active').length,
+        totalMetrics: metricsHistory.length,
       }
     };
 
@@ -2373,9 +2549,68 @@ async function renderGoalsDashboard(metrics) {
     linkElement.click();
   }
 
-  function renderDashboard() {
-    const chartData = prepareChartData();
+  // Prevent multiple simultaneous renders
+  let isRenderingDashboard = false;
 
+  async function renderDashboard() {
+    // --- Dashboard Questions State ---
+    let dashboardQuestions = null;
+
+    async function fetchDashboardQuestions() {
+      try {
+        const response = await axios.get('/api/dashboard/questions', {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+        dashboardQuestions = response.data.questions || null;
+      } catch (error) {
+        console.error('Error fetching dashboard questions:', error);
+        dashboardQuestions = null;
+      }
+    }
+
+    async function saveDashboardQuestions(answers) {
+      try {
+        await axios.post('/api/dashboard/questions', answers, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+        // Update local state after successful save
+        dashboardQuestions = answers;
+        alert('Progress answers saved!');
+      } catch (error) {
+        console.error('Error saving dashboard questions:', error);
+        alert('Error saving answers');
+      }
+    }
+
+    // Function to update form values after save
+    function updateFormValues() {
+      const launchedToggle = document.getElementById('launched-toggle');
+      const weeksToLaunch = document.getElementById('weeks-to-launch');
+      const usersTalked = document.getElementById('users-talked');
+      const usersLearned = document.getElementById('users-learned');
+      const morale = document.getElementById('morale');
+      const primaryMetricImproved = document.getElementById('primary-metric-improved');
+      const biggestObstacle = document.getElementById('biggest-obstacle');
+
+      if (launchedToggle) launchedToggle.checked = dashboardQuestions?.launched || false;
+      if (weeksToLaunch) weeksToLaunch.value = dashboardQuestions?.weeksToLaunch || '';
+      if (usersTalked) usersTalked.value = dashboardQuestions?.usersTalked || '';
+      if (usersLearned) usersLearned.value = dashboardQuestions?.usersLearned || '';
+      if (morale) morale.value = dashboardQuestions?.morale || '';
+      if (primaryMetricImproved) primaryMetricImproved.value = dashboardQuestions?.primaryMetricImproved || '';
+      if (biggestObstacle) biggestObstacle.value = dashboardQuestions?.biggestObstacle || '';
+    }
+
+  // Fetch questions before rendering
+  await fetchDashboardQuestions();
+    if (isRenderingDashboard) {
+      console.log('⚠️ Dashboard already rendering, skipping duplicate call');
+      return;
+    }
+    
+    isRenderingDashboard = true;
+    console.log('🔄 Starting dashboard render');
+    
     dashboardContent.innerHTML = `
       <div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
         <!-- Header Section -->
@@ -2385,35 +2620,377 @@ async function renderGoalsDashboard(metrics) {
               <div>
                 <h1 class="text-4xl font-bold mb-2 flex items-center">
                   <i class="fas fa-rocket mr-3 text-yellow-300"></i>
-                  Registro de Logros y Metas
+                  Goals & Achievements Log
                 </h1>
-                <p class="text-blue-100 text-lg">Sistema de seguimiento para emprendedores visionarios</p>
+                <p class="text-blue-100 text-lg">Tracking system for visionary entrepreneurs</p>
               </div>
               <div class="hidden md:block">
                 <i class="fas fa-chart-line text-6xl text-white/20"></i>
               </div>
             </div>
           </div>
-        <!-- Goals Checklist Section - Prominent -->
+        </div>
+
+        <!-- Dashboard Questions Section -->
+        <div class="max-w-7xl mx-auto mb-8">
+          <div class="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100 relative overflow-hidden">
+            <!-- Background decoration -->
+            <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full -mr-16 -mt-16 opacity-50"></div>
+            <div class="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-blue-100 to-indigo-100 rounded-full -ml-12 -mb-12 opacity-30"></div>
+
+            <div class="relative z-10">
+              <style>
+                .toggle-checkbox {
+                  appearance: none;
+                  background-color: #e5e7eb;
+                  border-radius: 9999px;
+                  position: relative;
+                  transition: background-color 0.2s ease;
+                }
+                .toggle-checkbox:checked {
+                  background-color: #6366f1;
+                }
+                .toggle-checkbox:checked::after {
+                  content: '';
+                  position: absolute;
+                  top: 2px;
+                  left: 18px;
+                  width: 16px;
+                  height: 16px;
+                  background-color: white;
+                  border-radius: 50%;
+                  transition: left 0.2s ease;
+                  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                }
+                .toggle-checkbox::after {
+                  content: '';
+                  position: absolute;
+                  top: 2px;
+                  left: 2px;
+                  width: 16px;
+                  height: 16px;
+                  background-color: white;
+                  border-radius: 50%;
+                  transition: left 0.2s ease;
+                  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                }
+              </style>
+
+              <h2 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
+                <i class="fas fa-clipboard-check mr-4 text-indigo-500 text-4xl"></i>
+                Startup Progress Tracker
+              </h2>
+              <p class="text-gray-600 mb-6 text-lg">Track your entrepreneurial journey with real-time progress saving</p>
+
+              <!-- Progress indicator -->
+              <div class="mb-8 bg-gray-100 rounded-full h-3 overflow-hidden">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+              </div>
+
+              <form id="dashboard-questions-form" class="space-y-8">
+                <!-- Launch Section -->
+                <div class="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-100">
+                  <h3 class="text-xl font-bold text-indigo-800 mb-4 flex items-center">
+                    <i class="fas fa-rocket mr-3 text-indigo-600"></i>
+                    Launch Status
+                  </h3>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-3">
+                      <label class="flex items-center space-x-3 cursor-pointer group">
+                        <input type="checkbox" id="launched-toggle" class="toggle-checkbox h-6 w-6 text-indigo-600 rounded focus:ring-indigo-500" ${dashboardQuestions?.launched ? 'checked' : ''} />
+                        <span class="text-gray-700 font-medium group-hover:text-indigo-700 transition-colors">Are you launched?</span>
+                      </label>
+                      <p class="text-sm text-gray-500 ml-9">Check this when your product goes live!</p>
+                    </div>
+                    <div class="space-y-2">
+                      <label for="weeks-to-launch" class="block text-gray-700 font-semibold">Weeks to launch <span class="text-red-500">*</span></label>
+                      <input type="number" id="weeks-to-launch" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 text-lg" min="0" value="${dashboardQuestions?.weeksToLaunch ?? ''}" placeholder="e.g. 4" />
+                      <p class="text-sm text-indigo-600 font-medium">⏰ Almost there, looking forward to your launch!</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Users Section -->
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+                  <h3 class="text-xl font-bold text-green-800 mb-4 flex items-center">
+                    <i class="fas fa-users mr-3 text-green-600"></i>
+                    User Discovery
+                  </h3>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                      <label for="users-talked" class="block text-gray-700 font-semibold">Users talked to this week <span class="text-red-500">*</span></label>
+                      <input type="number" id="users-talked" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg" min="0" value="${dashboardQuestions?.usersTalked ?? ''}" placeholder="e.g. 12" />
+                      <p class="text-sm text-green-600 font-medium">🎯 Keep the conversation going!</p>
+                    </div>
+                    <div class="space-y-2">
+                      <label for="users-learned" class="block text-gray-700 font-semibold">Key learnings from users</label>
+                      <textarea id="users-learned" rows="3" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 resize-none" placeholder="What insights have you gained?">${dashboardQuestions?.usersLearned ?? ''}</textarea>
+                      <p class="text-sm text-green-600 font-medium">💡 Every conversation is valuable data</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Goals & Morale Section -->
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-100">
+                  <h3 class="text-xl font-bold text-purple-800 mb-4 flex items-center">
+                    <i class="fas fa-bullseye mr-3 text-purple-600"></i>
+                    Goals & Motivation
+                  </h3>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                      <label for="morale" class="block text-gray-700 font-semibold">Current morale (1-10) <span class="text-red-500">*</span></label>
+                      <select id="morale" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-lg">
+                        <option value="" ${!dashboardQuestions?.morale ? 'selected' : ''}>Select your morale...</option>
+                        ${[...Array(10).keys()].map(i => `<option value="${i+1}" ${dashboardQuestions?.morale == (i+1) ? 'selected' : ''}>${i+1} ${i+1 <= 3 ? '😞' : i+1 <= 6 ? '😐' : '😊'}</option>`).join('')}
+                      </select>
+                      <p class="text-sm text-purple-600 font-medium">⚡ Stay motivated, you're building something amazing!</p>
+                    </div>
+                    <div class="space-y-2">
+                      <label for="primary-metric-improved" class="block text-gray-700 font-semibold">What improved your primary metric?</label>
+                      <input type="text" id="primary-metric-improved" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 text-lg" value="${dashboardQuestions?.primaryMetricImproved ?? ''}" placeholder="e.g. Better onboarding flow" />
+                      <p class="text-sm text-purple-600 font-medium">📈 Every improvement counts</p>
+                    </div>
+                  </div>
+                  <div class="mt-6 space-y-2">
+                    <label for="biggest-obstacle" class="block text-gray-700 font-semibold">Biggest obstacle right now</label>
+                    <textarea id="biggest-obstacle" rows="2" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 resize-none" placeholder="What's blocking your progress?">${dashboardQuestions?.biggestObstacle ?? ''}</textarea>
+                    <p class="text-sm text-purple-600 font-medium">🛠️ Every challenge is an opportunity to grow</p>
+                  </div>
+                </div>
+
+                <!-- Save Button & Status -->
+                <div class="text-center space-y-4">
+                  <button type="submit" class="px-12 py-4 text-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white rounded-2xl hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 transition-all duration-300 font-bold shadow-xl hover:shadow-2xl transform hover:-translate-y-1 hover:scale-105">
+                    <i class="fas fa-save mr-3"></i>Save Progress
+                  </button>
+                  <div id="save-status" class="text-sm"></div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- PRIMARY METRICS SECTION - MOVED TO TOP -->
+        <div class="max-w-7xl mx-auto mb-8">
+          <div class="bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 rounded-2xl p-10 shadow-2xl border-4 border-white/20">
+            <div class="text-center mb-10">
+              <h2 class="text-4xl font-bold text-white mb-3 flex items-center justify-center">
+                <i class="fas fa-chart-line mr-4 text-yellow-300 text-5xl"></i>
+                Business Key Metrics
+              </h2>
+              <p class="text-purple-100 text-xl">Track your key performance indicators evolution</p>
+            </div>
+
+            <!-- Primary Metrics Selection -->
+            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 mb-10">
+              <h3 class="text-2xl font-bold text-white mb-6 flex items-center">
+                <i class="fas fa-cog mr-3 text-xl"></i>
+                Configure Primary Metrics
+              </h3>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white/20 rounded-lg p-6">
+                  <label class="block text-white font-semibold mb-3 text-lg">Primary Metric 1:</label>
+                  <select id="metric1-select" class="w-full px-5 py-3 text-lg bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none">
+                    <option value="users" ${primaryMetrics.metric1_name === 'users' ? 'selected' : ''}>👥 Number of Users</option>
+                    <option value="revenue" ${primaryMetrics.metric1_name === 'revenue' ? 'selected' : ''}>💰 Revenue</option>
+                  </select>
+                </div>
+
+                <div class="bg-white/20 rounded-lg p-6">
+                  <label class="block text-white font-semibold mb-3 text-lg">Primary Metric 2:</label>
+                  <select id="metric2-select" class="w-full px-5 py-3 text-lg bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none">
+                    <option value="users" ${primaryMetrics.metric2_name === 'users' ? 'selected' : ''}>👥 Number of Users</option>
+                    <option value="revenue" ${primaryMetrics.metric2_name === 'revenue' ? 'selected' : ''}>💰 Revenue</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="text-center mt-8">
+                <button
+                  id="update-metrics-btn"
+                  class="px-8 py-4 text-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                >
+                  <i class="fas fa-save mr-2"></i>Update Metrics
+                </button>
+              </div>
+            </div>
+
+            <!-- Add Metric Value Form -->
+            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 mb-10">
+              <h3 class="text-2xl font-bold text-white mb-6 flex items-center">
+                <i class="fas fa-plus-circle mr-3 text-xl"></i>
+                Register New Value
+              </h3>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label class="block text-white font-semibold mb-3 text-lg">Metric:</label>
+                  <select id="new-metric-name" class="w-full px-5 py-3 text-lg bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none">
+                    <option value="users">👥 Number of Users</option>
+                    <option value="revenue">💰 Revenue</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-white font-semibold mb-3 text-lg">Value:</label>
+                  <input
+                    type="number"
+                    id="new-metric-value"
+                    placeholder="e.g. 150"
+                    class="w-full px-4 py-2 bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-white font-semibold mb-2">Date:</label>
+                  <input
+                    type="date"
+                    id="new-metric-date"
+                    value="${new Date().toISOString().split('T')[0]}"
+                    class="w-full px-4 py-2 bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div class="text-center mt-6">
+                <button
+                  id="add-metric-btn"
+                  class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                >
+                  <i class="fas fa-plus mr-2"></i>Add Value
+                </button>
+              </div>
+            </div>
+
+            <!-- Metrics Evolution Chart - ALWAYS SHOW -->
+            <div class="bg-white rounded-xl shadow-xl p-8 mb-10">
+              <div class="flex items-center justify-between mb-8">
+                <h3 class="text-3xl font-bold text-gray-800 flex items-center">
+                  <i class="fas fa-chart-line mr-3 text-blue-500 text-4xl"></i>
+                  User Growth Evolution
+                </h3>
+                
+                <!-- Time Period Selector -->
+                <div class="flex gap-3">
+                  <button
+                    data-period="1m"
+                    class="period-btn px-6 py-3 rounded-lg text-base font-semibold transition-all duration-200 bg-blue-500 text-white"
+                  >
+                    1 Month
+                  </button>
+                  <button
+                    data-period="3m"
+                    class="period-btn px-6 py-3 rounded-lg text-base font-semibold transition-all duration-200 bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  >
+                    3 Months
+                  </button>
+                  <button
+                    data-period="1y"
+                    class="period-btn px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  >
+                    1 Year
+                  </button>
+                  <button
+                    data-period="all"
+                    class="period-btn px-6 py-3 rounded-lg text-base font-semibold transition-all duration-200 bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  >
+                    All Time
+                  </button>
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-8" style="max-height: 600px;">
+                <div style="height: 550px; max-height: 550px; width: 100%; position: relative;">
+                  <canvas id="metrics-evolution-chart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metrics History Table -->
+            <div class="bg-white rounded-xl shadow-xl p-6">
+              <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                <i class="fas fa-table mr-2 text-purple-500"></i>
+                Metrics History
+              </h3>
+
+              ${metricsHistory.length === 0 ?
+                `<div class="text-center py-12 text-gray-500">
+                  <i class="fas fa-chart-bar text-4xl mb-4 text-gray-400"></i>
+                  <p class="text-lg">No metrics data yet</p>
+                  <p class="text-sm">Start by registering your first metrics above</p>
+                </div>` :
+                `<div class="overflow-x-auto">
+                  <table class="w-full table-auto">
+                    <thead>
+                      <tr class="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                        <th class="px-4 py-3 text-left font-semibold">Date</th>
+                        <th class="px-4 py-3 text-left font-semibold">Metric</th>
+                        <th class="px-4 py-3 text-right font-semibold">Value</th>
+                        <th class="px-4 py-3 text-center font-semibold">Trend</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                      ${metricsHistory.slice(0, 20).map((metric, index) => {
+                        const prevMetric = metricsHistory[index + 1];
+                        const trend = prevMetric ?
+                          (metric.metric_value > prevMetric.metric_value ? 'up' : metric.metric_value < prevMetric.metric_value ? 'down' : 'same') : 'same';
+
+                        return `
+                          <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-4 py-3 text-gray-800 font-medium">${new Date(metric.recorded_date).toLocaleDateString('en-US')}</td>
+                            <td class="px-4 py-3 text-gray-800">
+                              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                metric.metric_name === 'users'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-green-100 text-green-800'
+                              }">
+                                <i class="fas ${metric.metric_name === 'users' ? 'fa-users' : 'fa-dollar-sign'} mr-1"></i>
+                                ${metric.metric_name === 'users' ? 'Users' : 'Revenue'}
+                              </span>
+                            </td>
+                            <td class="px-4 py-3 text-gray-800 font-bold text-right">
+                              ${metric.metric_name === 'revenue' ? '$' : ''}${metric.metric_value.toLocaleString()}
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                              ${trend === 'up' ?
+                                '<i class="fas fa-arrow-up text-green-500"></i>' :
+                                trend === 'down' ?
+                                '<i class="fas fa-arrow-down text-red-500"></i>' :
+                                '<i class="fas fa-minus text-gray-400"></i>'
+                              }
+                            </td>
+                          </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>`
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Goals Checklist Section - NOW BELOW METRICS -->
         <div class="max-w-7xl mx-auto mb-8">
           <div class="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-2xl p-8 shadow-2xl border-4 border-white/20">
             <div class="text-center mb-8">
               <h2 class="text-3xl font-bold text-white mb-2 flex items-center justify-center">
                 <i class="fas fa-clipboard-check mr-3 text-yellow-300"></i>
-                Checklist de Metas Diarias
+                Daily Goals Checklist
               </h2>
-              <p class="text-emerald-100 text-lg">Marca tus metas completadas con un solo click</p>
+              <p class="text-emerald-100 text-lg">Mark your completed goals with one click</p>
             </div>
 
             <!-- Quick Stats Row -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
               <div class="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
                 <div class="text-2xl font-bold text-white">${goals.length}</div>
-                <div class="text-emerald-100 text-sm">Total Metas</div>
+                <div class="text-emerald-100 text-sm">Total Goals</div>
               </div>
               <div class="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
                 <div class="text-2xl font-bold text-white">${goals.filter(g => g.status === 'completed').length}</div>
-                <div class="text-emerald-100 text-sm">Completadas</div>
+                <div class="text-emerald-100 text-sm">Completed</div>
               </div>
               <div class="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
                 <div class="text-2xl font-bold text-white">${goals.filter(g => g.status === 'active').length}</div>
@@ -2509,7 +3086,7 @@ async function renderGoalsDashboard(metrics) {
                 <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mr-4">
                   <i class="fas fa-bullseye text-white text-xl"></i>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-800">Mis Metas</h2>
+                <h2 class="text-2xl font-bold text-gray-800">My Goals</h2>
               </div>
 
               <!-- Add Goal Form -->
@@ -2518,14 +3095,14 @@ async function renderGoalsDashboard(metrics) {
                   <input
                     type="text"
                     id="new-goal-input"
-                    placeholder="¿Cuál es tu próxima meta? 🚀"
+                    placeholder="What's your next goal? 🚀"
                     class="flex-1 px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-700"
                   />
                   <button
                     id="add-goal-btn"
                     class="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                   >
-                    <i class="fas fa-plus mr-2"></i>Agregar Meta
+                    <i class="fas fa-plus mr-2"></i>Add Goal
                   </button>
                 </div>
               </div>
@@ -2535,8 +3112,8 @@ async function renderGoalsDashboard(metrics) {
                 ${goals.length === 0 ?
                   `<div class="text-center py-12 text-gray-500">
                     <i class="fas fa-lightbulb text-4xl mb-4 text-yellow-400"></i>
-                    <p class="text-lg">¡Comienza agregando tu primera meta!</p>
-                    <p class="text-sm">Las metas son el primer paso hacia el éxito</p>
+                    <p class="text-lg">Start by adding your first goal!</p>
+                    <p class="text-sm">Goals are the first step towards success</p>
                   </div>` :
                   goals.map(goal => `
                     <div class="bg-gradient-to-r ${goal.status === 'completed' ? 'from-green-50 to-emerald-50 border-green-200' : 'from-gray-50 to-blue-50 border-gray-200'} border-2 rounded-xl p-6 transition-all duration-200 hover:shadow-lg">
@@ -2548,7 +3125,7 @@ async function renderGoalsDashboard(metrics) {
                           <div>
                             <h3 class="font-semibold text-gray-800 ${goal.status === 'completed' ? 'line-through text-gray-600' : ''}">${goal.description}</h3>
                             <span class="text-sm ${goal.status === 'completed' ? 'text-green-600' : 'text-blue-600'} font-medium">
-                              ${goal.status === 'completed' ? '✅ Completada' : '🎯 Activa'}
+                              ${goal.status === 'completed' ? '✅ Completed' : '🎯 Active'}
                             </span>
                           </div>
                         </div>
@@ -2557,64 +3134,13 @@ async function renderGoalsDashboard(metrics) {
                             onclick="markGoalCompleted(${goal.id})"
                             class="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                           >
-                            <i class="fas fa-check mr-1"></i>Marcar Completada
+                            <i class="fas fa-check mr-1"></i>Mark as Completed
                           </button>` : ''
                         }
                       </div>
                     </div>
                   `).join('')
                 }
-              </div>
-            </div>
-
-            <!-- Weekly Updates Section -->
-            <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-              <div class="flex items-center mb-6">
-                <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mr-4">
-                  <i class="fas fa-calendar-week text-white text-xl"></i>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-800">Actualización Semanal</h2>
-              </div>
-
-              <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-6">
-                <div class="mb-4">
-                  <input
-                    type="text"
-                    id="week-input"
-                    placeholder="Ej: Semana 1 - Oct 2025 📅"
-                    class="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-700"
-                  />
-                </div>
-
-                <h3 class="font-semibold text-gray-800 mb-4 flex items-center">
-                  <i class="fas fa-tasks mr-2 text-purple-500"></i>
-                  Marcar cumplimiento de metas:
-                </h3>
-
-                <div id="goal-statuses" class="space-y-3">
-                  ${goals.filter(g => g.status === 'active').length === 0 ?
-                    `<p class="text-gray-500 italic">Agrega metas activas para poder marcar su cumplimiento semanal</p>` :
-                    goals.filter(g => g.status === 'active').map(goal => `
-                      <div class="flex items-center p-3 bg-white rounded-lg border border-gray-200 hover:border-purple-300 transition-colors">
-                        <input
-                          type="checkbox"
-                          data-goal-id="${goal.id}"
-                          class="w-5 h-5 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                        />
-                        <label class="ml-3 text-gray-700 font-medium cursor-pointer flex-1">
-                          ${goal.description}
-                        </label>
-                      </div>
-                    `).join('')
-                  }
-                </div>
-
-                <button
-                  id="submit-weekly-btn"
-                  class="w-full mt-6 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  <i class="fas fa-paper-plane mr-2"></i>Enviar Actualización Semanal
-                </button>
               </div>
             </div>
 
@@ -2631,14 +3157,14 @@ async function renderGoalsDashboard(metrics) {
                   <div class="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center mr-4">
                     <i class="fas fa-chart-pie text-white text-xl"></i>
                   </div>
-                  <h2 class="text-2xl font-bold text-gray-800">Estado de Metas</h2>
+                  <h2 class="text-2xl font-bold text-gray-800">Goals Status</h2>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <!-- Pie Chart -->
-                  <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Cumplimiento General</h3>
-                    <div style="height: 250px;">
+                  <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-6" style="max-height: 350px;">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Overall Completion</h3>
+                    <div style="height: 250px; max-height: 250px; position: relative;">
                       <canvas id="goals-pie-chart"></canvas>
                     </div>
                   </div>
@@ -2648,7 +3174,7 @@ async function renderGoalsDashboard(metrics) {
                     <div class="bg-gradient-to-r from-emerald-100 to-teal-100 rounded-xl p-4">
                       <div class="flex items-center justify-between">
                         <div>
-                          <p class="text-sm text-gray-600">Total de Metas</p>
+                          <p class="text-sm text-gray-600">Total Goals</p>
                           <p class="text-2xl font-bold text-gray-800">${goals.length}</p>
                         </div>
                         <div class="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center">
@@ -2660,7 +3186,7 @@ async function renderGoalsDashboard(metrics) {
                     <div class="bg-gradient-to-r from-blue-100 to-indigo-100 rounded-xl p-4">
                       <div class="flex items-center justify-between">
                         <div>
-                          <p class="text-sm text-gray-600">Metas Completadas</p>
+                          <p class="text-sm text-gray-600">Completed Goals</p>
                           <p class="text-2xl font-bold text-gray-800">${goals.filter(g => g.status === 'completed').length}</p>
                         </div>
                         <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
@@ -2672,7 +3198,7 @@ async function renderGoalsDashboard(metrics) {
                     <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-4">
                       <div class="flex items-center justify-between">
                         <div>
-                          <p class="text-sm text-gray-600">Tasa de Éxito</p>
+                          <p class="text-sm text-gray-600">Success Rate</p>
                           <p class="text-2xl font-bold text-gray-800">${goals.length > 0 ? Math.round((goals.filter(g => g.status === 'completed').length / goals.length) * 100) : 0}%</p>
                         </div>
                         <div class="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
@@ -2690,22 +3216,14 @@ async function renderGoalsDashboard(metrics) {
                   <div class="w-12 h-12 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-xl flex items-center justify-center mr-4">
                     <i class="fas fa-chart-line text-white text-xl"></i>
                   </div>
-                  <h2 class="text-2xl font-bold text-gray-800">Progreso Semanal</h2>
+                  <h2 class="text-2xl font-bold text-gray-800">Goals Progress Over Time</h2>
                 </div>
 
-                ${weeklyUpdates.length > 0 && goals.length > 0 ? `
-                  <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-6">
-                    <div style="height: 350px;">
-                      <canvas id="progress-chart"></canvas>
-                    </div>
+                <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-6" style="max-height: 400px;">
+                  <div style="height: 350px; max-height: 350px; position: relative;">
+                    <canvas id="progress-chart"></canvas>
                   </div>
-                ` : `
-                  <div class="text-center py-12 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl">
-                    <i class="fas fa-chart-bar text-4xl mb-4 text-gray-400"></i>
-                    <p class="text-gray-600 font-medium">No hay datos suficientes</p>
-                    <p class="text-sm text-gray-500">Agrega metas y actualizaciones semanales para ver tu progreso</p>
-                  </div>
-                `}
+                </div>
               </div>
 
               <!-- Weekly Bar Chart -->
@@ -2714,106 +3232,14 @@ async function renderGoalsDashboard(metrics) {
                   <div class="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mr-4">
                     <i class="fas fa-chart-bar text-white text-xl"></i>
                   </div>
-                  <h2 class="text-2xl font-bold text-gray-800">Cumplimiento por Semana</h2>
+                  <h2 class="text-2xl font-bold text-gray-800">Goals Completed Per Week</h2>
                 </div>
 
-                <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-6">
-                  <div style="height: 300px;">
+                <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-6" style="max-height: 350px;">
+                  <div style="height: 300px; max-height: 300px; position: relative;">
                     <canvas id="weekly-bar-chart"></canvas>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Achievements Section -->
-            <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-              <div class="flex items-center mb-6">
-                <div class="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center mr-4">
-                  <i class="fas fa-trophy text-white text-xl"></i>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-800">Logros</h2>
-              </div>
-
-              <!-- Add Achievement Form -->
-              <div class="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 mb-6">
-                <div class="flex flex-col gap-4">
-                  <input
-                    type="text"
-                    id="new-achievement-input"
-                    placeholder="¡Celebra tu logro! 🏆"
-                    class="px-4 py-3 border-2 border-yellow-200 rounded-xl focus:border-yellow-500 focus:outline-none transition-colors text-gray-700"
-                  />
-                  <button
-                    id="add-achievement-btn"
-                    class="px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                  >
-                    <i class="fas fa-plus mr-2"></i>Agregar Logro
-                  </button>
-                </div>
-              </div>
-
-              <!-- Achievements List -->
-              <div class="space-y-4 max-h-96 overflow-y-auto">
-                ${achievements.length === 0 ?
-                  `<div class="text-center py-8 text-gray-500">
-                    <i class="fas fa-star text-3xl mb-3 text-yellow-400"></i>
-                    <p class="font-medium">¡Tu primer logro te espera!</p>
-                    <p class="text-sm">Registra tus victorias y celebraciones</p>
-                  </div>` :
-                  achievements.map(achievement => `
-                    <div class="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
-                      <div class="flex items-start">
-                        <div class="w-8 h-8 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mr-3 mt-1">
-                          <i class="fas fa-star text-white text-xs"></i>
-                        </div>
-                        <div class="flex-1">
-                          <p class="text-gray-800 font-medium">${achievement.description}</p>
-                          <p class="text-sm text-gray-500">${achievement.date}</p>
-                        </div>
-                      </div>
-                    </div>
-                  `).join('')
-                }
-              </div>
-            </div>
-
-            <!-- Weekly History -->
-            <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-              <div class="flex items-center mb-6">
-                <div class="w-12 h-12 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center mr-4">
-                  <i class="fas fa-history text-white text-xl"></i>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-800">Historial Semanal</h2>
-              </div>
-
-              <div class="space-y-4 max-h-80 overflow-y-auto">
-                ${weeklyUpdates.length === 0 ?
-                  `<div class="text-center py-8 text-gray-500">
-                    <i class="fas fa-calendar-alt text-3xl mb-3 text-teal-400"></i>
-                    <p class="font-medium">Sin actualizaciones aún</p>
-                    <p class="text-sm">Comienza tu seguimiento semanal</p>
-                  </div>` :
-                  weeklyUpdates.map((update, index) => `
-                    <div class="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4">
-                      <h3 class="font-semibold text-teal-800 mb-3 flex items-center">
-                        <i class="fas fa-calendar-week mr-2"></i>${update.week}
-                      </h3>
-                      <div class="space-y-2">
-                        ${Object.entries(JSON.parse(update.goal_statuses)).map(([goalId, completed]) => {
-                          const goal = goals.find(g => g.id == goalId);
-                          return `
-                            <div class="flex items-center text-sm">
-                              <i class="fas ${completed ? 'fa-check-circle text-green-500' : 'fa-times-circle text-red-500'} mr-2"></i>
-                              <span class="${completed ? 'text-green-700' : 'text-red-700'}">
-                                ${goal?.description}: ${completed ? 'Cumplida' : 'No cumplida'}
-                              </span>
-                            </div>
-                          `;
-                        }).join('')}
-                      </div>
-                    </div>
-                  `).join('')
-                }
               </div>
             </div>
 
@@ -2875,269 +3301,242 @@ async function renderGoalsDashboard(metrics) {
           </div>
         </div>
 
-        <!-- Primary Metrics Section -->
-        <div class="max-w-7xl mx-auto mt-8">
-          <div class="bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 rounded-2xl p-8 shadow-2xl border-4 border-white/20">
-            <div class="text-center mb-8">
-              <h2 class="text-3xl font-bold text-white mb-2 flex items-center justify-center">
-                <i class="fas fa-chart-line mr-3 text-yellow-300"></i>
-                Métricas Principales de Negocio
-              </h2>
-              <p class="text-purple-100 text-lg">Seguimiento de tus indicadores clave de rendimiento</p>
-            </div>
-
-            <!-- Primary Metrics Selection -->
-            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-6 mb-8">
-              <h3 class="text-xl font-bold text-white mb-4 flex items-center">
-                <i class="fas fa-cog mr-2"></i>
-                Configurar Métricas Principales
-              </h3>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white/20 rounded-lg p-4">
-                  <label class="block text-white font-semibold mb-2">Métrica Principal 1:</label>
-                  <select id="metric1-select" class="w-full px-4 py-2 bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none">
-                    <option value="users" ${primaryMetrics.metric1_name === 'users' ? 'selected' : ''}>👥 Número de Usuarios</option>
-                    <option value="revenue" ${primaryMetrics.metric1_name === 'revenue' ? 'selected' : ''}>💰 Ingresos</option>
-                  </select>
-                </div>
-
-                <div class="bg-white/20 rounded-lg p-4">
-                  <label class="block text-white font-semibold mb-2">Métrica Principal 2:</label>
-                  <select id="metric2-select" class="w-full px-4 py-2 bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none">
-                    <option value="users" ${primaryMetrics.metric2_name === 'users' ? 'selected' : ''}>👥 Número de Usuarios</option>
-                    <option value="revenue" ${primaryMetrics.metric2_name === 'revenue' ? 'selected' : ''}>💰 Ingresos</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="text-center mt-6">
-                <button
-                  id="update-metrics-btn"
-                  class="px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  <i class="fas fa-save mr-2"></i>Actualizar Métricas
-                </button>
-              </div>
-            </div>
-
-            <!-- Add Metric Value Form -->
-            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-6 mb-8">
-              <h3 class="text-xl font-bold text-white mb-4 flex items-center">
-                <i class="fas fa-plus-circle mr-2"></i>
-                Registrar Nuevo Valor
-              </h3>
-
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label class="block text-white font-semibold mb-2">Métrica:</label>
-                  <select id="new-metric-name" class="w-full px-4 py-2 bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none">
-                    <option value="users">👥 Número de Usuarios</option>
-                    <option value="revenue">💰 Ingresos</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-white font-semibold mb-2">Valor:</label>
-                  <input
-                    type="number"
-                    id="new-metric-value"
-                    placeholder="Ej: 150"
-                    class="w-full px-4 py-2 bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-white font-semibold mb-2">Fecha:</label>
-                  <input
-                    type="date"
-                    id="new-metric-date"
-                    value="${new Date().toISOString().split('T')[0]}"
-                    class="w-full px-4 py-2 bg-white text-gray-800 rounded-lg border-2 border-white/30 focus:border-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div class="text-center mt-6">
-                <button
-                  id="add-metric-btn"
-                  class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  <i class="fas fa-plus mr-2"></i>Agregar Valor
-                </button>
-              </div>
-            </div>
-
-            <!-- Metrics Evolution Chart -->
-            <div class="bg-white rounded-xl shadow-xl p-6 mb-8">
-              <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                <i class="fas fa-chart-line mr-2 text-blue-500"></i>
-                Evolución Diaria de Métricas
-              </h3>
-
-              ${metricsHistory.length === 0 ?
-                `<div class="text-center py-12 text-gray-500">
-                  <i class="fas fa-chart-line text-4xl mb-4 text-gray-400"></i>
-                  <p class="text-lg">No hay datos suficientes para mostrar la evolución</p>
-                  <p class="text-sm">Registra métricas durante varios días para ver la gráfica</p>
-                </div>` :
-                `<div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
-                  <div style="height: 400px;">
-                    <canvas id="metrics-evolution-chart"></canvas>
-                  </div>
-                </div>`
-              }
-            </div>
-
-            <!-- Metrics History Table -->
-            <div class="bg-white rounded-xl shadow-xl p-6">
-              <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                <i class="fas fa-table mr-2 text-purple-500"></i>
-                Historial de Métricas
-              </h3>
-
-              ${metricsHistory.length === 0 ?
-                `<div class="text-center py-12 text-gray-500">
-                  <i class="fas fa-chart-bar text-4xl mb-4 text-gray-400"></i>
-                  <p class="text-lg">No hay datos de métricas aún</p>
-                  <p class="text-sm">Comienza registrando tus primeras métricas</p>
-                </div>` :
-                `<div class="overflow-x-auto">
-                  <table class="w-full table-auto">
-                    <thead>
-                      <tr class="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
-                        <th class="px-4 py-3 text-left font-semibold">Fecha</th>
-                        <th class="px-4 py-3 text-left font-semibold">Métrica</th>
-                        <th class="px-4 py-3 text-right font-semibold">Valor</th>
-                        <th class="px-4 py-3 text-center font-semibold">Tendencia</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                      ${metricsHistory.slice(0, 20).map((metric, index) => {
-                        const prevMetric = metricsHistory[index + 1];
-                        const trend = prevMetric ?
-                          (metric.metric_value > prevMetric.metric_value ? 'up' : metric.metric_value < prevMetric.metric_value ? 'down' : 'same') : 'same';
-
-                        return `
-                          <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-4 py-3 text-gray-800 font-medium">${new Date(metric.recorded_date).toLocaleDateString('es-ES')}</td>
-                            <td class="px-4 py-3 text-gray-800">
-                              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                metric.metric_name === 'users'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-green-100 text-green-800'
-                              }">
-                                <i class="fas ${metric.metric_name === 'users' ? 'fa-users' : 'fa-dollar-sign'} mr-1"></i>
-                                ${metric.metric_name === 'users' ? 'Usuarios' : 'Ingresos'}
-                              </span>
-                            </td>
-                            <td class="px-4 py-3 text-gray-800 font-bold text-right">
-                              ${metric.metric_name === 'revenue' ? '$' : ''}${metric.metric_value.toLocaleString()}
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                              ${trend === 'up' ?
-                                '<i class="fas fa-arrow-up text-green-500"></i>' :
-                                trend === 'down' ?
-                                '<i class="fas fa-arrow-down text-red-500"></i>' :
-                                '<i class="fas fa-minus text-gray-400"></i>'
-                              }
-                            </td>
-                          </tr>
-                        `;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>`
-              }
-            </div>
-          </div>
-        </div>
-
       </div>
     `;
 
-    // Add event listeners
-    document.getElementById('add-goal-btn').addEventListener('click', () => {
-      const input = document.getElementById('new-goal-input');
-      if (input.value.trim()) {
-        addGoal(input.value);
-        input.value = '';
-      }
-    });
+    // Add form submit handler after rendering
+    setTimeout(() => {
+      const form = document.getElementById('dashboard-questions-form');
+      if (form) {
+        // Auto-save functionality
+        let autoSaveTimeout;
+        let isAutoSaving = false;
 
-    document.getElementById('submit-weekly-btn').addEventListener('click', () => {
-      const weekInput = document.getElementById('week-input');
-      const checkboxes = document.querySelectorAll('#goal-statuses input[type="checkbox"]');
-      const goalStatuses = {};
-      checkboxes.forEach((checkbox) => {
-        goalStatuses[checkbox.dataset.goalId] = checkbox.checked;
+        async function autoSaveDashboardQuestions() {
+          if (isAutoSaving) return;
+          isAutoSaving = true;
+
+          try {
+            const answers = {
+              launched: document.getElementById('launched-toggle').checked,
+              weeksToLaunch: parseInt(document.getElementById('weeks-to-launch').value) || 0,
+              usersTalked: parseInt(document.getElementById('users-talked').value) || 0,
+              usersLearned: document.getElementById('users-learned').value,
+              morale: parseInt(document.getElementById('morale').value) || 1,
+              primaryMetricImproved: document.getElementById('primary-metric-improved').value,
+              biggestObstacle: document.getElementById('biggest-obstacle').value
+            };
+
+            await axios.post('/api/dashboard/questions', answers, {
+              headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            // Update local state after successful save
+            dashboardQuestions = answers;
+
+            // Update save status indicator with better styling
+            const saveStatus = document.getElementById('save-status');
+            if (saveStatus) {
+              saveStatus.innerHTML = '<div class="flex items-center justify-center text-green-600 font-semibold animate-bounce"><i class="fas fa-cloud-upload-alt mr-2 text-lg"></i>Auto-saved!</div>';
+              saveStatus.className = 'text-center mt-4 p-3 bg-green-50 rounded-lg border border-green-200 transition-all duration-300';
+              setTimeout(() => {
+                saveStatus.innerHTML = '';
+                saveStatus.className = 'text-sm mt-2';
+              }, 2500);
+            }
+
+            console.log('✅ Auto-saved dashboard questions');
+          } catch (error) {
+            console.error('Error auto-saving dashboard questions:', error);
+            const saveStatus = document.getElementById('save-status');
+            if (saveStatus) {
+              saveStatus.innerHTML = '<div class="flex items-center justify-center text-red-600 font-semibold"><i class="fas fa-exclamation-triangle mr-2 text-lg"></i>Auto-save failed - will retry</div>';
+              saveStatus.className = 'text-center mt-4 p-3 bg-red-50 rounded-lg border border-red-200 transition-all duration-300';
+              setTimeout(() => {
+                saveStatus.innerHTML = '';
+                saveStatus.className = 'text-sm mt-2';
+              }, 3500);
+            }
+          } finally {
+            isAutoSaving = false;
+          }
+        }
+
+        // Function to trigger auto-save with debounce
+        function triggerAutoSave() {
+          clearTimeout(autoSaveTimeout);
+          autoSaveTimeout = setTimeout(autoSaveDashboardQuestions, 1000); // Save after 1 second of inactivity
+
+          // Show saving indicator immediately
+          const saveStatus = document.getElementById('save-status');
+          if (saveStatus) {
+            saveStatus.innerHTML = '<div class="flex items-center justify-center text-blue-600 font-semibold"><i class="fas fa-sync-alt fa-spin mr-2 text-lg"></i>Saving changes...</div>';
+            saveStatus.className = 'text-center mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-all duration-300';
+          }
+
+          // Update progress immediately
+          updateProgress();
+        }
+
+        // Function to calculate and update progress
+        function updateProgress() {
+          const fields = [
+            'weeks-to-launch',
+            'users-talked',
+            'morale'
+          ];
+
+          let completed = 0;
+          fields.forEach(fieldId => {
+            const element = document.getElementById(fieldId);
+            if (element && element.value && element.value.trim() !== '') {
+              completed++;
+            }
+          });
+
+          // Check checkbox separately
+          const checkbox = document.getElementById('launched-toggle');
+          if (checkbox && checkbox.checked) {
+            completed++;
+          }
+
+          const progressPercentage = (completed / 4) * 100;
+          const progressBar = document.getElementById('progress-bar');
+          if (progressBar) {
+            progressBar.style.width = progressPercentage + '%';
+          }
+        }
+
+        // Add event listeners to all form fields for progress tracking
+        const progressFields = [
+          'launched-toggle',
+          'weeks-to-launch',
+          'users-talked',
+          'users-learned',
+          'morale',
+          'primary-metric-improved',
+          'biggest-obstacle'
+        ];
+
+        progressFields.forEach(fieldId => {
+          const element = document.getElementById(fieldId);
+          if (element) {
+            if (element.type === 'checkbox') {
+              element.addEventListener('change', updateProgress);
+            } else {
+              element.addEventListener('input', updateProgress);
+              element.addEventListener('change', updateProgress);
+            }
+          }
+        });
+
+        // Initial progress calculation
+        setTimeout(updateProgress, 100);
+
+        // Manual save on form submit
+        form.onsubmit = async function(e) {
+          e.preventDefault();
+          clearTimeout(autoSaveTimeout); // Cancel any pending auto-save
+
+          // Disable the button and show loading state
+          const submitButton = form.querySelector('button[type="submit"]');
+          const originalButtonText = submitButton.innerHTML;
+          submitButton.disabled = true;
+          submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
+          const answers = {
+            launched: document.getElementById('launched-toggle').checked,
+            weeksToLaunch: parseInt(document.getElementById('weeks-to-launch').value) || 0,
+            usersTalked: parseInt(document.getElementById('users-talked').value) || 0,
+            usersLearned: document.getElementById('users-learned').value,
+            morale: parseInt(document.getElementById('morale').value) || 1,
+            primaryMetricImproved: document.getElementById('primary-metric-improved').value,
+            biggestObstacle: document.getElementById('biggest-obstacle').value
+          };
+
+          try {
+            await axios.post('/api/dashboard/questions', answers, {
+              headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            // Update local state after successful save
+            dashboardQuestions = answers;
+
+            // Show success animation
+            submitButton.innerHTML = '<i class="fas fa-check mr-2"></i>Saved!';
+            submitButton.classList.remove('bg-gradient-to-r', 'from-indigo-500', 'to-purple-500', 'hover:from-indigo-600', 'hover:to-purple-600');
+            submitButton.classList.add('bg-green-500', 'hover:bg-green-600');
+
+            // Add success message
+            const saveStatus = document.getElementById('save-status');
+            if (saveStatus) {
+              saveStatus.innerHTML = '<div class="flex items-center justify-center text-green-600 font-semibold"><i class="fas fa-check-circle mr-2"></i>All answers saved successfully!</div>';
+              saveStatus.classList.add('animate-pulse');
+            }
+
+            // Reset button after 2 seconds
+            setTimeout(() => {
+              submitButton.disabled = false;
+              submitButton.innerHTML = originalButtonText;
+              submitButton.classList.remove('bg-green-500', 'hover:bg-green-600');
+              submitButton.classList.add('bg-gradient-to-r', 'from-indigo-500', 'to-purple-500', 'hover:from-indigo-600', 'hover:to-purple-600');
+
+              if (saveStatus) {
+                saveStatus.innerHTML = '';
+                saveStatus.classList.remove('animate-pulse');
+              }
+            }, 2000);
+
+          } catch (error) {
+            console.error('Error saving dashboard questions:', error);
+
+            // Show error state
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Try Again';
+            submitButton.classList.remove('bg-gradient-to-r', 'from-indigo-500', 'to-purple-500', 'hover:from-indigo-600', 'hover:to-purple-600');
+            submitButton.classList.add('bg-red-500', 'hover:bg-red-600');
+
+            // Add error message
+            const saveStatus = document.getElementById('save-status');
+            if (saveStatus) {
+              saveStatus.innerHTML = '<div class="flex items-center justify-center text-red-600 font-semibold"><i class="fas fa-exclamation-circle mr-2"></i>Failed to save. Please check your connection and try again.</div>';
+            }
+
+            // Reset button after 3 seconds
+            setTimeout(() => {
+              submitButton.innerHTML = originalButtonText;
+              submitButton.classList.remove('bg-red-500', 'hover:bg-red-600');
+              submitButton.classList.add('bg-gradient-to-r', 'from-indigo-500', 'to-purple-500', 'hover:from-indigo-600', 'hover:to-purple-600');
+
+              if (saveStatus) {
+                saveStatus.innerHTML = '';
+              }
+            }, 3000);
+          }
+        };
+      }
+    }, 100);
+
+    // Event listeners are now handled by delegation at the top of renderGoalsDashboard
+    // No need to attach them here anymore
+    console.log('✅ Dashboard HTML rendered, event delegation already active');
+
+    // Period selector buttons for metrics evolution chart
+    let currentPeriod = '1m';
+    document.querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        // Update active button style
+        document.querySelectorAll('.period-btn').forEach(b => {
+          b.classList.remove('bg-blue-500', 'text-white');
+          b.classList.add('bg-gray-200', 'text-gray-700');
+        });
+        this.classList.remove('bg-gray-200', 'text-gray-700');
+        this.classList.add('bg-blue-500', 'text-white');
+        
+        // Update chart with new period
+        currentPeriod = this.getAttribute('data-period');
+        renderMetricsEvolutionChart(currentPeriod);
       });
-      if (weekInput.value.trim()) {
-        submitWeeklyUpdate(weekInput.value, goalStatuses);
-        weekInput.value = '';
-        checkboxes.forEach((checkbox) => checkbox.checked = false);
-      }
-    });
-
-    document.getElementById('add-achievement-btn').addEventListener('click', () => {
-      const input = document.getElementById('new-achievement-input');
-      if (input.value.trim()) {
-        addAchievement(new Date().toISOString().split('T')[0], input.value);
-        input.value = '';
-      }
-    });
-
-    document.getElementById('export-pdf-btn').addEventListener('click', exportInvestorReport);
-    document.getElementById('export-json-btn').addEventListener('click', exportDataToJSON);
-
-    // Metrics functionality
-    document.getElementById('update-metrics-btn').addEventListener('click', async () => {
-      const metric1 = document.getElementById('metric1-select').value;
-      const metric2 = document.getElementById('metric2-select').value;
-
-      if (metric1 === metric2) {
-        alert('Las dos métricas principales deben ser diferentes');
-        return;
-      }
-
-      const success = await updatePrimaryMetrics(metric1, metric2);
-      if (success) {
-        alert('Métricas principales actualizadas correctamente');
-        // Refresh the dashboard to show updated metrics
-        await fetchPrimaryMetrics();
-        renderDashboard();
-      } else {
-        alert('Error al actualizar las métricas principales');
-      }
-    });
-
-    document.getElementById('add-metric-btn').addEventListener('click', async () => {
-      const metricName = document.getElementById('new-metric-name').value;
-      const metricValue = parseFloat(document.getElementById('new-metric-value').value);
-      const recordedDate = document.getElementById('new-metric-date').value;
-
-      if (!metricValue || metricValue < 0) {
-        alert('Por favor ingresa un valor válido mayor o igual a 0');
-        return;
-      }
-
-      if (!recordedDate) {
-        alert('Por favor selecciona una fecha');
-        return;
-      }
-
-      const success = await addMetricValue(metricName, metricValue, recordedDate);
-      if (success) {
-        alert('Valor de métrica agregado correctamente');
-        // Clear form
-        document.getElementById('new-metric-value').value = '';
-        document.getElementById('new-metric-date').value = new Date().toISOString().split('T')[0];
-        // Refresh metrics data
-        await fetchMetricsHistory();
-        renderDashboard();
-      } else {
-        alert('Error al agregar el valor de métrica');
-      }
     });
 
     // Checklist functionality
@@ -3166,440 +3565,594 @@ async function renderGoalsDashboard(metrics) {
     // Make markGoalCompleted available globally
     window.markGoalCompleted = markGoalCompleted;
 
-    // Render chart if data available
+    // Render chart if data available - ONLY ONCE with longer delay for Chrome
     if (goals.length > 0) {
-      setTimeout(() => {
+      // Clear any existing timeout
+      if (window.chartRenderTimeout) clearTimeout(window.chartRenderTimeout);
+      
+      window.chartRenderTimeout = setTimeout(() => {
+        console.log('Starting delayed chart render...');
         renderChart();
-      }, 100);
+        window.chartRenderTimeout = null;
+      }, 300); // Increased from 100ms to 300ms for Chrome compatibility
     }
+    
+    // Mark render as complete
+    isRenderingDashboard = false;
+    console.log('✅ Dashboard render completed');
   }
 
+  // Track if chart is currently rendering to prevent multiple calls
+  let isRenderingChart = false;
+
   function renderChart() {
-    // Render Pie Chart for Goals Overview
-    const pieCtx = document.getElementById('goals-pie-chart');
-    if (pieCtx && window.Chart) {
+    if (isRenderingChart) {
+      console.log('⚠️ Chart rendering already in progress, skipping...');
+      return;
+    }
+    
+    isRenderingChart = true;
+    console.log('renderChart called with goals:', goals.length);
+    
+    // Use try-finally to ensure flag is always reset
+    try {
+      if (!window.Chart) {
+        console.error('Chart.js not loaded');
+        return;
+      }
+      
+      // Verify all canvas elements exist before rendering
+      const pieCtx = document.getElementById('goals-pie-chart');
+      const barCtx = document.getElementById('weekly-bar-chart');
+      const lineCtx = document.getElementById('progress-chart');
+      
+      if (!pieCtx || !barCtx || !lineCtx) {
+        console.error('⚠️ One or more canvas elements not found:', { 
+          pie: !!pieCtx, 
+          bar: !!barCtx, 
+          line: !!lineCtx 
+        });
+        return;
+      }
+      
+      console.log('✅ All canvas elements found, proceeding with render');
+
+      // 1. PIE CHART - Goals Status Overview
+      if (pieCtx) {
+        const existingChart = Chart.getChart(pieCtx);
+        if (existingChart) existingChart.destroy();
+      
       const completedGoals = goals.filter(g => g.status === 'completed').length;
       const activeGoals = goals.filter(g => g.status === 'active').length;
+      const totalGoals = goals.length;
+      
+      console.log('Pie chart - Total goals:', totalGoals, 'Completed:', completedGoals, 'Active:', activeGoals);
 
-      new Chart(pieCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Completadas', 'Pendientes'],
-          datasets: [{
-            data: [completedGoals, activeGoals],
-            backgroundColor: [
-              'rgba(34, 197, 94, 0.8)',
-              'rgba(239, 68, 68, 0.8)'
-            ],
-            borderColor: [
-              'rgba(34, 197, 94, 1)',
-              'rgba(239, 68, 68, 1)'
-            ],
-            borderWidth: 3,
-            hoverBackgroundColor: [
-              'rgba(34, 197, 94, 0.9)',
-              'rgba(239, 68, 68, 0.9)'
+      // Si no hay goals, mostrar datos mínimos para que el gráfico se vea
+      let displayCompleted = totalGoals > 0 ? completedGoals : 0;
+      let displayActive = totalGoals > 0 ? activeGoals : 1; // Al menos 1 para que se vea el gráfico
+
+      // Sanitize numbers AGGRESSIVELY (avoid NaN / Infinity / negative)
+      displayCompleted = Math.max(0, Math.floor(Number(displayCompleted) || 0));
+      displayActive = Math.max(0, Math.floor(Number(displayActive) || 0));
+
+      // Prevent extreme values
+      if (displayCompleted > 10000) displayCompleted = 10000;
+      if (displayActive > 10000) displayActive = 10000;
+
+      // If both zero, force a visible pending slice
+      if (displayCompleted === 0 && displayActive === 0) displayActive = 1;
+
+      const pieData = [displayCompleted, displayActive];
+
+      console.log('Pie chart final data:', pieData);
+
+      try {
+        new Chart(pieCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Completed', 'Pending'],
+            datasets: [{
+              data: pieData,
+              backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)'],
+              borderWidth: 2,
+              borderColor: '#fff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+              duration: 0 // Disable animation to prevent infinite loop issues
+            },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom'
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const total = pieData.reduce((a,b) => a + b, 0);
+                    const value = Math.floor(Number(context.parsed) || 0);
+                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                    return context.label + ': ' + value + ' (' + percentage + '%)';
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        if (totalGoals > 0) {
+          console.log('✓ Goals status pie chart rendered with real data');
+        } else {
+          console.log('⚠️ Goals status pie chart rendered with placeholder data (no goals yet)');
+        }
+      } catch(e) {
+        console.error('Goals status pie chart error:', e);
+      }
+    }
+
+    // 2. BAR CHART - Goals Completed Per Week (DATOS REALES)
+    if (barCtx) {
+      const existingChart = Chart.getChart(barCtx);
+      if (existingChart) existingChart.destroy();
+
+      // Calcular goals completados por semana (últimas 8 semanas)
+      const now = new Date();
+      const weeks = [];
+      const goalsCompletedPerWeek = [];
+
+      console.log('Total goals available:', goals.length);
+      console.log('Goals data:', goals.map(g => ({ id: g.id, status: g.status, created_at: g.created_at, updated_at: g.updated_at })));
+
+      // Generar últimas 8 semanas
+      for (let i = 7; i >= 0; i--) {
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - (i * 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+
+        const weekLabel = `W${8-i}`;
+        weeks.push(weekLabel);
+
+        // Contar goals completados en esta semana específica
+        const goalsCompletedInWeek = goals.filter(goal => {
+          if (goal.status !== 'completed') return false;
+          const completedDate = new Date(goal.updated_at);
+          return completedDate >= weekStart && completedDate <= weekEnd;
+        }).length;
+
+        goalsCompletedPerWeek.push(goalsCompletedInWeek);
+
+        console.log(`Week ${weekLabel} (${weekStart.toDateString()} - ${weekEnd.toDateString()}): ${goalsCompletedInWeek} goals completed`);
+      }
+
+      console.log('Bar chart - Goals completed per week:', goalsCompletedPerWeek);
+
+      // Sanitize values AGGRESSIVELY (ensure finite positive integers)
+      const sanitizedGoalsPerWeek = goalsCompletedPerWeek.map(v => {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n < 0 || n > 10000) return 0;
+        return Math.floor(n);
+      });
+
+      const maxY = Math.max(...sanitizedGoalsPerWeek, 1);
+      const safeMaxY = Math.min(maxY + 1, 10000); // Cap at 10k
+
+      console.log('Bar chart sanitized data:', sanitizedGoalsPerWeek, 'Max Y:', safeMaxY);
+
+      try {
+        new Chart(barCtx, {
+          type: 'bar',
+          data: {
+            labels: weeks,
+            datasets: [{
+              label: 'Goals Completed Per Week',
+              data: sanitizedGoalsPerWeek,
+              backgroundColor: 'rgba(249, 115, 22, 0.8)',
+              borderColor: 'rgba(249, 115, 22, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+              duration: 0 // Disable animation
+            },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top'
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const val = Math.floor(Number(context.parsed.y) || 0);
+                    return context.dataset.label + ': ' + val + ' goals';
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                min: 0,
+                max: safeMaxY,
+                ticks: {
+                  stepSize: Math.max(1, Math.ceil(safeMaxY / 10)),
+                  callback: function(value) {
+                    const val = Math.floor(Number(value) || 0);
+                    if (!Number.isFinite(val)) return '0';
+                    return val;
+                  }
+                }
+              }
+            }
+          }
+        });
+        console.log('✓ Weekly goals completed chart rendered with real data');
+      } catch(e) {
+        console.error('Weekly goals completed chart error:', e);
+      }
+    }
+
+    // 3. LINE CHART - Goals Progress Over Time (DATOS REALES)
+    if (lineCtx) {
+      const existingChart = Chart.getChart(lineCtx);
+      if (existingChart) existingChart.destroy();
+
+      // Calcular progreso acumulado real de goals por semana
+      const now = new Date();
+      const weeks = [];
+      const totalGoalsData = [];
+      const completedGoalsData = [];
+
+      console.log('Progress chart - Total goals available:', goals.length);
+      console.log('Progress chart - Goals data sample:', goals.slice(0, 3).map(g => ({
+        id: g.id,
+        status: g.status,
+        created_at: g.created_at,
+        updated_at: g.updated_at
+      })));
+
+      // Generar últimas 8 semanas
+      for (let i = 7; i >= 0; i--) {
+        const weekEnd = new Date(now);
+        weekEnd.setDate(now.getDate() - (i * 7));
+
+        const weekLabel = `W${8-i}`;
+        weeks.push(weekLabel);
+
+        // Contar goals creados hasta esta semana (acumulado)
+        const goalsCreatedByWeek = goals.filter(goal => {
+          const createdDate = new Date(goal.created_at);
+          return createdDate <= weekEnd;
+        }).length;
+
+        // Contar goals completados hasta esta semana (acumulado)
+        const goalsCompletedByWeek = goals.filter(goal => {
+          if (goal.status !== 'completed') return false;
+          const updatedDate = new Date(goal.updated_at);
+          return updatedDate <= weekEnd;
+        }).length;
+
+        totalGoalsData.push(goalsCreatedByWeek);
+        completedGoalsData.push(goalsCompletedByWeek);
+
+        console.log(`Progress chart - ${weekLabel} (until ${weekEnd.toDateString()}): ${goalsCreatedByWeek} created, ${goalsCompletedByWeek} completed`);
+      }
+
+      console.log('Progress chart - Total goals by week:', totalGoalsData);
+      console.log('Progress chart - Completed goals by week:', completedGoalsData);
+
+      // Sanitize arrays AGGRESSIVELY
+      const sanitizedTotal = totalGoalsData.map(v => {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n < 0 || n > 100000) return 0;
+        return Math.floor(n);
+      });
+      const sanitizedCompleted = completedGoalsData.map(v => {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n < 0 || n > 100000) return 0;
+        return Math.floor(n);
+      });
+
+      const maxY = Math.max(...sanitizedTotal, ...sanitizedCompleted, 1);
+      const safeMaxY = Math.min(maxY + 1, 100000); // Cap at reasonable max
+      const step = Math.max(1, Math.ceil(safeMaxY / 10));
+
+      console.log('Progress chart sanitized - Total:', sanitizedTotal, 'Completed:', sanitizedCompleted, 'Max Y:', safeMaxY);
+
+      // Si no hay datos, mostrar advertencia en logs
+      const hasData = sanitizedTotal.some(v => v > 0) || sanitizedCompleted.some(v => v > 0);
+
+      try {
+        new Chart(lineCtx, {
+          type: 'line',
+          data: {
+            labels: weeks,
+            datasets: [
+              {
+                label: 'Total Goals Created (Cumulative)',
+                data: sanitizedTotal,
+                borderColor: 'rgba(59, 130, 246, 1)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(59, 130, 246, 1)'
+              },
+              {
+                label: 'Goals Completed (Cumulative)',
+                data: sanitizedCompleted,
+                borderColor: 'rgba(34, 197, 94, 1)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: 'rgba(34, 197, 94, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(34, 197, 94, 1)'
+              }
             ]
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: {
-                padding: 20,
-                usePointStyle: true,
-                font: {
-                  size: 14,
-                  weight: 'bold'
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+              duration: 0 // Disable animation to prevent infinite loop
+            },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top'
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const val = Math.floor(Number(context.parsed.y) || 0);
+                    return context.dataset.label + ': ' + val + ' goals';
+                  }
                 }
               }
             },
-            tooltip: {
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              titleColor: '#ffffff',
-              bodyColor: '#ffffff',
-              callbacks: {
-                label: function(context) {
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                  const percentage = total > 0 ? Math.round((context.parsed / total) * 100) : 0;
-                  return `${context.label}: ${context.parsed} (${percentage}%)`;
+            scales: {
+              y: {
+                beginAtZero: true,
+                min: 0,
+                max: safeMaxY,
+                ticks: {
+                  stepSize: step,
+                  callback: function(value) {
+                    const val = Math.floor(Number(value) || 0);
+                    if (!Number.isFinite(val)) return '0';
+                    return val;
+                  }
+                }
+              },
+              x: {
+                grid: {
+                  display: false
                 }
               }
             }
-          },
-          animation: {
-            animateScale: true,
-            animateRotate: true,
-            duration: 2000,
-            easing: 'easeInOutQuart'
           }
+        });
+
+        if (hasData) {
+          console.log('✓ Goals progress chart rendered with real data');
+        } else {
+          console.log('⚠️ Goals progress chart rendered but no data available yet');
         }
-      });
+      } catch(e) {
+        console.error('Goals progress chart error:', e);
+      }
+    }
+    
+    } catch (error) {
+      console.error('Error in renderChart:', error);
+    } finally {
+      // Always reset the flag
+      isRenderingChart = false;
+    }
+  }  
+  
+  // Track if metrics chart is rendering
+  let isRenderingMetricsChart = false;
+  
+  // Function to render metrics evolution chart with time period filter
+  function renderMetricsEvolutionChart(period = '1m') {
+    if (isRenderingMetricsChart) {
+      console.log('⚠️ Metrics chart rendering already in progress, skipping...');
+      return;
+    }
+    
+    isRenderingMetricsChart = true;
+    
+    try {
+      const evolutionCtx = document.getElementById('metrics-evolution-chart');
+      if (!evolutionCtx || !window.Chart) {
+        console.log('Cannot render metrics chart - canvas or Chart.js not available');
+        return;
+      }
+
+      console.log('Rendering metrics evolution chart with period:', period);
+      console.log('Metrics history data:', metricsHistory.length, 'records');
+
+      // Destroy existing chart
+      const existingChart = Chart.getChart(evolutionCtx);
+      if (existingChart) {
+        existingChart.destroy();
+      }
+
+      // If no data, show message
+    if (metricsHistory.length === 0) {
+      console.log('No metrics history data available');
+      // Chart.js cannot display a message, so we'll just skip rendering
+      return;
     }
 
-    // Render Weekly Bar Chart
-    const barCtx = document.getElementById('weekly-bar-chart');
-    if (barCtx && window.Chart && weeklyUpdates.length > 0) {
-      const weeks = weeklyUpdates.map(u => u.week).slice(-8); // Last 8 weeks
-      const completionRates = weeks.map(week => {
-        const update = weeklyUpdates.find(u => u.week === week);
-        if (!update) return 0;
-
-        const statuses = JSON.parse(update.goal_statuses);
-        const totalGoals = Object.keys(statuses).length;
-        const completedGoals = Object.values(statuses).filter(status => status).length;
-        return totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
-      });
-
-      new Chart(barCtx, {
-        type: 'bar',
-        data: {
-          labels: weeks,
-          datasets: [{
-            label: 'Tasa de Cumplimiento (%)',
-            data: completionRates,
-            backgroundColor: 'rgba(249, 115, 22, 0.8)',
-            borderColor: 'rgba(249, 115, 22, 1)',
-            borderWidth: 2,
-            borderRadius: 8,
-            borderSkipped: false,
-            hoverBackgroundColor: 'rgba(249, 115, 22, 0.9)'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: false
-            },
-            tooltip: {
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              titleColor: '#ffffff',
-              bodyColor: '#ffffff',
-              callbacks: {
-                label: function(context) {
-                  return `Cumplimiento: ${context.parsed.y.toFixed(1)}%`;
-                }
-              }
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              max: 100,
-              ticks: {
-                callback: function(value) {
-                  return value + '%';
-                }
-              }
-            },
-            x: {
-              ticks: {
-                maxRotation: 45,
-                minRotation: 45
-              }
-            }
-          },
-          animation: {
-            duration: 2000,
-            easing: 'easeInOutQuart',
-            delay: function(context) {
-              return context.dataIndex * 200;
-            }
-          }
-        }
-      });
+    // Filter data by period
+    const now = new Date();
+    let startDate;
+    
+    switch(period) {
+      case '1m':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case '3m':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      case '1y':
+        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      case 'all':
+        startDate = new Date(0); // Beginning of time
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     }
 
-    // Render Line Chart for Progress (existing functionality)
-    const ctx = document.getElementById('progress-chart');
-    if (ctx && window.Chart && weeklyUpdates.length > 0 && goals.length > 0) {
-      const gradientGreen = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
-      gradientGreen.addColorStop(0, 'rgba(34, 197, 94, 0.8)');
-      gradientGreen.addColorStop(1, 'rgba(34, 197, 94, 0.1)');
+    // Filter metrics by date range
+    const filteredMetrics = metricsHistory.filter(metric => {
+      const metricDate = new Date(metric.recorded_date);
+      return metricDate >= startDate;
+    });
 
-      const gradientBlue = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
-      gradientBlue.addColorStop(0, 'rgba(59, 130, 246, 0.8)');
-      gradientBlue.addColorStop(1, 'rgba(59, 130, 246, 0.1)');
+    console.log('Filtered metrics:', filteredMetrics.length, 'records for period', period);
+    console.log('Start date:', startDate);
+    console.log('Sample metric dates:', metricsHistory.slice(0, 3).map(m => m.recorded_date));
 
-      const gradientPurple = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
-      gradientPurple.addColorStop(0, 'rgba(147, 51, 234, 0.8)');
-      gradientPurple.addColorStop(1, 'rgba(147, 51, 234, 0.1)');
-
-      const gradientOrange = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
-      gradientOrange.addColorStop(0, 'rgba(249, 115, 22, 0.8)');
-      gradientOrange.addColorStop(1, 'rgba(249, 115, 22, 0.1)');
-
-      const gradients = [gradientGreen, gradientBlue, gradientPurple, gradientOrange];
-
-      const chartData = prepareChartData();
-      const enhancedData = {
-        ...chartData,
-        datasets: chartData.datasets.map((dataset, index) => ({
-          ...dataset,
-          borderColor: [
-            '#22c55e', // green
-            '#3b82f6', // blue
-            '#9333ea', // purple
-            '#f97316', // orange
-            '#ec4899', // pink
-            '#06b6d4', // cyan
-          ][index % 6],
-          backgroundColor: gradients[index % gradients.length],
-          borderWidth: 3,
-          pointBackgroundColor: [
-            '#22c55e',
-            '#3b82f6',
-            '#9333ea',
-            '#f97316',
-            '#ec4899',
-            '#06b6d4',
-          ][index % 6],
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 2,
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          fill: true,
-          tension: 0.4,
-        }))
-      };
-
-      new Chart(ctx, {
-        type: 'line',
-        data: enhancedData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {
-            intersect: false,
-            mode: 'index'
-          },
-          plugins: {
-            legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                usePointStyle: true,
-                padding: 20,
-                font: {
-                  size: 12,
-                  weight: 'bold'
-                }
-              }
-            },
-            tooltip: {
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              titleColor: '#ffffff',
-              bodyColor: '#ffffff',
-              borderColor: '#3b82f6',
-              borderWidth: 1,
-              cornerRadius: 8,
-              displayColors: true,
-              callbacks: {
-                label: function(context) {
-                  return `${context.dataset.label}: ${context.parsed.y === 1 ? '✅ Cumplida' : '❌ No cumplida'}`;
-                }
-              }
-            }
-          },
-          scales: {
-            x: {
-              grid: {
-                display: false
-              },
-              ticks: {
-                font: {
-                  size: 11
-                }
-              }
-            },
-            y: {
-              beginAtZero: true,
-              max: 1,
-              grid: {
-                color: 'rgba(0, 0, 0, 0.1)'
-              },
-              ticks: {
-                callback: function(value) {
-                  return value === 1 ? 'Cumplida' : 'No cumplida';
-                },
-                font: {
-                  size: 11
-                }
-              }
-            }
-          },
-          elements: {
-            point: {
-              hoverBorderWidth: 3
-            }
-          },
-          animation: {
-            duration: 2000,
-            easing: 'easeInOutQuart'
-          }
-        }
-      });
+    // If no data in range, show message
+    if (filteredMetrics.length === 0) {
+      console.log('No data in selected time range');
+      return;
     }
 
-    // Render Metrics Evolution Chart
-    const evolutionCtx = document.getElementById('metrics-evolution-chart');
-    if (evolutionCtx && window.Chart && metricsHistory.length > 0) {
-      // Group metrics by date
-      const metricsByDate = {};
-      metricsHistory.forEach(metric => {
-        if (!metricsByDate[metric.recorded_date]) {
-          metricsByDate[metric.recorded_date] = { users: null, revenue: null };
-        }
-        metricsByDate[metric.recorded_date][metric.metric_name] = metric.metric_value;
-      });
+    // Group metrics by date
+    const metricsByDate = {};
+    filteredMetrics.forEach(metric => {
+      if (!metricsByDate[metric.recorded_date]) {
+        metricsByDate[metric.recorded_date] = { users: null, revenue: null };
+      }
+      metricsByDate[metric.recorded_date][metric.metric_name] = metric.metric_value;
+    });
 
-      // Sort dates
-      const sortedDates = Object.keys(metricsByDate).sort();
+    // Sort dates
+    const sortedDates = Object.keys(metricsByDate).sort();
 
-      // Prepare data for Chart.js
-      const labels = sortedDates.map(date => {
-        const d = new Date(date);
-        return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
-      });
+    // Prepare data for Chart.js
+    const labels = sortedDates.map(date => {
+      const d = new Date(date);
+      // Format based on period
+      if (period === '1m') {
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } else if (period === '3m') {
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } else if (period === '1y') {
+        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      } else {
+        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      }
+    });
 
-      const usersData = sortedDates.map(date => metricsByDate[date].users);
-      const revenueData = sortedDates.map(date => metricsByDate[date].revenue);
+    const usersData = sortedDates.map(date => metricsByDate[date].users);
+    const revenueData = sortedDates.map(date => metricsByDate[date].revenue);
 
-      // Create gradients
-      const gradientUsers = evolutionCtx.getContext('2d').createLinearGradient(0, 0, 0, 400);
-      gradientUsers.addColorStop(0, 'rgba(59, 130, 246, 0.8)');
-      gradientUsers.addColorStop(1, 'rgba(59, 130, 246, 0.1)');
+    console.log('Chart labels:', labels);
+    console.log('Users data:', usersData);
+    console.log('Revenue data:', revenueData);
 
-      const gradientRevenue = evolutionCtx.getContext('2d').createLinearGradient(0, 0, 0, 400);
-      gradientRevenue.addColorStop(0, 'rgba(34, 197, 94, 0.8)');
-      gradientRevenue.addColorStop(1, 'rgba(34, 197, 94, 0.1)');
-
-      new Chart(evolutionCtx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Usuarios',
-              data: usersData,
-              borderColor: '#3b82f6',
-              backgroundColor: gradientUsers,
-              borderWidth: 3,
-              pointBackgroundColor: '#3b82f6',
-              pointBorderColor: '#ffffff',
-              pointBorderWidth: 2,
-              pointRadius: 6,
-              pointHoverRadius: 8,
-              fill: true,
-              tension: 0.4,
-              spanGaps: true
-            },
-            {
-              label: 'Ingresos',
-              data: revenueData,
-              borderColor: '#22c55e',
-              backgroundColor: gradientRevenue,
-              borderWidth: 3,
-              pointBackgroundColor: '#22c55e',
-              pointBorderColor: '#ffffff',
-              pointBorderWidth: 2,
-              pointRadius: 6,
-              pointHoverRadius: 8,
-              fill: true,
-              tension: 0.4,
-              spanGaps: true
+    new Chart(evolutionCtx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Users',
+            data: usersData,
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 3,
+            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
+            fill: true,
+            tension: 0.4
+          },
+          {
+            label: 'Revenue',
+            data: revenueData,
+            backgroundColor: 'rgba(34, 197, 94, 0.2)',
+            borderColor: 'rgba(34, 197, 94, 1)',
+            borderWidth: 3,
+            pointBackgroundColor: 'rgba(34, 197, 94, 1)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgba(34, 197, 94, 1)',
+            fill: true,
+            tension: 0.4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.datasetIndex === 0) { // Users
+                  label += context.parsed.y !== null ? context.parsed.y.toLocaleString() : 'No data';
+                } else { // Revenue
+                  label += context.parsed.y !== null ? '$' + context.parsed.y.toLocaleString() : 'No data';
+                }
+                return label;
+              }
             }
-          ]
+          }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {
-            intersect: false,
-            mode: 'index'
-          },
-          plugins: {
-            legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                usePointStyle: true,
-                padding: 20,
-                font: {
-                  size: 12,
-                  weight: 'bold'
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                if (value >= 1000000) {
+                  return (value / 1000000).toFixed(1) + 'M';
+                } else if (value >= 1000) {
+                  return (value / 1000).toFixed(1) + 'k';
                 }
-              }
-            },
-            tooltip: {
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              titleColor: '#ffffff',
-              bodyColor: '#ffffff',
-              borderColor: '#3b82f6',
-              borderWidth: 1,
-              cornerRadius: 8,
-              displayColors: true,
-              callbacks: {
-                label: function(context) {
-                  let label = context.dataset.label || '';
-                  if (label) {
-                    label += ': ';
-                  }
-                  if (context.datasetIndex === 0) { // Users
-                    label += context.parsed.y !== null ? context.parsed.y : 'Sin datos';
-                  } else { // Revenue
-                    label += context.parsed.y !== null ? '$' + context.parsed.y.toLocaleString() : 'Sin datos';
-                  }
-                  return label;
-                }
+                return value;
               }
             }
-          },
-          scales: {
-            x: {
-              grid: {
-                display: false
-              },
-              ticks: {
-                font: {
-                  size: 11
-                }
-              }
-            },
-            y: {
-              beginAtZero: true,
-              grid: {
-                color: 'rgba(0, 0, 0, 0.1)'
-              },
-              ticks: {
-                font: {
-                  size: 11
-                },
-                callback: function(value, index, values) {
-                  if (value >= 1000) {
-                    return (value / 1000).toFixed(1) + 'k';
-                  }
-                  return value;
-                }
-              }
-            }
-          },
-          elements: {
-            point: {
-              hoverBorderWidth: 3
-            }
-          },
-          animation: {
-            duration: 2000,
-            easing: 'easeInOutQuart'
           }
         }
-      });
+      }
+    });
+    
+    console.log('Metrics evolution chart rendered successfully');
+    
+    } catch (error) {
+      console.error('Error in renderMetricsEvolutionChart:', error);
+    } finally {
+      // Always reset the flag
+      isRenderingMetricsChart = false;
     }
   }
 
@@ -3609,10 +4162,49 @@ async function renderGoalsDashboard(metrics) {
   dashboardContent.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i><p class="text-gray-600">Cargando datos del dashboard...</p></div>';
   
   try {
-    await Promise.all([fetchGoals(), fetchWeeklyUpdates()]);
-    console.log('All dashboard data loaded successfully');        
+    await Promise.all([fetchGoals(), fetchPrimaryMetrics(), fetchMetricsHistory()]);
+    console.log('All dashboard data loaded successfully');
+    console.log('Metrics history loaded:', metricsHistory.length, 'records');
+    console.log('Goals loaded:', goals.length, 'goals');
     loading = false;
     renderDashboard();
+    
+    // Wait for Chart.js to be available
+    const waitForChart = () => {
+      return new Promise((resolve) => {
+        if (window.Chart) {
+          console.log('Chart.js is available');
+          resolve();
+        } else {
+          console.log('Waiting for Chart.js...');
+          setTimeout(() => waitForChart().then(resolve), 100);
+        }
+      });
+    };
+    
+    await waitForChart();
+    
+    // Render charts after a short delay to ensure DOM is updated
+    setTimeout(() => {
+      console.log('Starting chart rendering...');
+      try {
+        renderChart();
+        console.log('renderChart completed');
+      } catch (error) {
+        console.error('Error rendering charts:', error);
+      }
+      
+      // Render metrics evolution chart separately with additional delay
+      setTimeout(() => {
+        console.log('Starting metrics evolution chart rendering...');
+        try {
+          renderMetricsEvolutionChart('1m');
+          console.log('renderMetricsEvolutionChart completed');
+        } catch (error) {
+          console.error('Error rendering metrics evolution chart:', error);
+        }
+      }, 300);
+    }, 300);
   } catch (error) {
     console.error('Error loading dashboard data:', error);
     dashboardContent.innerHTML = `
@@ -3675,6 +4267,7 @@ async function editProduct(productId) {
         form.url.value = product.url || '';
         form.compensation_type.value = product.compensation_type || 'free';
         form.compensation_amount.value = product.compensation_amount || '';
+        form.pricing_model.value = product.pricing_model || 'subscription_monthly';
         form.max_validators.value = product.max_validators || 3;
         form.duration_days.value = product.duration_days || '';
 
@@ -3826,6 +4419,19 @@ function showCreateProductModal() {
               <input type="number" name="compensation_amount" min="0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
             </div>
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">💰 Modelo de Pricing del Producto *</label>
+            <select name="pricing_model" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+              <option value="">Selecciona modelo de pricing...</option>
+              <option value="free">Gratis</option>
+              <option value="freemium">Freemium (Gratis + Planes de pago)</option>
+              <option value="one_time">Pago único</option>
+              <option value="subscription_monthly">Suscripción Mensual</option>
+              <option value="subscription_yearly">Suscripción Anual</option>
+              <option value="usage_based">Basado en uso / Pay-as-you-go</option>
+              <option value="enterprise">Enterprise / Pricing personalizado</option>
+            </select>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Máximo Validadores</label>
@@ -3885,6 +4491,7 @@ async function handleCreateProduct(e) {
     url: formData.get('url'),
     compensation_type: formData.get('compensation_type'),
     compensation_amount: formData.get('compensation_amount') ? parseFloat(formData.get('compensation_amount')) : null,
+    pricing_model: formData.get('pricing_model'),
     max_validators: formData.get('max_validators') ? parseInt(formData.get('max_validators')) : 3,
     duration_days: formData.get('duration_days') ? parseInt(formData.get('duration_days')) : null
   };
@@ -4669,7 +5276,7 @@ function updateMarketplaceAuthUI() {
           <option value="validator" ${currentUser.role === 'validator' ? 'selected' : ''}>Validator</option>
         </select>
         <button onclick="logout()" class="text-gray-600 hover:text-red-600 transition">
-          <i class="fas fa-sign-out-alt mr-1"></i>Salir
+          <i class="fas fa-sign-out-alt mr-1"></i>Logout
         </button>
       </div>
     `;
@@ -4677,7 +5284,7 @@ function updateMarketplaceAuthUI() {
     // Mobile auth nav
     mobileAuthNav.innerHTML = `
       <button onclick="logout()" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-red-600 transition">
-        <i class="fas fa-sign-out-alt mr-2"></i>Salir (${currentUser.name})
+        <i class="fas fa-sign-out-alt mr-2"></i>Logout (${currentUser.name})
       </button>
     `;
     
@@ -4707,19 +5314,19 @@ function updateMarketplaceAuthUI() {
     // Not authenticated: show all tabs
     authNav.innerHTML = `
       <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition mr-4">
-        Iniciar Sesión
+        Login
       </button>
       <button onclick="showAuthModal('register')" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-        Registrarse
+        Sign Up
       </button>
     `;
     
     mobileAuthNav.innerHTML = `
       <button onclick="showAuthModal('login')" class="block w-full text-left px-3 py-2 text-gray-700 hover:text-primary transition">
-        <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
+        <i class="fas fa-sign-in-alt mr-2"></i>Login
       </button>
       <button onclick="showAuthModal('register')" class="block w-full text-left px-3 py-2 mt-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
-        <i class="fas fa-user-plus mr-2"></i>Registrarse
+        <i class="fas fa-user-plus mr-2"></i>Sign Up
       </button>
     `;
     
@@ -4770,8 +5377,8 @@ function loginWithGoogle(role) {
   content.innerHTML = `
     <div class="text-center py-8">
       <i class="fab fa-google text-4xl text-red-600 mb-4"></i>
-      <h2 class="text-xl font-bold mb-2">Conectando con Google...</h2>
-      <p class="text-gray-600">Redirigiendo a Google...</p>
+      <h2 class="text-xl font-bold mb-2">Connecting with Google...</h2>
+      <p class="text-gray-600">Redirecting to Google...</p>
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mt-4"></div>
     </div>
   `;
@@ -4813,7 +5420,7 @@ async function loadChatInterface() {
     
   } catch (error) {
     console.error('Error loading chat interface:', error);
-    showError('Error al cargar la interfaz de chat');
+    showError('Error loading chat interface');
   }
 }
 
@@ -4836,7 +5443,7 @@ async function loadConversationsList() {
     document.getElementById('conversations-list').innerHTML = `
       <div class="text-center py-8 text-gray-500">
         <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
-        <p>Error al cargar conversaciones</p>
+        <p>Error loading conversations</p>
       </div>
     `;
   }
@@ -4849,8 +5456,8 @@ function renderConversationsList(conversations) {
     container.innerHTML = `
       <div class="text-center py-8 text-gray-500">
         <i class="fas fa-comments text-3xl mb-2"></i>
-        <p>No tienes conversaciones activas</p>
-        <p class="text-sm mt-2">Las conversaciones aparecerán aquí cuando contactes con validadores</p>
+        <p>You don't have active conversations</p>
+        <p class="text-sm mt-2">Conversations will appear here when you contact validators</p>
       </div>
     `;
     return;
@@ -4868,7 +5475,7 @@ function renderConversationsList(conversations) {
             <h4 class="font-medium text-gray-900 truncate">${escapeHtml(conv.other_user_name)}</h4>
             ${conv.unread_count > 0 ? `<span class="bg-red-500 text-white text-xs rounded-full px-2 py-1">${conv.unread_count}</span>` : ''}
           </div>
-          <p class="text-sm text-gray-600 truncate">${escapeHtml(conv.project_title || 'Sin proyecto')}</p>
+          <p class="text-sm text-gray-600 truncate">${escapeHtml(conv.project_title || 'No project')}</p>
           ${conv.last_message ? `<p class="text-xs text-gray-500 truncate mt-1">${escapeHtml(conv.last_message)}</p>` : ''}
         </div>
       </div>
@@ -4935,7 +5542,7 @@ async function loadConversationMessages(conversationId) {
     document.getElementById('chat-messages').innerHTML = `
       <div class="text-center py-8 text-gray-500">
         <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
-        <p>Error al cargar mensajes</p>
+        <p>Error loading messages</p>
       </div>
     `;
   }
@@ -4948,8 +5555,8 @@ function renderConversationMessages(messages) {
     container.innerHTML = `
       <div class="text-center py-8 text-gray-500">
         <i class="fas fa-comments text-3xl mb-2"></i>
-        <p>No hay mensajes en esta conversación</p>
-        <p class="text-sm mt-2">Envía el primer mensaje para comenzar</p>
+        <p>No messages in this conversation</p>
+        <p class="text-sm mt-2">Send the first message to start</p>
       </div>
     `;
     return;
@@ -5003,7 +5610,7 @@ async function sendCurrentChatMessage() {
     
   } catch (error) {
     console.error('Error sending message:', error);
-    showError('Error al enviar mensaje');
+    showError('Error sending message');
   }
 }
 
@@ -5049,7 +5656,7 @@ function renderPendingRequests(requests) {
           <h4 class="font-medium text-gray-900">${escapeHtml(request.founder_name)}</h4>
           <p class="text-sm text-gray-600 mt-1">${escapeHtml(request.message)}</p>
           <p class="text-xs text-gray-500 mt-2">
-            Proyecto: ${escapeHtml(request.project_title)}
+            Project: ${escapeHtml(request.project_title)}
           </p>
           <p class="text-xs text-gray-500">
             ${new Date(request.created_at).toLocaleString('es-ES')}
@@ -5058,11 +5665,11 @@ function renderPendingRequests(requests) {
         <div class="flex space-x-2 ml-4">
           <button onclick="acceptChatRequest('${request.id}')" 
                   class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition">
-            Aceptar
+            Accept
           </button>
           <button onclick="rejectChatRequest('${request.id}')" 
                   class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition">
-            Rechazar
+            Reject
           </button>
         </div>
       </div>

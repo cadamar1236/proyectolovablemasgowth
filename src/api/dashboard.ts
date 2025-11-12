@@ -348,4 +348,70 @@ dashboard.get('/admin/logged-in-users', requireAuth, async (c) => {
   return c.json({ count: results[0].count });
 });
 
+// Dashboard Questions API
+
+dashboard.get('/questions', requireAuth, async (c) => {
+  const userId = c.get('userId');
+  // Get current week start (Monday)
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay() + 1); // Monday
+  weekStart.setHours(0,0,0,0);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  // Get latest (this week) or most recent
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM dashboard_questions WHERE user_id = ? AND week_start = ? ORDER BY created_at DESC LIMIT 1'
+  ).bind(userId, weekStartStr).all();
+
+  if (results.length > 0) {
+    return c.json({ questions: results[0] });
+  } else {
+    // If not found, get most recent
+    const { results: recent } = await c.env.DB.prepare(
+      'SELECT * FROM dashboard_questions WHERE user_id = ? ORDER BY week_start DESC, created_at DESC LIMIT 1'
+    ).bind(userId).all();
+    return c.json({ questions: recent[0] || null });
+  }
+});
+
+dashboard.post('/questions', requireAuth, async (c) => {
+  const userId = c.get('userId');
+  const body = await c.req.json();
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay() + 1); // Monday
+  weekStart.setHours(0,0,0,0);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  // Upsert for this week
+  await c.env.DB.prepare(
+    `INSERT INTO dashboard_questions
+      (user_id, week_start, launched, weeks_to_launch, users_talked, users_learned, morale, primary_metric_improved, biggest_obstacle, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id, week_start) DO UPDATE SET
+        launched=excluded.launched,
+        weeks_to_launch=excluded.weeks_to_launch,
+        users_talked=excluded.users_talked,
+        users_learned=excluded.users_learned,
+        morale=excluded.morale,
+        primary_metric_improved=excluded.primary_metric_improved,
+        biggest_obstacle=excluded.biggest_obstacle,
+        updated_at=CURRENT_TIMESTAMP
+    `
+  ).bind(
+    userId,
+    weekStartStr,
+    !!body.launched,
+    body.weeksToLaunch ?? null,
+    body.usersTalked ?? null,
+    body.usersLearned ?? null,
+    body.morale ?? null,
+    body.primaryMetricImproved ?? null,
+    body.biggestObstacle ?? null
+  ).run();
+
+  return c.json({ success: true });
+});
+
 export default dashboard;

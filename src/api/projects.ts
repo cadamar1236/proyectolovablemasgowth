@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Bindings, AuthContext } from '../types';
 import { requireAuth } from './auth';
+import { checkVoteRateLimit } from './rateLimit';
 
 const projects = new Hono<{ Bindings: Bindings; Variables: AuthContext }>();
 
@@ -116,6 +117,15 @@ projects.post('/:id/vote', requireAuth, async (c) => {
     return c.json({ error: 'Only validators can vote on projects' }, 403);
   }
 
+  // Check rate limit (1 vote per 5 seconds per user)
+  const rateLimitCheck = await checkVoteRateLimit(c.env.CACHE, userId);
+  if (!rateLimitCheck.allowed) {
+    return c.json({ 
+      error: `Please wait ${rateLimitCheck.retryAfter} seconds before voting again`,
+      retryAfter: rateLimitCheck.retryAfter
+    }, 429);
+  }
+
   const { rating } = await c.req.json();
 
   if (!rating || rating < 1 || rating > 5) {
@@ -123,16 +133,17 @@ projects.post('/:id/vote', requireAuth, async (c) => {
   }
 
   try {
-    // Check if project exists
+    // Check if project exists and get category
     const project = await c.env.DB.prepare(
-      'SELECT id FROM projects WHERE id = ?'
+      'SELECT id, category FROM projects WHERE id = ?'
     ).bind(projectId).first();
 
     if (!project) {
       return c.json({ error: 'Project not found' }, 404);
     }
 
-    // Insert or update vote
+    // Insert or update vote (trigger will auto-update project stats)
+    // This is now a SINGLE write operation instead of 2
     await c.env.DB.prepare(`
       INSERT INTO project_votes (project_id, user_id, rating, updated_at)
       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -141,25 +152,32 @@ projects.post('/:id/vote', requireAuth, async (c) => {
         updated_at = CURRENT_TIMESTAMP
     `).bind(projectId, userId, rating).run();
 
-    // Update project rating stats
-    await c.env.DB.prepare(`
-      UPDATE projects
-      SET
-        rating_average = (
-          SELECT AVG(rating)
-          FROM project_votes
-          WHERE project_id = ?
-        ),
-        votes_count = (
-          SELECT COUNT(*)
-          FROM project_votes
-          WHERE project_id = ?
-        ),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(projectId, projectId, projectId).run();
+    // NOTE: Project rating_average and votes_count are automatically updated by SQL trigger
+    // This optimization reduces database writes from 2 to 1 per vote (50% improvement)
 
-    return c.json({ message: 'Vote recorded successfully' });
+    // Invalidate leaderboard cache for all relevant keys
+    try {
+      const category = (project as any).category || 'general';
+      const cacheKeys = [
+        `leaderboard:all:all:50`,
+        `leaderboard:${category}:all:50`,
+        `leaderboard:all:week:50`,
+        `leaderboard:all:month:50`,
+        `leaderboard:all:year:50`,
+      ];
+      
+      for (const key of cacheKeys) {
+        await c.env.CACHE?.delete(key);
+      }
+    } catch (e) {
+      // Cache invalidation failed, continue
+    }
+
+    return c.json({
+      message: 'Vote recorded successfully',
+      success: true,
+      rating: rating
+    });
   } catch (error) {
     console.error('Error recording vote:', error);
     return c.json({ error: 'Failed to record vote' }, 500);
@@ -178,46 +196,140 @@ projects.get('/:id/vote', async (c) => {
   return c.json({ vote: vote || null });
 });
 
-// Get leaderboard
+// Get leaderboard with enhanced scoring (votes + growth + goals)
 projects.get('/leaderboard/top', async (c) => {
   const category = c.req.query('category') || 'all';
-  const limit = parseInt(c.req.query('limit') || '10');
+  const limit = parseInt(c.req.query('limit') || '50');
+  const timeframe = c.req.query('timeframe') || 'all';
 
+  // Try to get from cache first
+  const cacheKey = `leaderboard:${category}:${timeframe}:${limit}`;
+  try {
+    const cached = await c.env.CACHE?.get(cacheKey, 'json');
+    if (cached) {
+      return c.json(cached);
+    }
+  } catch (e) {
+    // Cache miss or not configured, continue
+  }
+
+  // Query que obtiene únicamente los items del marketplace (beta_products)
   let query = `
     SELECT
-      p.id,
-      p.title,
-      p.description,
-      p.target_market,
-      p.value_proposition,
-      p.category,
-      p.rating_average,
-      p.votes_count,
-      p.created_at,
-      u.name as creator_name
-    FROM projects p
-    JOIN users u ON p.user_id = u.id
-    WHERE p.status = 'published' AND p.votes_count > 0
+      bp.id,
+      bp.title,
+      bp.description,
+      bp.category,
+      bp.rating_average,
+      bp.votes_count,
+      bp.created_at,
+      u.name as creator_name,
+      bp.company_user_id as user_id,
+      -- Contar goals del usuario dueño del producto
+      (SELECT COUNT(*) FROM goals WHERE user_id = bp.company_user_id) as total_goals,
+      (SELECT COUNT(*) FROM goals WHERE user_id = bp.company_user_id AND status = 'completed') as completed_goals,
+      -- Obtener métricas del usuario
+      (SELECT metric_value FROM user_metrics WHERE user_id = bp.company_user_id AND metric_name = 'users' ORDER BY recorded_date DESC LIMIT 1) as user_metric_users,
+      (SELECT metric_value FROM user_metrics WHERE user_id = bp.company_user_id AND metric_name = 'revenue' ORDER BY recorded_date DESC LIMIT 1) as user_metric_revenue
+    FROM beta_products bp
+    JOIN users u ON bp.company_user_id = u.id
+    WHERE bp.status = 'active'
   `;
 
-  const params = [];
+  const params: any[] = [];
 
   if (category !== 'all') {
-    query += ' AND p.category = ?';
+    query += ' AND bp.category = ?';
     params.push(category);
   }
 
-  query += ' ORDER BY p.rating_average DESC, p.votes_count DESC LIMIT ?';
-  params.push(limit);
+  if (timeframe !== 'all') {
+    const daysMap: Record<string, number> = { 'week': 7, 'month': 30, 'year': 365 };
+    const days = daysMap[timeframe] || 365;
+    query += ` AND bp.created_at >= datetime('now', '-${days} days')`;
+  }
+
+  // Ordenar inicialmente por rating y votos
+  const finalQuery = query + ' ORDER BY bp.rating_average DESC, bp.votes_count DESC';
 
   try {
-    const { results } = await c.env.DB.prepare(query).bind(...params).all();
-    return c.json({ leaderboard: results });
+    const { results } = await c.env.DB.prepare(finalQuery).bind(...params).all();
+    
+    // Calculate enhanced scores for each project
+    const projectsWithScores = results.map((project: any) => {
+      // Solo usar métricas del usuario
+      const currentUsers = project.user_metric_users || 0;
+      const currentRevenue = project.user_metric_revenue || 0;
+      
+      const score = calculateLeaderboardScore({
+        ...project,
+        current_users: currentUsers,
+        current_revenue: currentRevenue
+      });
+      
+      return {
+        ...project,
+        current_users: currentUsers,
+        current_revenue: currentRevenue,
+        leaderboard_score: score.finalScore,
+        score_breakdown: score.breakdown
+      };
+    });
+
+    // Re-sort by the new composite score
+    projectsWithScores.sort((a: any, b: any) => b.leaderboard_score - a.leaderboard_score);
+
+    // Apply limit
+    const limitedResults = projectsWithScores.slice(0, limit);
+
+    const result = { leaderboard: limitedResults };
+
+    // Store in cache for 5 minutes
+    try {
+      await c.env.CACHE?.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 });
+    } catch (e) {
+      // Cache write failed, continue
+    }
+
+    return c.json(result);
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
     return c.json({ error: 'Failed to fetch leaderboard' }, 500);
   }
 });
+
+// Helper function to calculate composite leaderboard score
+function calculateLeaderboardScore(project: any) {
+  // 1. Rating Score (40% weight) - Convert 0-5 rating to 0-100 scale
+  const ratingScore = (project.rating_average || 0) * 20;
+  
+  // 2. Growth Score (35% weight) - Based on users and revenue
+  const currentUsers = project.current_users || 0;
+  const currentRevenue = project.current_revenue || 0;
+  
+  // Normalize growth metrics (adjust thresholds based on your marketplace)
+  const userScore = Math.min((currentUsers / 10000) * 100, 100); // 10k users = 100 points
+  const revenueScore = Math.min((currentRevenue / 100000) * 100, 100); // $100k = 100 points
+  
+  const growthScore = (userScore + revenueScore) / 2;
+  
+  // 3. Goals Score (25% weight) - Percentage of goals completed
+  const totalGoals = project.total_goals || 0;
+  const completedGoals = project.completed_goals || 0;
+  const goalsScore = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
+  
+  // Calculate weighted final score
+  const finalScore = (ratingScore * 0.40) + (growthScore * 0.35) + (goalsScore * 0.25);
+  
+  return {
+    finalScore: Math.round(finalScore * 10) / 10, // Round to 1 decimal
+    breakdown: {
+      rating: Math.round(ratingScore * 10) / 10,
+      growth: Math.round(growthScore * 10) / 10,
+      goals: Math.round(goalsScore * 10) / 10
+    }
+  };
+}
 
 // Get leaderboard by category
 projects.get('/leaderboard/categories', async (c) => {

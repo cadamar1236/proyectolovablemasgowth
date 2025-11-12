@@ -299,6 +299,7 @@ marketplace.get('/products/search', async (c) => {
     q,                      // Text search
     category,
     stage,
+    pricing_model,
     status = 'active',
     min_budget,
     max_budget,
@@ -343,6 +344,11 @@ marketplace.get('/products/search', async (c) => {
   if (stage) {
     query += ` AND p.stage = ?`;
     params.push(stage);
+  }
+  
+  if (pricing_model) {
+    query += ` AND p.pricing_model = ?`;
+    params.push(pricing_model);
   }
   
   if (min_budget) {
@@ -457,6 +463,7 @@ marketplace.post('/products', requireAuth, async (c) => {
     looking_for,
     compensation_type,
     compensation_amount,
+    pricing_model,
     duration_days,
     validators_needed,
     requirements // JSON
@@ -468,6 +475,7 @@ marketplace.post('/products', requireAuth, async (c) => {
   const lookingForValue = looking_for || 'General feedback';
   const compensationTypeValue = compensation_type || 'free_access';
   const compensationAmountValue = compensation_amount || 0;
+  const pricingModelValue = pricing_model || 'subscription_monthly';
   const durationDaysValue = duration_days || 14;
   const validatorsNeededValue = validators_needed || 5;
   
@@ -532,12 +540,12 @@ marketplace.post('/products', requireAuth, async (c) => {
       INSERT INTO beta_products (
         company_user_id, title, description, category, subcategory,
         stage, url, looking_for, compensation_type, compensation_amount,
-        duration_days, validators_needed, requirements, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        pricing_model, duration_days, validators_needed, requirements, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       userId, title, description, category, subcategoryValue,
       stage, url, lookingForValue, compensationTypeValue, compensationAmountValue,
-      durationDaysValue, validatorsNeededValue, requirementsValue, 'active'
+      pricingModelValue, durationDaysValue, validatorsNeededValue, requirementsValue, 'active'
     ).run();
     
     console.log('Producto insertado con éxito:', result);
@@ -552,13 +560,14 @@ marketplace.post('/products', requireAuth, async (c) => {
     }
     
     return c.json({
+      success: true,
       id: result.meta.last_row_id,
       message: 'Product created successfully',
       validators_allocated: validatorsNeededValue
     });
   } catch (error) {
     console.error('Error al crear el producto:', error);
-    return c.json({ error: 'Error interno al crear el producto' }, 500);
+    return c.json({ success: false, error: 'Error interno al crear el producto' }, 500);
   }
 });
 
@@ -588,7 +597,7 @@ marketplace.put('/products/:id', requireAuth, async (c) => {
   
   const allowedFields = [
     'title', 'description', 'category', 'subcategory', 'stage', 'url',
-    'looking_for', 'compensation_type', 'compensation_amount',
+    'looking_for', 'compensation_type', 'compensation_amount', 'pricing_model',
     'duration_days', 'validators_needed', 'requirements', 'status'
   ];
   
