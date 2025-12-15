@@ -172,3 +172,13 @@ def clear_pending_action(phone_number: str):
         db.commit()
     finally:
         db.close()
+
+def get_recent_conversations(phone_number: str, limit: int = 10):
+    """Obtiene las conversaciones recientes de un usuario"""
+    db = SessionLocal()
+    try:
+        return db.query(ConversationHistoryDB).filter(
+            ConversationHistoryDB.phone_number == phone_number
+        ).order_by(ConversationHistoryDB.created_at.desc()).limit(limit).all()
+    finally:
+        db.close()

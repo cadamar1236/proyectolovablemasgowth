@@ -1,16 +1,13 @@
+"""Sistema de Chat con IA Generativa usando Groq
 
-"""Sistema Multiagente con Agno Framework
-
-Este módulo define los agentes especializados que manejan diferentes aspectos
-de la gestión de goals y métricas a través de WhatsApp.
+Este módulo implementa un chatbot conversacional inteligente que usa Groq
+para procesar lenguaje natural y gestionar goals/métricas/leaderboard.
 """
-from agno.agent import Agent
-from agno.models.groq import Groq
-from agno.tools import tool
-from typing import Optional, Dict, Any, List
 import json
 import re
 from datetime import datetime
+from typing import Optional, Dict, Any
+from groq import Groq
 
 from config import config
 from api_client import api_client
@@ -20,637 +17,355 @@ from database import (
     get_pending_action,
     set_pending_action,
     clear_pending_action,
-    save_conversation
+    save_conversation,
+    get_recent_conversations
 )
-from models import MessageType
 
-# ============================================
-# HERRAMIENTAS (TOOLS) PARA LOS AGENTES
-# ============================================
+# Cliente Groq
+groq_client = Groq(api_key=config.GROQ_API_KEY)
 
-@tool
-def get_user_goals(auth_token: str) -> str:
-    """
-    Obtiene la lista de goals del usuario.
-    
-    Args:
-        auth_token: Token de autenticación del usuario
-        
-    Returns:
-        JSON string con los goals del usuario
-    """
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(api_client.get_goals(auth_token))
-        return json.dumps(result, ensure_ascii=False)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
 
-@tool
-def create_new_goal(auth_token: str, description: str) -> str:
-    """
-    Crea un nuevo goal para el usuario.
-    
-    Args:
-        auth_token: Token de autenticación
-        description: Descripción del nuevo goal
-        
-    Returns:
-        JSON string con el goal creado
-    """
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(api_client.create_goal(auth_token, description))
-        return json.dumps(result, ensure_ascii=False)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-@tool
-def complete_goal(auth_token: str, goal_id: int) -> str:
-    """
-    Marca un goal como completado.
-    
-    Args:
-        auth_token: Token de autenticación
-        goal_id: ID del goal a completar
-        
-    Returns:
-        JSON string con el resultado
-    """
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(api_client.complete_goal(auth_token, goal_id))
-        return json.dumps(result, ensure_ascii=False)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-@tool
-def add_user_metric(auth_token: str, metric_name: str, metric_value: float, recorded_date: str) -> str:
-    """
-    Añade una métrica (usuarios o revenue).
-    
-    Args:
-        auth_token: Token de autenticación
-        metric_name: Nombre de la métrica ('users' o 'revenue')
-        metric_value: Valor de la métrica
-        recorded_date: Fecha en formato YYYY-MM-DD
-        
-    Returns:
-        JSON string con el resultado
-    """
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(
-            api_client.add_metric(auth_token, metric_name, metric_value, recorded_date)
-        )
-        return json.dumps(result, ensure_ascii=False)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-@tool
-def get_metrics_history(auth_token: str) -> str:
-    """
-    Obtiene el historial de métricas del usuario.
-    
-    Args:
-        auth_token: Token de autenticación
-        
-    Returns:
-        JSON string con el historial de métricas
-    """
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(api_client.get_metrics_history(auth_token))
-        return json.dumps(result, ensure_ascii=False)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-@tool
-def add_achievement(auth_token: str, date: str, description: str) -> str:
-    """
-    Añade un logro/achievement.
-    
-    Args:
-        auth_token: Token de autenticación
-        date: Fecha del logro en formato YYYY-MM-DD
-        description: Descripción del logro
-        
-    Returns:
-        JSON string con el resultado
-    """
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(api_client.add_achievement(auth_token, date, description))
-        return json.dumps(result, ensure_ascii=False)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-# ============================================
-# AGENTE CLASIFICADOR DE INTENCIONES
-# ============================================
-
-class IntentClassifierAgent:
-    """Agente que clasifica la intención del mensaje del usuario"""
+class ConversationalAgent:
+    """Agente conversacional inteligente con Groq"""
     
     def __init__(self):
-        self.agent = Agent(
-            name="IntentClassifier",
-            model=Groq(id=config.GROQ_MODEL, api_key=config.GROQ_API_KEY),
-            description="Clasificador de intenciones de mensajes de usuarios",
-            instructions=[
-                "Eres un clasificador de intenciones para un sistema de gestión de goals.",
-                "Debes identificar qué quiere hacer el usuario basándote en su mensaje.",
-                "Las intenciones posibles son:",
-                "- LIST_GOALS: ver goals (palabras clave: mis goals, ver goals, goals, objetivos)",
-                "- ADD_GOAL: crear nuevo goal (palabras clave: nuevo goal, crear goal, añadir goal, agregar)",
-                "- UPDATE_GOAL: completar/actualizar goal (palabras clave: completar, terminar, hecho, completé)",
-                "- ADD_METRIC: registrar métrica (palabras clave: usuarios, revenue, ingresos, métrica)",
-                "- VIEW_LEADERBOARD: ver ranking (palabras clave: leaderboard, ranking, posición, top)",
-                "- ADD_ACHIEVEMENT: añadir logro (palabras clave: logro, achievement, conseguí)",
-                "- HELP: ayuda (palabras clave: ayuda, help, comandos)",
-                "- LOGIN: autenticarse (palabras clave: login, iniciar sesión, entrar)",
-                "- STATUS: ver estado (palabras clave: estado, status, mi cuenta)",
-                "- UNKNOWN: si no está claro",
-                "Responde SOLO con el nombre de la intención en mayúsculas."
-            ],
-            markdown=False
-        )
-    
-    def classify(self, message: str) -> MessageType:
-        """Clasifica la intención del mensaje"""
-        # Primero intentamos con reglas simples para mayor velocidad
-        message_lower = message.lower().strip()
-        
-        # Patrones de regex para clasificación rápida
-        patterns = {
-            MessageType.LIST_GOALS: r"(mis\s+goals?|ver\s+goals?|lista\s+goals?|objetivos|^goals?$)",
-            MessageType.ADD_GOAL: r"(nuevo\s+goal|crear\s+goal|añadir\s+goal|agregar\s+goal)",
-            MessageType.UPDATE_GOAL: r"(completar|terminar|hecho|completé|marcar)\s*(\d+)?",
-            MessageType.ADD_METRIC: r"(usuarios?\s+\d+|revenue\s+\d+|ingresos?\s+\d+|métrica)",
-            MessageType.VIEW_LEADERBOARD: r"(leaderboard|ranking|posici[oó]n|top\s*\d*)",
-            MessageType.ADD_ACHIEVEMENT: r"(logro|achievement|conseguí|hice)",
-        }
-        
-        for intent, pattern in patterns.items():
-            if re.search(pattern, message_lower):
-                return intent
-        
-        # Comandos exactos
-        exact_commands = {
-            "ayuda": MessageType.UNKNOWN,  # Tratamos ayuda especialmente
-            "help": MessageType.UNKNOWN,
-            "login": MessageType.UNKNOWN,
-            "estado": MessageType.UNKNOWN,
-            "status": MessageType.UNKNOWN,
-        }
-        
-        if message_lower in exact_commands:
-            return exact_commands[message_lower]
-        
-        # Si no hay match claro, usar el LLM
+        self.model = config.GROQ_MODEL
+        self.system_prompt = """Eres un asistente de productividad amigable y conversacional para LovableGrowth.
+Tu personalidad es motivadora, cercana y profesional. Usas emojis con moderación.
+
+CAPACIDADES que tienes:
+1. Ver goals del usuario - cuando pregunten por sus metas/objetivos
+2. Crear nuevos goals - cuando quieran añadir una meta nueva
+3. Completar goals - cuando digan que terminaron algo
+4. Registrar métricas (usuarios/revenue) - para tracking de crecimiento
+5. Ver leaderboard/ranking - posición en la comunidad
+6. Registrar logros/achievements
+7. Ver estado de cuenta
+
+INSTRUCCIONES:
+- Responde de forma natural y conversacional, NO como un menú de opciones
+- Interpreta la intención del usuario aunque no use comandos exactos
+- Si el usuario dice algo ambiguo, interpreta la intención más probable
+- Sé conciso pero amigable
+- Motiva y celebra los logros del usuario
+- Si no entiendes algo, pregunta de forma amable
+
+FORMATO DE RESPUESTA:
+Responde en JSON con esta estructura:
+{
+    "action": "NOMBRE_ACCION",
+    "params": {...parámetros necesarios...},
+    "response": "Respuesta para el usuario si no hay acción"
+}
+
+ACCIONES DISPONIBLES:
+- LIST_GOALS: ver goals (params: {})
+- ADD_GOAL: crear goal (params: {"description": "descripción del goal"})
+- COMPLETE_GOAL: completar (params: {"goal_index": número} o {"description": "parte del nombre"})
+- ADD_METRIC_USERS: registrar usuarios (params: {"value": número})
+- ADD_METRIC_REVENUE: registrar ingresos (params: {"value": número})
+- VIEW_LEADERBOARD: ver ranking (params: {})
+- ADD_ACHIEVEMENT: logro (params: {"description": "descripción"})
+- VIEW_STATUS: estado cuenta (params: {})
+- VIEW_METRICS: ver métricas (params: {})
+- CHAT: solo conversar (params: {}, usa "response" para tu mensaje)
+
+Si el usuario solo saluda o conversa, usa CHAT y escribe una respuesta amigable."""
+
+    def _call_groq(self, messages: list) -> str:
+        """Llama a Groq API"""
         try:
-            response = self.agent.run(message)
-            intent_str = response.content.strip().upper()
+            response = groq_client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=500
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Error llamando a Groq: {e}")
+            return json.dumps({
+                "action": "CHAT",
+                "params": {},
+                "response": "Lo siento, tuve un problema procesando tu mensaje. ¿Puedes intentarlo de nuevo?"
+            })
+    
+    def parse_intent(self, message: str, context: str = "") -> Dict[str, Any]:
+        """Analiza la intención del mensaje usando Groq"""
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": f"Contexto previo: {context}\n\nMensaje del usuario: {message}"}
+        ]
+        
+        response = self._call_groq(messages)
+        
+        # Intentar parsear JSON
+        try:
+            # Limpiar respuesta si tiene markdown
+            clean_response = response
+            if "```json" in response:
+                clean_response = response.split("```json")[1].split("```")[0]
+            elif "```" in response:
+                clean_response = response.split("```")[1].split("```")[0]
             
-            intent_map = {
-                "LIST_GOALS": MessageType.LIST_GOALS,
-                "ADD_GOAL": MessageType.ADD_GOAL,
-                "UPDATE_GOAL": MessageType.UPDATE_GOAL,
-                "ADD_METRIC": MessageType.ADD_METRIC,
-                "VIEW_LEADERBOARD": MessageType.VIEW_LEADERBOARD,
-                "ADD_ACHIEVEMENT": MessageType.ADD_ACHIEVEMENT,
-            }
-            
-            return intent_map.get(intent_str, MessageType.UNKNOWN)
+            return json.loads(clean_response.strip())
         except:
-            return MessageType.UNKNOWN
+            # Si falla, retornar como chat normal
+            return {
+                "action": "CHAT",
+                "params": {},
+                "response": response
+            }
+    
+    def generate_response(self, context: str, data: Any, action_type: str) -> str:
+        """Genera una respuesta conversacional basada en los datos"""
+        prompt = f"""Genera una respuesta conversacional y amigable basada en:
 
-# ============================================
-# AGENTE DE GESTIÓN DE GOALS
-# ============================================
+Acción realizada: {action_type}
+Datos: {json.dumps(data, ensure_ascii=False) if data else 'Ninguno'}
+Contexto: {context}
 
-class GoalsManagerAgent:
-    """Agente especializado en gestión de goals"""
+La respuesta debe ser natural, usar emojis apropiados, y motivar al usuario.
+NO uses formato JSON, solo el texto de respuesta."""
+
+        messages = [
+            {"role": "system", "content": "Eres un asistente amigable de productividad. Responde de forma conversacional."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        return self._call_groq(messages)
+
+
+class ChatOrchestrator:
+    """Orquestador del chat conversacional"""
     
     def __init__(self):
-        self.agent = Agent(
-            name="GoalsManager",
-            model=Groq(id=config.GROQ_MODEL, api_key=config.GROQ_API_KEY),
-            description="Gestor de goals y objetivos",
-            tools=[get_user_goals, create_new_goal, complete_goal],
-            instructions=[
-                "Eres un asistente de gestión de goals.",
-                "Ayudas a los usuarios a ver, crear y completar sus goals.",
-                "Siempre responde de forma amigable y motivadora.",
-                "Usa emojis para hacer los mensajes más visuales.",
-                "Formatea las listas de goals de forma clara con números."
-            ],
-            markdown=False
-        )
-    
-    async def list_goals(self, auth_token: str) -> str:
-        """Lista los goals del usuario"""
-        try:
-            result = await api_client.get_goals(auth_token)
-            goals = result.get("goals", [])
-            
-            if not goals:
-                return "📋 No tienes goals activos.\n\n➕ Crea uno con: 'nuevo goal [descripción]'"
-            
-            # Separar activos y completados
-            active = [g for g in goals if g.get("status") == "active"]
-            completed = [g for g in goals if g.get("status") == "completed"]
-            
-            text = "📋 *TUS GOALS:*\n\n"
-            
-            if active:
-                text += "🎯 *Activos:*\n"
-                for i, goal in enumerate(active, 1):
-                    text += f"{i}. {goal['description']}\n"
-                text += "\n"
-            
-            if completed:
-                text += f"✅ *Completados:* {len(completed)}\n"
-            
-            text += "\n💡 Usa 'completar [número]' para marcar como hecho"
-            
-            return text
-        except Exception as e:
-            return f"❌ Error al obtener goals: {str(e)}"
-    
-    async def add_goal(self, auth_token: str, description: str) -> str:
-        """Añade un nuevo goal"""
-        try:
-            result = await api_client.create_goal(auth_token, description)
-            return f"✅ Goal añadido:\n\n📌 \"{description}\"\n\n¡A por ello! 💪"
-        except Exception as e:
-            return f"❌ Error al crear goal: {str(e)}"
-    
-    async def complete_goal_by_index(self, auth_token: str, index: int) -> str:
-        """Completa un goal por su índice en la lista"""
-        try:
-            # Obtener goals para encontrar el ID real
-            result = await api_client.get_goals(auth_token)
-            goals = result.get("goals", [])
-            active_goals = [g for g in goals if g.get("status") == "active"]
-            
-            if not active_goals:
-                return "📋 No tienes goals activos para completar."
-            
-            if index < 1 or index > len(active_goals):
-                return f"❌ Número inválido. Tienes {len(active_goals)} goals activos."
-            
-            goal = active_goals[index - 1]
-            await api_client.complete_goal(auth_token, goal["id"])
-            
-            return f"🎉 ¡Felicitaciones!\n\nCompletaste: \"{goal['description']}\"\n\n¡Tu ranking puede haber mejorado! 📈"
-        except Exception as e:
-            return f"❌ Error al completar goal: {str(e)}"
-
-# ============================================
-# AGENTE DE MÉTRICAS
-# ============================================
-
-class MetricsAgent:
-    """Agente especializado en métricas"""
-    
-    def __init__(self):
-        self.agent = Agent(
-            name="MetricsManager",
-            model=Groq(id=config.GROQ_MODEL, api_key=config.GROQ_API_KEY),
-            description="Gestor de métricas de negocio",
-            tools=[add_user_metric, get_metrics_history],
-            instructions=[
-                "Eres un asistente de métricas de negocio.",
-                "Ayudas a registrar y consultar métricas de usuarios y revenue.",
-                "Siempre confirma los datos registrados.",
-                "Proporciona contexto sobre el progreso."
-            ],
-            markdown=False
-        )
-    
-    async def add_metric(self, auth_token: str, metric_name: str, value: float) -> str:
-        """Registra una métrica"""
-        try:
-            today = datetime.now().strftime("%Y-%m-%d")
-            await api_client.add_metric(auth_token, metric_name, value, today)
-            
-            emoji = "👥" if metric_name == "users" else "💰"
-            label = "Usuarios" if metric_name == "users" else "Revenue"
-            
-            return f"📊 Métrica registrada:\n\n{emoji} {label}: {value}\n📅 Fecha: {today}\n\n¡Sigue creciendo! 📈"
-        except Exception as e:
-            return f"❌ Error al registrar métrica: {str(e)}"
-    
-    async def get_history(self, auth_token: str) -> str:
-        """Obtiene historial de métricas"""
-        try:
-            result = await api_client.get_metrics_history(auth_token)
-            history = result.get("metricsHistory", [])
-            
-            if not history:
-                return "📊 No tienes métricas registradas.\n\nRegistra con:\n• 'usuarios [número]'\n• 'revenue [número]'"
-            
-            text = "📊 *TUS MÉTRICAS:*\n\n"
-            
-            # Agrupar por fecha y mostrar últimas 5
-            seen_dates = set()
-            count = 0
-            for m in history:
-                if count >= 5:
-                    break
-                date = m.get("recorded_date", "")
-                if date not in seen_dates:
-                    seen_dates.add(date)
-                    text += f"📅 {date}\n"
-                
-                emoji = "👥" if m.get("metric_name") == "users" else "💰"
-                text += f"   {emoji} {m.get('metric_name')}: {m.get('metric_value')}\n"
-                count += 1
-            
-            return text
-        except Exception as e:
-            return f"❌ Error al obtener métricas: {str(e)}"
-
-# ============================================
-# AGENTE DE LEADERBOARD
-# ============================================
-
-class LeaderboardAgent:
-    """Agente para consultas de leaderboard"""
-    
-    async def get_leaderboard(self, auth_token: str, current_user_id: int = None) -> str:
-        """Obtiene el leaderboard"""
-        try:
-            result = await api_client.get_leaderboard(auth_token)
-            leaderboard = result.get("leaderboard", [])
-            current_user = result.get("current_user")
-            
-            if not leaderboard:
-                return "🏆 No hay datos de leaderboard disponibles."
-            
-            text = "🏆 *LEADERBOARD*\n\n"
-            medals = ["🥇", "🥈", "🥉"]
-            
-            for entry in leaderboard[:10]:
-                rank = entry.get("rank", 0)
-                medal = medals[rank - 1] if rank <= 3 else f"{rank}."
-                name = entry.get("name", "Anónimo")[:15]
-                score = entry.get("score", 0)
-                completed = entry.get("completed_goals", 0)
-                total = entry.get("total_goals", 0)
-                is_me = "👈" if entry.get("is_current_user") else ""
-                text += f"{medal} {name} - {score}pts ({completed}/{total} goals) {is_me}\n"
-            
-            # Si el usuario actual no está en top 10, mostrar su posición
-            if current_user and current_user.get("rank", 0) > 10:
-                text += f"\n...\n{current_user['rank']}. Tú - {current_user['score']}pts 👈"
-            
-            text += "\n\n💡 Completa goals para subir posiciones!"
-            
-            return text
-        except Exception as e:
-            # Fallback message
-            return "🏆 *LEADERBOARD*\n\n¡Completa goals para mejorar tu posición!\n\n📊 Cada goal completado = +10 pts\n📋 Cada goal creado = +2 pts\n🏆 Cada logro = +5 pts"
-
-# ============================================
-# ORQUESTADOR PRINCIPAL
-# ============================================
-
-class AgentOrchestrator:
-    """Orquestador que coordina todos los agentes"""
-    
-    def __init__(self):
-        self.intent_classifier = IntentClassifierAgent()
-        self.goals_agent = GoalsManagerAgent()
-        self.metrics_agent = MetricsAgent()
-        self.leaderboard_agent = LeaderboardAgent()
+        self.agent = ConversationalAgent()
     
     async def process_message(self, phone_number: str, message: str) -> str:
-        """
-        Procesa un mensaje entrante y devuelve la respuesta apropiada
+        """Procesa un mensaje y genera respuesta"""
         
-        Args:
-            phone_number: Número de WhatsApp del usuario
-            message: Mensaje recibido
-            
-        Returns:
-            Mensaje de respuesta
-        """
-        # Obtener usuario de la base de datos
+        # Obtener usuario
         user = get_whatsapp_user(phone_number)
-        
-        # Verificar si hay una acción pendiente
         pending = get_pending_action(phone_number)
         
-        # Si no está autenticado, manejar flujo de auth
+        # Si no autenticado, manejar auth
         if not user or not user.is_verified:
-            return await self._handle_auth_flow(phone_number, message, pending)
+            return await self._handle_auth(phone_number, message, pending)
         
-        # Si hay acción pendiente, procesarla
-        if pending:
-            return await self._handle_pending_action(phone_number, message, pending, user.auth_token)
+        # Guardar mensaje en conversación
+        save_conversation(phone_number, message, "inbound")
         
-        # Clasificar intención
-        message_lower = message.lower().strip()
+        # Obtener contexto de conversaciones recientes
+        recent = get_recent_conversations(phone_number, limit=5)
+        context = "\n".join([f"{'Usuario' if c.direction == 'inbound' else 'Asistente'}: {c.message}" for c in reversed(recent)]) if recent else ""
         
-        # Comandos especiales
-        if message_lower in ["ayuda", "help", "?"]:
-            return self._get_help_message()
+        # Analizar intención con Groq
+        intent = self.agent.parse_intent(message, context)
+        action = intent.get("action", "CHAT")
+        params = intent.get("params", {})
         
-        if message_lower in ["login", "entrar", "iniciar sesión"]:
-            set_pending_action(phone_number, "AUTH_EMAIL")
-            return "🔐 Para iniciar sesión, envía tu email registrado en LovableGrowth:"
+        # Ejecutar acción
+        response = await self._execute_action(action, params, user.auth_token, intent)
         
-        if message_lower in ["estado", "status", "mi cuenta"]:
-            return f"✅ Sesión activa\n📧 {user.email}\n\n¿Qué deseas hacer?"
+        # Guardar respuesta
+        save_conversation(phone_number, response, "outbound")
         
-        # Clasificar intención
-        intent = self.intent_classifier.classify(message)
-        
-        # Ejecutar acción según intención
-        if intent == MessageType.LIST_GOALS:
-            return await self.goals_agent.list_goals(user.auth_token)
-        
-        elif intent == MessageType.ADD_GOAL:
-            # Extraer descripción del goal
-            match = re.search(r"(?:nuevo\s+goal|crear\s+goal|añadir\s+goal|agregar\s+goal)\s+(.+)", message_lower)
-            if match:
-                description = match.group(1).strip()
-                return await self.goals_agent.add_goal(user.auth_token, description)
-            else:
-                set_pending_action(phone_number, "ADD_GOAL")
-                return "📝 ¿Cuál es la descripción de tu nuevo goal?"
-        
-        elif intent == MessageType.UPDATE_GOAL:
-            # Extraer número del goal
-            match = re.search(r"(\d+)", message)
-            if match:
-                index = int(match.group(1))
-                return await self.goals_agent.complete_goal_by_index(user.auth_token, index)
-            else:
-                set_pending_action(phone_number, "COMPLETE_GOAL")
-                return "🎯 ¿Cuál es el número del goal que completaste?\n\nEnvía 'mis goals' para ver la lista."
-        
-        elif intent == MessageType.ADD_METRIC:
-            # Extraer métrica
-            users_match = re.search(r"usuarios?\s+(\d+(?:\.\d+)?)", message_lower)
-            revenue_match = re.search(r"(?:revenue|ingresos?)\s+(\d+(?:\.\d+)?)", message_lower)
-            
-            if users_match:
-                value = float(users_match.group(1))
-                return await self.metrics_agent.add_metric(user.auth_token, "users", value)
-            elif revenue_match:
-                value = float(revenue_match.group(1))
-                return await self.metrics_agent.add_metric(user.auth_token, "revenue", value)
-            else:
-                # Mostrar historial
-                return await self.metrics_agent.get_history(user.auth_token)
-        
-        elif intent == MessageType.VIEW_LEADERBOARD:
-            return await self.leaderboard_agent.get_leaderboard(user.auth_token, user.user_id)
-        
-        elif intent == MessageType.ADD_ACHIEVEMENT:
-            set_pending_action(phone_number, "ADD_ACHIEVEMENT")
-            return "🏆 ¿Qué logro quieres registrar?\n\nDescribe brevemente tu achievement:"
-        
-        else:
-            return self._get_unknown_command_message()
+        return response
     
-    async def _handle_auth_flow(self, phone_number: str, message: str, pending) -> str:
+    async def _execute_action(self, action: str, params: dict, auth_token: str, intent: dict) -> str:
+        """Ejecuta la acción detectada"""
+        
+        try:
+            if action == "LIST_GOALS":
+                result = await api_client.get_goals(auth_token)
+                goals = result.get("goals", [])
+                
+                if not goals:
+                    return "📋 No tienes goals activos todavía.\n\n¿Quieres crear tu primer goal? Solo dime qué quieres lograr 💪"
+                
+                active = [g for g in goals if g.get("status") == "active"]
+                completed = [g for g in goals if g.get("status") == "completed"]
+                
+                text = "🎯 *Tus Goals:*\n\n"
+                if active:
+                    for i, g in enumerate(active, 1):
+                        text += f"{i}. {g['description']}\n"
+                
+                if completed:
+                    text += f"\n✅ Completados: {len(completed)}"
+                
+                text += "\n\n¿Quieres completar alguno o añadir uno nuevo?"
+                return text
+            
+            elif action == "ADD_GOAL":
+                desc = params.get("description", "")
+                if not desc:
+                    return "¿Cuál es el goal que quieres crear? Descríbemelo 📝"
+                
+                await api_client.create_goal(auth_token, desc)
+                return f"✅ ¡Goal creado!\n\n📌 \"{desc}\"\n\n¡A por ello! 💪 Avísame cuando lo completes."
+            
+            elif action == "COMPLETE_GOAL":
+                goal_index = params.get("goal_index")
+                goal_desc = params.get("description", "")
+                
+                result = await api_client.get_goals(auth_token)
+                active = [g for g in result.get("goals", []) if g.get("status") == "active"]
+                
+                if not active:
+                    return "No tienes goals activos para completar. ¿Quieres crear uno nuevo?"
+                
+                goal_to_complete = None
+                
+                if goal_index and 1 <= goal_index <= len(active):
+                    goal_to_complete = active[goal_index - 1]
+                elif goal_desc:
+                    # Buscar por descripción
+                    for g in active:
+                        if goal_desc.lower() in g["description"].lower():
+                            goal_to_complete = g
+                            break
+                
+                if goal_to_complete:
+                    await api_client.complete_goal(auth_token, goal_to_complete["id"])
+                    return f"🎉 ¡Felicidades!\n\n✅ Completaste: \"{goal_to_complete['description']}\"\n\n¡Tu ranking puede haber subido! 📈 ¿Qué más vas a conquistar?"
+                else:
+                    text = "¿Cuál goal completaste? Tus goals activos son:\n\n"
+                    for i, g in enumerate(active, 1):
+                        text += f"{i}. {g['description']}\n"
+                    text += "\nDime el número o el nombre del goal."
+                    return text
+            
+            elif action == "ADD_METRIC_USERS":
+                value = params.get("value")
+                if not value:
+                    return "¿Cuántos usuarios tienes ahora? Dame el número 👥"
+                
+                today = datetime.now().strftime("%Y-%m-%d")
+                await api_client.add_metric(auth_token, "users", float(value), today)
+                return f"📊 ¡Registrado!\n\n👥 Usuarios: {value}\n📅 {today}\n\n¡Sigue creciendo! 🚀"
+            
+            elif action == "ADD_METRIC_REVENUE":
+                value = params.get("value")
+                if not value:
+                    return "¿Cuánto revenue tienes? Dame el número 💰"
+                
+                today = datetime.now().strftime("%Y-%m-%d")
+                await api_client.add_metric(auth_token, "revenue", float(value), today)
+                return f"📊 ¡Registrado!\n\n💰 Revenue: ${value}\n📅 {today}\n\n¡El dinero está entrando! 🎉"
+            
+            elif action == "VIEW_LEADERBOARD":
+                result = await api_client.get_leaderboard(auth_token)
+                leaderboard = result.get("leaderboard", [])
+                
+                if not leaderboard:
+                    return "🏆 El leaderboard está vacío. ¡Sé el primero en completar goals y liderar!"
+                
+                medals = ["🥇", "🥈", "🥉"]
+                text = "🏆 *Leaderboard:*\n\n"
+                
+                for entry in leaderboard[:10]:
+                    rank = entry.get("rank", 0)
+                    medal = medals[rank - 1] if rank <= 3 else f"{rank}."
+                    name = entry.get("name", "Anónimo")[:12]
+                    score = entry.get("score", 0)
+                    is_me = " 👈" if entry.get("is_current_user") else ""
+                    text += f"{medal} {name} - {score}pts{is_me}\n"
+                
+                text += "\n💡 ¡Completa más goals para subir!"
+                return text
+            
+            elif action == "ADD_ACHIEVEMENT":
+                desc = params.get("description", "")
+                if not desc:
+                    return "🏆 ¿Qué logro conseguiste? Cuéntame 👀"
+                
+                today = datetime.now().strftime("%Y-%m-%d")
+                await api_client.add_achievement(auth_token, today, desc)
+                return f"🏆 ¡Logro registrado!\n\n\"{desc}\"\n\n¡Eres increíble! 💪"
+            
+            elif action == "VIEW_METRICS":
+                result = await api_client.get_metrics_history(auth_token)
+                history = result.get("metricsHistory", [])
+                
+                if not history:
+                    return "📊 No tienes métricas registradas.\n\nDime cuántos usuarios o cuánto revenue tienes para empezar a trackear 📈"
+                
+                text = "📊 *Tus métricas recientes:*\n\n"
+                for m in history[:5]:
+                    emoji = "👥" if m.get("metric_name") == "users" else "💰"
+                    text += f"{emoji} {m.get('metric_name')}: {m.get('metric_value')} ({m.get('recorded_date')})\n"
+                
+                return text
+            
+            elif action == "VIEW_STATUS":
+                return "✅ Tu cuenta está activa y funcionando.\n\n¿En qué te puedo ayudar hoy?"
+            
+            else:  # CHAT
+                response = intent.get("response", "")
+                if response:
+                    return response
+                return "¡Hola! Soy tu asistente de LovableGrowth 🎯\n\nPuedo ayudarte con:\n• Ver y gestionar tus goals\n• Registrar métricas\n• Ver tu posición en el leaderboard\n\n¿Qué necesitas?"
+        
+        except Exception as e:
+            print(f"Error ejecutando acción {action}: {e}")
+            return f"Ups, tuve un problema. ¿Puedes intentarlo de nuevo? 🙏"
+    
+    async def _handle_auth(self, phone_number: str, message: str, pending) -> str:
         """Maneja el flujo de autenticación"""
         
         if not pending:
-            # Primer mensaje, dar bienvenida e iniciar flujo de auth
             set_pending_action(phone_number, "AUTH_EMAIL")
-            return """🎯 *¡Bienvenido a LovableGrowth!*
+            return """🎯 *¡Hola! Soy tu asistente de LovableGrowth*
 
-Soy tu asistente de productividad. Te ayudaré a:
-• 📋 Gestionar tus goals
-• 📊 Registrar métricas
-• 🏆 Competir en el leaderboard
+Te ayudaré a gestionar tus goals, métricas y más directamente desde WhatsApp.
 
-Para comenzar, necesito vincular tu cuenta.
+Para empezar, necesito vincular tu cuenta.
 
-📧 *Envía tu email* registrado en LovableGrowth:"""
+📧 *¿Cuál es tu email registrado?*"""
         
         if pending.action_type == "AUTH_EMAIL":
-            # Guardar email y dar opciones de autenticación
-            email = message.strip()
-            if "@" not in email:
-                return "❌ Por favor envía un email válido:"
+            email = message.strip().lower()
             
-            # Siempre dar opción de código o contraseña
-            set_pending_action(phone_number, "AUTH_CHOOSE_METHOD", json.dumps({"email": email}))
-            return f"""📧 Email: {email}
-
-🔐 *¿Cómo quieres autenticarte?*
-
-1️⃣ Si iniciaste sesión con *Google*:
-   → Ve a la app web → My Dashboard → Sección WhatsApp → Generar Código
-   → Envía el código de 6 dígitos
-
-2️⃣ Si tienes *contraseña*:
-   → Envía tu contraseña
-
-Envía el código de 6 dígitos o tu contraseña:"""
-        
-        if pending.action_type == "AUTH_CHOOSE_METHOD":
-            # El usuario puede enviar código (6 dígitos) o contraseña (cualquier otra cosa)
-            data = json.loads(pending.action_data) if pending.action_data else {}
-            email = data.get("email", "")
-            user_input = message.strip()
+            if "@" not in email or "." not in email:
+                return "Hmm, eso no parece un email válido. ¿Puedes verificarlo? 📧"
             
-            # Si es un código de 6 dígitos
-            if len(user_input) == 6 and user_input.isdigit():
-                try:
-                    result = await api_client.verify_google_code(email, user_input)
-                    if result and result.get("token"):
-                        # Autenticación exitosa con código
-                        create_or_update_whatsapp_user(
-                            phone_number=phone_number,
-                            user_id=result.get("user", {}).get("id"),
-                            auth_token=result.get("token"),
-                            email=email,
-                            is_verified=True
-                        )
-                        clear_pending_action(phone_number)
-                        
-                        name = result.get("user", {}).get("name", email.split("@")[0])
-                        return f"✅ ¡Autenticación exitosa!\n\nHola {name} 👋\n\nAhora puedes:\n• 'mis goals' - ver goals\n• 'nuevo goal [desc]' - crear goal\n• 'leaderboard' - ver ranking\n• 'ayuda' - ver comandos"
-                    else:
-                        return "❌ Código incorrecto o expirado.\n\nGenera un nuevo código en la app web o envía tu contraseña:"
-                except Exception as e:
-                    return f"❌ Error al verificar código.\n\nGenera un nuevo código en la app web o envía tu contraseña:"
-            else:
-                # Es una contraseña
-                try:
-                    result = await api_client.verify_user(email, user_input)
-                    if result and result.get("token"):
-                        # Autenticación exitosa con contraseña
-                        create_or_update_whatsapp_user(
-                            phone_number=phone_number,
-                            user_id=result.get("user", {}).get("id"),
-                            auth_token=result.get("token"),
-                            email=email,
-                            is_verified=True
-                        )
-                        clear_pending_action(phone_number)
-                        
-                        name = result.get("user", {}).get("name", email.split("@")[0])
-                        return f"✅ ¡Autenticación exitosa!\n\nHola {name} 👋\n\nAhora puedes:\n• 'mis goals' - ver goals\n• 'nuevo goal [desc]' - crear goal\n• 'leaderboard' - ver ranking\n• 'ayuda' - ver comandos"
-                    else:
-                        return "❌ Credenciales incorrectas.\n\nEnvía 'login' para intentar de nuevo."
-                except Exception as e:
-                    return f"❌ Error de autenticación.\n\nEnvía 'login' para intentar de nuevo."
-        
-        if pending.action_type == "AUTH_PASSWORD":
-            # Verificar credenciales
-            data = json.loads(pending.action_data) if pending.action_data else {}
-            email = data.get("email", "")
-            password = message.strip()
+            set_pending_action(phone_number, "AUTH_CODE", json.dumps({"email": email}))
             
-            try:
-                result = await api_client.verify_user(email, password)
-                if result and result.get("token"):
-                    # Autenticación exitosa
-                    create_or_update_whatsapp_user(
-                        phone_number=phone_number,
-                        user_id=result.get("user", {}).get("id"),
-                        auth_token=result.get("token"),
-                        email=email,
-                        is_verified=True
-                    )
-                    clear_pending_action(phone_number)
-                    
-                    name = result.get("user", {}).get("name", email.split("@")[0])
-                    return f"✅ ¡Autenticación exitosa!\n\nHola {name} 👋\n\nAhora puedes:\n• 'mis goals' - ver goals\n• 'nuevo goal [desc]' - crear goal\n• 'leaderboard' - ver ranking\n• 'ayuda' - ver comandos"
-                else:
-                    clear_pending_action(phone_number)
-                    return "❌ Credenciales incorrectas.\n\nEnvía 'login' para intentar de nuevo."
-            except Exception as e:
-                clear_pending_action(phone_number)
-                return f"❌ Error de autenticación.\n\nEnvía 'login' para intentar de nuevo."
+            return f"""📧 Perfecto: {email}
+
+🔐 *Ahora necesito verificar que eres tú:*
+
+1. Ve a *webapp.pages.dev/marketplace*
+2. Inicia sesión (con Google o contraseña)
+3. En *"My Dashboard"* busca *"Integración WhatsApp"*
+4. Haz clic en *"Generar Código"*
+5. Envíame el código de 6 dígitos
+
+⏱️ El código expira en 10 minutos."""
         
-        if pending.action_type == "AUTH_GOOGLE_CODE":
-            # Verificar código temporal para usuarios de Google
+        if pending.action_type == "AUTH_CODE":
             data = json.loads(pending.action_data) if pending.action_data else {}
             email = data.get("email", "")
             code = message.strip()
             
-            if len(code) != 6 or not code.isdigit():
-                return "❌ El código debe ser de 6 dígitos. Intenta de nuevo:"
+            # Limpiar código de espacios
+            code = re.sub(r'\s+', '', code)
             
+            # Verificar formato
+            if not code.isdigit():
+                return "El código debe ser solo números. ¿Puedes verificarlo? 🔢"
+            
+            if len(code) != 6:
+                return f"El código debe tener 6 dígitos (enviaste {len(code)}). Inténtalo de nuevo:"
+            
+            # Verificar código con la API
             try:
-                result = await api_client.verify_google_code(email, code)
+                result = await api_client.verify_whatsapp_code(email, code)
+                
                 if result and result.get("token"):
-                    # Autenticación exitosa
+                    # Éxito
                     create_or_update_whatsapp_user(
                         phone_number=phone_number,
                         user_id=result.get("user", {}).get("id"),
@@ -661,70 +376,31 @@ Envía el código de 6 dígitos o tu contraseña:"""
                     clear_pending_action(phone_number)
                     
                     name = result.get("user", {}).get("name", email.split("@")[0])
-                    return f"✅ ¡Autenticación exitosa!\n\nHola {name} 👋\n\nAhora puedes:\n• 'mis goals' - ver goals\n• 'nuevo goal [desc]' - crear goal\n• 'leaderboard' - ver ranking\n• 'ayuda' - ver comandos"
+                    
+                    return f"""✅ *¡Bienvenido, {name}!*
+
+Tu cuenta de WhatsApp está vinculada. 🎉
+
+Ahora puedes hablarme naturalmente:
+• "¿Cuáles son mis goals?"
+• "Añade un goal: lanzar MVP"
+• "Completé el goal 1"
+• "Tengo 50 usuarios"
+• "¿Cómo voy en el ranking?"
+
+¿En qué te ayudo? 🚀"""
                 else:
-                    return "❌ Código incorrecto o expirado.\n\nVe a la app web y genera un nuevo código."
+                    return "❌ El código no es válido o ya expiró.\n\nGenera uno nuevo en la app web y envíamelo."
+            
             except Exception as e:
-                return f"❌ Error al verificar código.\n\nVe a la app web y genera un nuevo código."
+                print(f"Error verificando código: {e}")
+                return "❌ Hubo un error verificando el código.\n\nGenera uno nuevo en la app web e intenta de nuevo."
         
-        return "🔐 Envía 'login' para iniciar sesión."
-    
-    async def _handle_pending_action(self, phone_number: str, message: str, pending, auth_token: str) -> str:
-        """Maneja acciones pendientes"""
-        
-        if pending.action_type == "ADD_GOAL":
-            clear_pending_action(phone_number)
-            return await self.goals_agent.add_goal(auth_token, message.strip())
-        
-        if pending.action_type == "COMPLETE_GOAL":
-            clear_pending_action(phone_number)
-            try:
-                index = int(message.strip())
-                return await self.goals_agent.complete_goal_by_index(auth_token, index)
-            except ValueError:
-                return "❌ Por favor envía solo el número del goal."
-        
-        if pending.action_type == "ADD_ACHIEVEMENT":
-            clear_pending_action(phone_number)
-            try:
-                today = datetime.now().strftime("%Y-%m-%d")
-                await api_client.add_achievement(auth_token, today, message.strip())
-                return f"🏆 ¡Logro registrado!\n\n\"{message.strip()}\"\n\n¡Sigue así! 💪"
-            except Exception as e:
-                return f"❌ Error al registrar logro: {str(e)}"
-        
+        # Fallback
         clear_pending_action(phone_number)
-        return "Acción cancelada. ¿En qué te puedo ayudar?"
-    
-    def _get_help_message(self) -> str:
-        return """📚 *COMANDOS DISPONIBLES:*
+        set_pending_action(phone_number, "AUTH_EMAIL")
+        return "Parece que hubo un problema. Empecemos de nuevo.\n\n📧 ¿Cuál es tu email registrado?"
 
-📋 *Goals:*
-• mis goals - ver tus goals
-• nuevo goal [descripción] - crear goal
-• completar [número] - marcar completado
 
-📊 *Métricas:*
-• mis métricas - ver historial
-• usuarios [número] - registrar usuarios
-• revenue [número] - registrar ingresos
-
-🏆 *Ranking:*
-• leaderboard - ver posiciones
-
-⚙️ *Cuenta:*
-• estado - ver tu estado
-• ayuda - ver este mensaje"""
-    
-    def _get_unknown_command_message(self) -> str:
-        return """🤔 No entendí tu mensaje.
-
-Prueba con:
-• 'mis goals' - ver goals
-• 'completar [#]' - completar goal
-• 'nuevo goal [desc]' - crear goal
-• 'leaderboard' - ver ranking
-• 'ayuda' - ver opciones"""
-
-# Instancia global del orquestador
-orchestrator = AgentOrchestrator()
+# Instancia global
+orchestrator = ChatOrchestrator()

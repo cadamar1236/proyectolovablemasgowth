@@ -155,17 +155,22 @@ class WebAppAPIClient:
                 return response.json()
             return None
     
-    async def verify_google_code(self, email: str, code: str) -> Optional[Dict[str, Any]]:
-        """Verifica código temporal para usuarios de Google"""
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/auth/verify-whatsapp-code",
-                headers={"Content-Type": "application/json"},
-                json={"email": email, "code": code}
-            )
-            if response.status_code == 200:
-                return response.json()
-            return None
+    async def verify_whatsapp_code(self, email: str, code: str) -> Optional[Dict[str, Any]]:
+        """Verifica código temporal de WhatsApp"""
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/auth/verify-whatsapp-code",
+                    headers={"Content-Type": "application/json"},
+                    json={"email": email, "code": code}
+                )
+                print(f"Verify code response: {response.status_code} - {response.text}")
+                if response.status_code == 200:
+                    return response.json()
+                return None
+            except Exception as e:
+                print(f"Error verifying code: {e}")
+                return None
 
 # Instancia global del cliente
 api_client = WebAppAPIClient()
