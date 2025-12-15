@@ -54,6 +54,8 @@ interface DBAchievement {
 }
 
 const Dashboard = () => {
+  console.log("Dashboard component loaded");
+  
   const [goals, setGoals] = useState<Goal[]>([]);
   const [weeklyUpdates, setWeeklyUpdates] = useState<WeeklyUpdate[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -549,52 +551,28 @@ const Dashboard = () => {
         <h2 className="text-2xl font-bold text-gray-900 mb-6">📱 Integración WhatsApp</h2>
         <div className="bg-white p-6 rounded-lg shadow-md border">
           <p className="text-gray-700 mb-4">
-            Conecta tu WhatsApp para recibir actualizaciones de goals y participar en el leaderboard.
+            Conecta tu WhatsApp para recibir actualizaciones de goals.
           </p>
-
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">🔐 Vincular WhatsApp</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Genera un código temporal para vincular tu WhatsApp con tu cuenta.
-              </p>
-
-              {!whatsappCode ? (
-                <button
-                  onClick={generateWhatsAppCode}
-                  disabled={generatingCode}
-                  className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                >
-                  {generatingCode ? '🔄 Generando...' : '📱 Generar Código WhatsApp'}
-                </button>
-              ) : (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-green-800 mb-2">✅ Código Generado</h4>
-                  <div className="bg-white border-2 border-dashed border-green-300 rounded p-3 mb-3">
-                    <p className="text-2xl font-mono font-bold text-center text-green-600">
-                      {whatsappCode.code}
-                    </p>
-                  </div>
-                  <p className="text-sm text-green-700 mb-3">
-                    ⏰ Válido por: {whatsappCode.expires_in}
-                  </p>
-                  <div className="text-sm text-gray-600">
-                    <p className="font-medium mb-1">📋 Instrucciones:</p>
-                    <ol className="list-decimal list-inside space-y-1">
-                      <li>Copia el código de arriba</li>
-                      <li>Envía este código por WhatsApp al número de sandbox</li>
-                      <li>Recibirás confirmación de vinculación</li>
-                    </ol>
-                  </div>
-                  <button
-                    onClick={() => setWhatsappCode(null)}
-                    className="mt-3 bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm transition-colors"
-                  >
-                    ❌ Cerrar
-                  </button>
-                </div>
-              )}
+          
+          <button
+            onClick={() => {
+              console.log("WhatsApp button clicked");
+              generateWhatsAppCode();
+            }}
+            disabled={generatingCode}
+            className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium"
+          >
+            {generatingCode ? '🔄 Generando...' : '📱 Generar Código WhatsApp'}
+          </button>
+          
+          {whatsappCode && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+              <p className="font-semibold text-green-800">Código: {whatsappCode.code}</p>
+              <p className="text-sm text-green-600">Válido por: {whatsappCode.expires_in}</p>
             </div>
+          )}
+        </div>
+      </section>
 
             <div className="border-t pt-4">
               <h3 className="text-lg font-semibold mb-2">💬 Comandos Disponibles</h3>
@@ -660,4 +638,6 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default Dashboard;c o n s o l e . l o g ( " D a s h b o a r d   l o a d e d " ) ; 
+ 
+ 
