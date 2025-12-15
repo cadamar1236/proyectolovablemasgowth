@@ -2275,6 +2275,15 @@ async function renderGoalsDashboard(metrics) {
         exportDataToJSON();
         return;
       }
+      
+      // WhatsApp code generation button
+      if (e.target.id === 'generate-whatsapp-code-btn' || e.target.closest('#generate-whatsapp-code-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('✅ Generate WhatsApp code clicked');
+        await generateWhatsAppCode();
+        return;
+      }
     });
     
     console.log('✅ Event delegation setup complete');
@@ -2420,6 +2429,62 @@ async function renderGoalsDashboard(metrics) {
       console.error('Error adding metric value:', error);
       console.error('Error details:', error.response?.data || error.message);
       return false;
+    }
+  }
+
+  // WhatsApp code generation function
+  async function generateWhatsAppCode() {
+    const container = document.getElementById('whatsapp-code-container');
+    if (!container) return;
+    
+    // Show loading state
+    container.innerHTML = `
+      <div class="flex items-center justify-center text-green-100">
+        <i class="fas fa-spinner fa-spin mr-2 text-xl"></i>
+        Generando código...
+      </div>
+    `;
+    
+    try {
+      const response = await axios.post('/api/auth/generate-whatsapp-code', {}, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      
+      if (response.data && response.data.code) {
+        container.innerHTML = `
+          <div class="bg-white rounded-xl p-6 text-center">
+            <h4 class="font-bold text-green-700 mb-3 text-lg">✅ Código Generado</h4>
+            <div class="bg-green-50 border-2 border-dashed border-green-400 rounded-lg p-4 mb-4">
+              <p class="text-4xl font-mono font-bold text-green-600 tracking-widest">${response.data.code}</p>
+            </div>
+            <p class="text-green-600 text-sm mb-4">
+              <i class="fas fa-clock mr-1"></i>Válido por: ${response.data.expires_in}
+            </p>
+            <p class="text-gray-600 text-sm mb-4">Envía este código por WhatsApp al número del sandbox</p>
+            <button
+              onclick="document.getElementById('whatsapp-code-container').innerHTML = '<button id=\\'generate-whatsapp-code-btn\\' class=\\'px-8 py-4 bg-white text-green-700 rounded-xl hover:bg-green-50 transition-all duration-200 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center mx-auto\\'><i class=\\'fab fa-whatsapp mr-3 text-xl\\'></i>Generar Código WhatsApp</button>'"
+              class="text-gray-500 hover:text-gray-700 text-sm underline"
+            >
+              Cerrar
+            </button>
+          </div>
+        `;
+      } else {
+        throw new Error('No code received');
+      }
+    } catch (error) {
+      console.error('Error generating WhatsApp code:', error);
+      container.innerHTML = `
+        <div class="text-center">
+          <p class="text-red-300 mb-4"><i class="fas fa-exclamation-triangle mr-2"></i>Error al generar el código</p>
+          <button
+            id="generate-whatsapp-code-btn"
+            class="px-8 py-4 bg-white text-green-700 rounded-xl hover:bg-green-50 transition-all duration-200 font-bold text-lg shadow-lg flex items-center justify-center mx-auto"
+          >
+            <i class="fas fa-redo mr-3"></i>Intentar de nuevo
+          </button>
+        </div>
+      `;
     }
   }
 
@@ -3295,6 +3360,60 @@ async function renderGoalsDashboard(metrics) {
                     <li>• Compatible con herramientas de análisis</li>
                     <li>• Formato estructurado para developers</li>
                   </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WhatsApp Integration Section -->
+        <div class="max-w-7xl mx-auto mt-8">
+          <div class="bg-gradient-to-r from-green-600 via-green-700 to-green-800 rounded-2xl p-8 text-white shadow-2xl border border-green-500">
+            <div class="text-center">
+              <h2 class="text-3xl font-bold mb-4 flex items-center justify-center">
+                <i class="fab fa-whatsapp mr-3 text-green-300 text-4xl"></i>
+                Integración WhatsApp
+              </h2>
+              <p class="text-green-100 mb-8 text-lg">Conecta tu WhatsApp para gestionar tus goals y ver el leaderboard desde tu teléfono</p>
+
+              <div class="bg-white/10 rounded-xl p-6 backdrop-blur-sm mb-6">
+                <h3 class="font-bold text-green-300 mb-4 flex items-center justify-center">
+                  <i class="fas fa-key mr-2"></i>Vincular tu cuenta
+                </h3>
+                <p class="text-green-100 mb-4 text-sm">Genera un código temporal de 6 dígitos para vincular tu WhatsApp</p>
+                
+                <div id="whatsapp-code-container">
+                  <button
+                    id="generate-whatsapp-code-btn"
+                    class="px-8 py-4 bg-white text-green-700 rounded-xl hover:bg-green-50 transition-all duration-200 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center mx-auto"
+                  >
+                    <i class="fab fa-whatsapp mr-3 text-xl"></i>Generar Código WhatsApp
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                <div class="bg-white/10 rounded-xl p-6 backdrop-blur-sm">
+                  <h3 class="font-bold text-green-300 mb-3 flex items-center">
+                    <i class="fas fa-comments mr-2"></i>Comandos disponibles:
+                  </h3>
+                  <ul class="text-green-100 space-y-2 text-sm">
+                    <li class="flex items-center"><code class="bg-green-900/50 px-2 py-1 rounded mr-2">"mis goals"</code> Ver tus goals activos</li>
+                    <li class="flex items-center"><code class="bg-green-900/50 px-2 py-1 rounded mr-2">"nuevo goal [desc]"</code> Crear un goal</li>
+                    <li class="flex items-center"><code class="bg-green-900/50 px-2 py-1 rounded mr-2">"leaderboard"</code> Ver ranking</li>
+                    <li class="flex items-center"><code class="bg-green-900/50 px-2 py-1 rounded mr-2">"ayuda"</code> Ver todos los comandos</li>
+                  </ul>
+                </div>
+                <div class="bg-white/10 rounded-xl p-6 backdrop-blur-sm">
+                  <h3 class="font-bold text-green-300 mb-3 flex items-center">
+                    <i class="fas fa-info-circle mr-2"></i>Instrucciones:
+                  </h3>
+                  <ol class="text-green-100 space-y-2 text-sm list-decimal list-inside">
+                    <li>Haz clic en "Generar Código WhatsApp"</li>
+                    <li>Copia el código de 6 dígitos</li>
+                    <li>Envía el código por WhatsApp al sandbox</li>
+                    <li>Recibirás confirmación de vinculación</li>
+                  </ol>
                 </div>
               </div>
             </div>
