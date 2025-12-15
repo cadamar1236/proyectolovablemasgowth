@@ -30,4 +30,5 @@ EXPOSE 8000
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-CMD ["/start.sh"]
+# Usar Python para manejar la variable PORT correctamente
+CMD ["python", "-c", "import os; port = os.getenv('PORT', '8000'); import uvicorn; uvicorn.run('main:app', host='0.0.0.0', port=int(port))"]

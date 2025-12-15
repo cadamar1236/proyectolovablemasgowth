@@ -541,13 +541,26 @@ Para comenzar, necesito vincular tu cuenta.
 📧 *Envía tu email* registrado en LovableGrowth:"""
         
         if pending.action_type == "AUTH_EMAIL":
-            # Guardar email y pedir password
+            # Guardar email y dar opciones de autenticación
             email = message.strip()
             if "@" not in email:
                 return "❌ Por favor envía un email válido:"
             
-            set_pending_action(phone_number, "AUTH_PASSWORD", json.dumps({"email": email}))
-            return f"📧 Email: {email}\n\n🔑 Ahora envía tu contraseña:"
+            # Verificar si el usuario existe y está registrado con Google
+            try:
+                user_check = await api_client.check_user_exists(email)
+                if user_check and user_check.get("auth_provider") == "google":
+                    # Usuario de Google OAuth - pedir código temporal
+                    set_pending_action(phone_number, "AUTH_GOOGLE_CODE", json.dumps({"email": email}))
+                    return f"📧 Email: {email}\n\n🔗 Como iniciaste sesión con Google, ve a la app web y genera un código temporal en Configuración > WhatsApp.\n\nEnvía ese código de 6 dígitos:"
+                else:
+                    # Usuario tradicional - pedir contraseña
+                    set_pending_action(phone_number, "AUTH_PASSWORD", json.dumps({"email": email}))
+                    return f"📧 Email: {email}\n\n🔑 Ahora envía tu contraseña:"
+            except Exception as e:
+                # Si hay error, asumir usuario tradicional
+                set_pending_action(phone_number, "AUTH_PASSWORD", json.dumps({"email": email}))
+                return f"📧 Email: {email}\n\n🔑 Ahora envía tu contraseña:"
         
         if pending.action_type == "AUTH_PASSWORD":
             # Verificar credenciales
@@ -576,6 +589,35 @@ Para comenzar, necesito vincular tu cuenta.
             except Exception as e:
                 clear_pending_action(phone_number)
                 return f"❌ Error de autenticación.\n\nEnvía 'login' para intentar de nuevo."
+        
+        if pending.action_type == "AUTH_GOOGLE_CODE":
+            # Verificar código temporal para usuarios de Google
+            data = json.loads(pending.action_data) if pending.action_data else {}
+            email = data.get("email", "")
+            code = message.strip()
+            
+            if len(code) != 6 or not code.isdigit():
+                return "❌ El código debe ser de 6 dígitos. Intenta de nuevo:"
+            
+            try:
+                result = await api_client.verify_google_code(email, code)
+                if result and result.get("token"):
+                    # Autenticación exitosa
+                    create_or_update_whatsapp_user(
+                        phone_number=phone_number,
+                        user_id=result.get("user", {}).get("id"),
+                        auth_token=result.get("token"),
+                        email=email,
+                        is_verified=True
+                    )
+                    clear_pending_action(phone_number)
+                    
+                    name = result.get("user", {}).get("name", email.split("@")[0])
+                    return f"✅ ¡Autenticación exitosa!\n\nHola {name} 👋\n\nAhora puedes:\n• 'mis goals' - ver goals\n• 'nuevo goal [desc]' - crear goal\n• 'leaderboard' - ver ranking\n• 'ayuda' - ver comandos"
+                else:
+                    return "❌ Código incorrecto o expirado.\n\nVe a la app web y genera un nuevo código."
+            except Exception as e:
+                return f"❌ Error al verificar código.\n\nVe a la app web y genera un nuevo código."
         
         return "🔐 Envía 'login' para iniciar sesión."
     

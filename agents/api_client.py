@@ -143,13 +143,25 @@ class WebAppAPIClient:
             response.raise_for_status()
             return response.json()
     
-    async def verify_user(self, email: str, password: str) -> Optional[Dict[str, Any]]:
-        """Verifica credenciales del usuario y obtiene token"""
+    async def check_user_exists(self, email: str) -> Optional[Dict[str, Any]]:
+        """Verifica si un usuario existe y obtiene info básica"""
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{self.base_url}/auth/login",
+                f"{self.base_url}/auth/check-user",
                 headers={"Content-Type": "application/json"},
-                json={"email": email, "password": password}
+                json={"email": email}
+            )
+            if response.status_code == 200:
+                return response.json()
+            return None
+    
+    async def verify_google_code(self, email: str, code: str) -> Optional[Dict[str, Any]]:
+        """Verifica código temporal para usuarios de Google"""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/auth/verify-whatsapp-code",
+                headers={"Content-Type": "application/json"},
+                json={"email": email, "code": code}
             )
             if response.status_code == 200:
                 return response.json()

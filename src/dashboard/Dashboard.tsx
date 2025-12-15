@@ -23,6 +23,11 @@ interface Achievement {
   description: string;
 }
 
+interface WhatsAppCode {
+  code: string;
+  expires_in: string;
+}
+
 interface DBGoal {
   id: number;
   user_id: number;
@@ -59,6 +64,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [internalData, setInternalData] = useState<any>({ dashboards: [], totalNonAdminUsers: 0 });
   const [loggedInUsers, setLoggedInUsers] = useState<number>(0);
+  const [whatsappCode, setWhatsappCode] = useState<WhatsAppCode | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
 
   // API functions
@@ -92,6 +99,30 @@ const Dashboard = () => {
       setAchievements(data.achievements.map(a => ({ id: a.id, date: a.date, description: a.description })));
     } catch (error) {
       console.error('Error fetching achievements:', error);
+    }
+  };
+
+  const generateWhatsAppCode = async () => {
+    setGeneratingCode(true);
+    try {
+      const response = await fetch('/api/auth/generate-whatsapp-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWhatsappCode(data);
+      } else {
+        alert('Error al generar el código. Inténtalo de nuevo.');
+      }
+    } catch (error) {
+      console.error('Error generating WhatsApp code:', error);
+      alert('Error al generar el código. Verifica tu conexión.');
+    } finally {
+      setGeneratingCode(false);
     }
   };
 
@@ -510,6 +541,83 @@ const Dashboard = () => {
         <div style={{ marginTop: '15px', fontSize: '14px', color: '#666' }}>
           <p><strong>Professional PDF includes:</strong> Statistics, goals, progress chart, and key achievements</p>
           <p><strong>JSON includes:</strong> All raw data for advanced analysis</p>
+        </div>
+      </section>
+
+      {/* WhatsApp Integration */}
+      <section>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">📱 Integración WhatsApp</h2>
+        <div className="bg-white p-6 rounded-lg shadow-md border">
+          <p className="text-gray-700 mb-4">
+            Conecta tu WhatsApp para recibir actualizaciones de goals y participar en el leaderboard.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">🔐 Vincular WhatsApp</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Genera un código temporal para vincular tu WhatsApp con tu cuenta.
+              </p>
+
+              {!whatsappCode ? (
+                <button
+                  onClick={generateWhatsAppCode}
+                  disabled={generatingCode}
+                  className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  {generatingCode ? '🔄 Generando...' : '📱 Generar Código WhatsApp'}
+                </button>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-green-800 mb-2">✅ Código Generado</h4>
+                  <div className="bg-white border-2 border-dashed border-green-300 rounded p-3 mb-3">
+                    <p className="text-2xl font-mono font-bold text-center text-green-600">
+                      {whatsappCode.code}
+                    </p>
+                  </div>
+                  <p className="text-sm text-green-700 mb-3">
+                    ⏰ Válido por: {whatsappCode.expires_in}
+                  </p>
+                  <div className="text-sm text-gray-600">
+                    <p className="font-medium mb-1">📋 Instrucciones:</p>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>Copia el código de arriba</li>
+                      <li>Envía este código por WhatsApp al número de sandbox</li>
+                      <li>Recibirás confirmación de vinculación</li>
+                    </ol>
+                  </div>
+                  <button
+                    onClick={() => setWhatsappCode(null)}
+                    className="mt-3 bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                  >
+                    ❌ Cerrar
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-2">💬 Comandos Disponibles</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="bg-blue-50 p-3 rounded">
+                  <code className="font-mono text-blue-800">"mis goals"</code>
+                  <p className="text-blue-600 mt-1">Ver tus goals activos</p>
+                </div>
+                <div className="bg-blue-50 p-3 rounded">
+                  <code className="font-mono text-blue-800">"nuevo goal [descripción]"</code>
+                  <p className="text-blue-600 mt-1">Crear un nuevo goal</p>
+                </div>
+                <div className="bg-blue-50 p-3 rounded">
+                  <code className="font-mono text-blue-800">"leaderboard"</code>
+                  <p className="text-blue-600 mt-1">Ver ranking de la comunidad</p>
+                </div>
+                <div className="bg-blue-50 p-3 rounded">
+                  <code className="font-mono text-blue-800">"ayuda"</code>
+                  <p className="text-blue-600 mt-1">Ver todos los comandos</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

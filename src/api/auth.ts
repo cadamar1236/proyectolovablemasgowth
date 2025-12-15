@@ -548,16 +548,136 @@ export async function requireAuth(c: any, next: any) {
   }
 }
 
-// Middleware: Require specific role
-export function requireRole(...roles: string[]) {
-  return async (c: any, next: any) => {
-    const userRole = c.get('userRole');
-    
-    if (!roles.includes(userRole)) {
-      return c.json({ error: 'Forbidden - Insufficient permissions' }, 403);
+// Check if user exists (for WhatsApp auth)
+auth.post('/check-user', async (c) => {
+  try {
+    const { email } = await c.req.json();
+
+    if (!email) {
+      return c.json({ error: 'Email is required' }, 400);
     }
-    
-    await next();
+
+    // Find user
+    const user = await c.env.DB.prepare(
+      'SELECT id, email, name, role, plan FROM users WHERE email = ?'
+    ).bind(email).first() as any;
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Check if user has password (traditional auth) or is Google OAuth
+    const hasPassword = await c.env.DB.prepare(
+      'SELECT password FROM users WHERE id = ?'
+    ).bind(user.id).first() as any;
+
+    return c.json({
+      exists: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        plan: user.plan
+      },
+      auth_provider: hasPassword && hasPassword.password ? 'password' : 'google'
+    });
+
+  } catch (error) {
+    console.error('Check user error:', error);
+    return c.json({ error: 'Check user failed' }, 500);
+  }
+});
+
+// Generate WhatsApp verification code (for Google OAuth users)
+auth.post('/generate-whatsapp-code', requireAuth, async (c) => {
+  try {
+    const userId = c.get('userId');
+
+    // Generate 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store code with expiration (10 minutes)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    await c.env.DB.prepare(`
+      INSERT OR REPLACE INTO whatsapp_codes (user_id, code, expires_at)
+      VALUES (?, ?, ?)
+    `).bind(userId, code, expiresAt).run();
+
+    return c.json({
+      message: 'Código generado exitosamente',
+      code: code,
+      expires_in: '10 minutos'
+    });
+
+  } catch (error) {
+    console.error('Generate WhatsApp code error:', error);
+    return c.json({ error: 'Failed to generate code' }, 500);
+  }
+});
+
+// Verify WhatsApp code
+auth.post('/verify-whatsapp-code', async (c) => {
+  try {
+    const { email, code } = await c.req.json();
+
+    if (!email || !code) {
+      return c.json({ error: 'Email and code are required' }, 400);
+    }
+
+    // Find user
+    const user = await c.env.DB.prepare(
+      'SELECT id, email, name, role, plan FROM users WHERE email = ?'
+    ).bind(email).first() as any;
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Check code
+    const codeRecord = await c.env.DB.prepare(`
+      SELECT * FROM whatsapp_codes
+      WHERE user_id = ? AND code = ? AND expires_at > datetime('now')
+    `).bind(user.id, code).first();
+
+    if (!codeRecord) {
+      return c.json({ error: 'Invalid or expired code' }, 401);
+    }
+
+    // Delete used code
+    await c.env.DB.prepare(
+      'DELETE FROM whatsapp_codes WHERE user_id = ? AND code = ?'
+    ).bind(user.id, code).run();
+
+    // Generate JWT token
+    const token = await sign(
+      {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
+      },
+      JWT_SECRET
+    );
+
+    return c.json({
+      message: 'Code verified successfully',
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        plan: user.plan
+      }
+    });
+
+  } catch (error) {
+    console.error('Verify WhatsApp code error:', error);
+    return c.json({ error: 'Code verification failed' }, 500);
+  }
+});
   };
 }
 
