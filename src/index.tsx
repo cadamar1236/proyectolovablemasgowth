@@ -24,6 +24,7 @@ import validatorRequests from './api/validator-requests';
 import chat from './api/chat';
 import notifications from './api/notifications';
 import quickPitch from './api/quick-pitch';
+import whatsapp from './api/whatsapp';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -48,6 +49,7 @@ app.route('/api/validator-requests', validatorRequests);
 app.route('/api/chat', chat);
 app.route('/api/notifications', notifications);
 app.route('/api/quick-pitch', quickPitch);
+app.route('/api/whatsapp', whatsapp);
 
 // Vote page for QR codes
 app.get('/vote/:projectId', async (c) => {

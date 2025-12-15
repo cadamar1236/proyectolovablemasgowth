@@ -414,4 +414,134 @@ dashboard.post('/questions', requireAuth, async (c) => {
   return c.json({ success: true });
 });
 
+// ===========================================
+// LEADERBOARD API (Public for WhatsApp Agents)
+// ===========================================
+
+// Get leaderboard - calculates scores based on goals and metrics
+dashboard.get('/leaderboard', requireAuth, async (c) => {
+  const currentUserId = c.get('userId');
+
+  try {
+    // Get all users with their goals and metrics
+    const { results: users } = await c.env.DB.prepare(
+      'SELECT id, email, name FROM users ORDER BY email'
+    ).all();
+
+    const { results: allGoals } = await c.env.DB.prepare(
+      'SELECT user_id, status FROM goals'
+    ).all();
+
+    const { results: allMetrics } = await c.env.DB.prepare(
+      'SELECT user_id, metric_name, metric_value FROM user_metrics'
+    ).all();
+
+    const { results: allAchievements } = await c.env.DB.prepare(
+      'SELECT user_id FROM achievements'
+    ).all();
+
+    // Calculate scores for each user
+    const leaderboard = users.map((user: any) => {
+      const userGoals = allGoals.filter((g: any) => g.user_id === user.id);
+      const totalGoals = userGoals.length;
+      const completedGoals = userGoals.filter((g: any) => g.status === 'completed').length;
+      
+      const userMetrics = allMetrics.filter((m: any) => m.user_id === user.id);
+      const latestUsers = userMetrics.find((m: any) => m.metric_name === 'users')?.metric_value || 0;
+      const latestRevenue = userMetrics.find((m: any) => m.metric_name === 'revenue')?.metric_value || 0;
+      
+      const achievementsCount = allAchievements.filter((a: any) => a.user_id === user.id).length;
+
+      // Score calculation:
+      // - Completed goals: 10 points each
+      // - Total goals created: 2 points each
+      // - Metrics registered: 1 point each
+      // - Achievements: 5 points each
+      const score = (completedGoals * 10) + (totalGoals * 2) + (userMetrics.length * 1) + (achievementsCount * 5);
+      
+      const completionRate = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
+
+      return {
+        user_id: user.id,
+        email: user.email,
+        name: user.name || user.email.split('@')[0],
+        total_goals: totalGoals,
+        completed_goals: completedGoals,
+        completion_rate: Math.round(completionRate),
+        total_users: latestUsers,
+        total_revenue: latestRevenue,
+        achievements_count: achievementsCount,
+        score: score,
+        is_current_user: user.id === currentUserId
+      };
+    });
+
+    // Sort by score descending
+    leaderboard.sort((a: any, b: any) => b.score - a.score);
+
+    // Add rank
+    leaderboard.forEach((entry: any, index: number) => {
+      entry.rank = index + 1;
+    });
+
+    // Find current user's position
+    const currentUserEntry = leaderboard.find((e: any) => e.user_id === currentUserId);
+
+    return c.json({
+      leaderboard: leaderboard.slice(0, 50), // Top 50
+      current_user: currentUserEntry || null,
+      total_users: users.length
+    });
+  } catch (error) {
+    console.error('Error in leaderboard endpoint:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get user's own stats for quick summary
+dashboard.get('/my-stats', requireAuth, async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    // Get goals
+    const { results: goals } = await c.env.DB.prepare(
+      'SELECT status FROM goals WHERE user_id = ?'
+    ).bind(userId).all();
+
+    const totalGoals = goals.length;
+    const completedGoals = goals.filter((g: any) => g.status === 'completed').length;
+
+    // Get latest metrics
+    const { results: metrics } = await c.env.DB.prepare(
+      'SELECT metric_name, metric_value FROM user_metrics WHERE user_id = ? ORDER BY recorded_date DESC'
+    ).bind(userId).all();
+
+    const latestUsers = metrics.find((m: any) => m.metric_name === 'users')?.metric_value || 0;
+    const latestRevenue = metrics.find((m: any) => m.metric_name === 'revenue')?.metric_value || 0;
+
+    // Get achievements count
+    const { results: achievements } = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM achievements WHERE user_id = ?'
+    ).bind(userId).all();
+
+    const achievementsCount = (achievements[0] as any)?.count || 0;
+
+    // Calculate score
+    const score = (completedGoals * 10) + (totalGoals * 2) + (metrics.length * 1) + (achievementsCount * 5);
+
+    return c.json({
+      total_goals: totalGoals,
+      completed_goals: completedGoals,
+      completion_rate: totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0,
+      latest_users: latestUsers,
+      latest_revenue: latestRevenue,
+      achievements_count: achievementsCount,
+      score: score
+    });
+  } catch (error) {
+    console.error('Error in my-stats endpoint:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 export default dashboard;
