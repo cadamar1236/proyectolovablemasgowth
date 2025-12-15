@@ -26,5 +26,5 @@ COPY . .
 # Puerto que expone la aplicación
 EXPOSE 8000
 
-# Comando para iniciar el servidor
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando para iniciar el servidor (usa PORT de Railway si está disponible)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

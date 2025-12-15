@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 import uvicorn
+import os
 
 from config import config
 from database import init_db, save_conversation
@@ -420,10 +421,13 @@ async def broadcast_message(
 # ============================================
 
 if __name__ == "__main__":
+    # Para Railway/Render, usar el puerto asignado dinámicamente
+    port = int(os.getenv("PORT", config.PORT))
+    
     uvicorn.run(
         "main:app",
         host=config.HOST,
-        port=config.PORT,
+        port=port,
         reload=True,
         log_level="info"
     )
