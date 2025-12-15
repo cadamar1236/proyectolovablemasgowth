@@ -9,8 +9,17 @@ class WebAppAPIClient:
     """Cliente para interactuar con la API de la webapp"""
     
     def __init__(self, base_url: str = None, auth_token: str = None):
-        self.base_url = base_url or config.WEBAPP_API_URL
+        raw_url = base_url or config.WEBAPP_API_URL
+        # Asegurar que la URL termina en /api
+        if not raw_url.endswith('/api'):
+            if raw_url.endswith('/'):
+                self.base_url = raw_url + 'api'
+            else:
+                self.base_url = raw_url + '/api'
+        else:
+            self.base_url = raw_url
         self.auth_token = auth_token
+        print(f"API Client initialized with base_url: {self.base_url}")
         
     def _get_headers(self, token: str = None) -> Dict[str, str]:
         """Genera headers con autenticación"""
