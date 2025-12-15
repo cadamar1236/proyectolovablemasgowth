@@ -226,7 +226,7 @@ async def get_qr_code():
     from fastapi.responses import HTMLResponse
     return HTMLResponse(content=html)
 
-@app.post("/webhook/twilio")
+@app.post("/webhook/whatsapp")
 async def twilio_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -295,7 +295,7 @@ async def twilio_webhook(
         twiml = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
         return Response(content=twiml, media_type="application/xml")
 
-@app.post("/webhook/twilio/status")
+@app.post("/webhook/whatsapp/status")
 async def twilio_status_callback(request: Request):
     """
     Callback para actualizaciones de estado de mensajes
