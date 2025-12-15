@@ -678,6 +678,17 @@ auth.post('/verify-whatsapp-code', async (c) => {
     return c.json({ error: 'Code verification failed' }, 500);
   }
 });
+
+// Middleware: Require specific role
+export function requireRole(...roles: string[]) {
+  return async (c: any, next: any) => {
+    const userRole = c.get('userRole');
+    
+    if (!roles.includes(userRole)) {
+      return c.json({ error: 'Forbidden - Insufficient permissions' }, 403);
+    }
+    
+    await next();
   };
 }
 

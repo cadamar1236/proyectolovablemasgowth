@@ -23,8 +23,6 @@
 		"binding": "AI"
 	},
 	"vars": {
-		"STRIPE_PUBLISHABLE_KEY": "pk_live_51QhutTGCWzoDsbCNXa5c3FfzM3eW4aUWkQ2Lb3YEtMTcZw3g8kaKkXreV71LgiD0XOLLT82uQwoYo11SXDJrcki600xkgQ3zND",
-		"TWILIO_WHATSAPP_NUMBER": "whatsapp:+14155238886",
-		"TWILIO_SANDBOX_CODE": "join your-sandbox-code"
+		"STRIPE_PUBLISHABLE_KEY": "pk_live_51QhutTGCWzoDsbCNXa5c3FfzM3eW4aUWkQ2Lb3YEtMTcZw3g8kaKkXreV71LgiD0XOLLT82uQwoYo11SXDJrcki600xkgQ3zND"
 	}
 }
