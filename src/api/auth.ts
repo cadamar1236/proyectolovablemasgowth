@@ -590,25 +590,38 @@ auth.post('/check-user', async (c) => {
 });
 
 // Generate WhatsApp verification code (for Google OAuth users)
+// Code is PERMANENT - only needs to be entered once
 auth.post('/generate-whatsapp-code', requireAuth, async (c) => {
   try {
     const userId = c.get('userId');
 
-    // Generate 6-digit code
+    // Check if user already has a code
+    const existingCode = await c.env.DB.prepare(
+      'SELECT code FROM whatsapp_codes WHERE user_id = ?'
+    ).bind(userId).first() as any;
+
+    if (existingCode) {
+      // Return existing code
+      return c.json({
+        message: 'Tu código de WhatsApp (permanente)',
+        code: existingCode.code,
+        expires_in: 'Nunca - código permanente'
+      });
+    }
+
+    // Generate new 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Store code with expiration (10 minutes)
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
+    // Store code WITHOUT expiration (permanent)
     await c.env.DB.prepare(`
       INSERT OR REPLACE INTO whatsapp_codes (user_id, code, expires_at)
       VALUES (?, ?, ?)
-    `).bind(userId, code, expiresAt).run();
+    `).bind(userId, code, '9999-12-31 23:59:59').run();
 
     return c.json({
       message: 'Código generado exitosamente',
       code: code,
-      expires_in: '10 minutos'
+      expires_in: 'Nunca - código permanente'
     });
 
   } catch (error) {
@@ -635,20 +648,19 @@ auth.post('/verify-whatsapp-code', async (c) => {
       return c.json({ error: 'User not found' }, 404);
     }
 
-    // Check code
+    // Check code (no expiration check - codes are permanent)
     const codeRecord = await c.env.DB.prepare(`
       SELECT * FROM whatsapp_codes
-      WHERE user_id = ? AND code = ? AND expires_at > datetime('now')
+      WHERE user_id = ? AND code = ?
     `).bind(user.id, code).first();
 
+    console.log('Code verification:', { userId: user.id, codeProvided: code, found: !!codeRecord });
+
     if (!codeRecord) {
-      return c.json({ error: 'Invalid or expired code' }, 401);
+      return c.json({ error: 'Invalid code' }, 401);
     }
 
-    // Delete used code
-    await c.env.DB.prepare(
-      'DELETE FROM whatsapp_codes WHERE user_id = ? AND code = ?'
-    ).bind(user.id, code).run();
+    // Do NOT delete the code - it's permanent and can be reused
 
     // Generate JWT token
     const token = await sign(

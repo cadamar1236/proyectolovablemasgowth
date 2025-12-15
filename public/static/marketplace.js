@@ -2453,19 +2453,19 @@ async function renderGoalsDashboard(metrics) {
       if (response.data && response.data.code) {
         container.innerHTML = `
           <div class="bg-white rounded-xl p-6 text-center">
-            <h4 class="font-bold text-green-700 mb-3 text-lg">✅ Código Generado</h4>
+            <h4 class="font-bold text-green-700 mb-3 text-lg">✅ Tu Código Permanente</h4>
             <div class="bg-green-50 border-2 border-dashed border-green-400 rounded-lg p-4 mb-4">
               <p class="text-4xl font-mono font-bold text-green-600 tracking-widest">${response.data.code}</p>
             </div>
             <p class="text-green-600 text-sm mb-4">
-              <i class="fas fa-clock mr-1"></i>Válido por: ${response.data.expires_in}
+              <i class="fas fa-infinity mr-1"></i>Este código es permanente - solo úsalo una vez
             </p>
-            <p class="text-gray-600 text-sm mb-4">Envía este código por WhatsApp al número del sandbox</p>
+            <p class="text-gray-600 text-sm mb-4">Envía este código por WhatsApp cuando te lo pida el bot</p>
             <button
-              onclick="document.getElementById('whatsapp-code-container').innerHTML = '<button id=\\'generate-whatsapp-code-btn\\' class=\\'px-8 py-4 bg-white text-green-700 rounded-xl hover:bg-green-50 transition-all duration-200 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center mx-auto\\'><i class=\\'fab fa-whatsapp mr-3 text-xl\\'></i>Generar Código WhatsApp</button>'"
-              class="text-gray-500 hover:text-gray-700 text-sm underline"
+              onclick="navigator.clipboard.writeText('${response.data.code}'); this.innerHTML='<i class=\\'fas fa-check mr-1\\'></i>Copiado!';"
+              class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
             >
-              Cerrar
+              <i class="fas fa-copy mr-1"></i>Copiar código
             </button>
           </div>
         `;

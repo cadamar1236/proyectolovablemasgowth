@@ -335,15 +335,15 @@ Para empezar, necesito vincular tu cuenta.
             
             return f"""📧 Perfecto: {email}
 
-🔐 *Ahora necesito verificar que eres tú:*
+🔐 *Necesito verificar que eres tú:*
 
 1. Ve a *webapp.pages.dev/marketplace*
 2. Inicia sesión (con Google o contraseña)
 3. En *"My Dashboard"* busca *"Integración WhatsApp"*
-4. Haz clic en *"Generar Código"*
-5. Envíame el código de 6 dígitos
+4. Copia tu *código permanente* de 6 dígitos
+5. Envíamelo aquí
 
-⏱️ El código expira en 10 minutos."""
+💡 El código es permanente, solo lo necesitas una vez."""
         
         if pending.action_type == "AUTH_CODE":
             data = json.loads(pending.action_data) if pending.action_data else {}
