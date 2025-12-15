@@ -546,21 +546,69 @@ Para comenzar, necesito vincular tu cuenta.
             if "@" not in email:
                 return "❌ Por favor envía un email válido:"
             
-            # Verificar si el usuario existe y está registrado con Google
-            try:
-                user_check = await api_client.check_user_exists(email)
-                if user_check and user_check.get("auth_provider") == "google":
-                    # Usuario de Google OAuth - pedir código temporal
-                    set_pending_action(phone_number, "AUTH_GOOGLE_CODE", json.dumps({"email": email}))
-                    return f"📧 Email: {email}\n\n🔗 Como iniciaste sesión con Google, ve a la app web y genera un código temporal en Configuración > WhatsApp.\n\nEnvía ese código de 6 dígitos:"
-                else:
-                    # Usuario tradicional - pedir contraseña
-                    set_pending_action(phone_number, "AUTH_PASSWORD", json.dumps({"email": email}))
-                    return f"📧 Email: {email}\n\n🔑 Ahora envía tu contraseña:"
-            except Exception as e:
-                # Si hay error, asumir usuario tradicional
-                set_pending_action(phone_number, "AUTH_PASSWORD", json.dumps({"email": email}))
-                return f"📧 Email: {email}\n\n🔑 Ahora envía tu contraseña:"
+            # Siempre dar opción de código o contraseña
+            set_pending_action(phone_number, "AUTH_CHOOSE_METHOD", json.dumps({"email": email}))
+            return f"""📧 Email: {email}
+
+🔐 *¿Cómo quieres autenticarte?*
+
+1️⃣ Si iniciaste sesión con *Google*:
+   → Ve a la app web → My Dashboard → Sección WhatsApp → Generar Código
+   → Envía el código de 6 dígitos
+
+2️⃣ Si tienes *contraseña*:
+   → Envía tu contraseña
+
+Envía el código de 6 dígitos o tu contraseña:"""
+        
+        if pending.action_type == "AUTH_CHOOSE_METHOD":
+            # El usuario puede enviar código (6 dígitos) o contraseña (cualquier otra cosa)
+            data = json.loads(pending.action_data) if pending.action_data else {}
+            email = data.get("email", "")
+            user_input = message.strip()
+            
+            # Si es un código de 6 dígitos
+            if len(user_input) == 6 and user_input.isdigit():
+                try:
+                    result = await api_client.verify_google_code(email, user_input)
+                    if result and result.get("token"):
+                        # Autenticación exitosa con código
+                        create_or_update_whatsapp_user(
+                            phone_number=phone_number,
+                            user_id=result.get("user", {}).get("id"),
+                            auth_token=result.get("token"),
+                            email=email,
+                            is_verified=True
+                        )
+                        clear_pending_action(phone_number)
+                        
+                        name = result.get("user", {}).get("name", email.split("@")[0])
+                        return f"✅ ¡Autenticación exitosa!\n\nHola {name} 👋\n\nAhora puedes:\n• 'mis goals' - ver goals\n• 'nuevo goal [desc]' - crear goal\n• 'leaderboard' - ver ranking\n• 'ayuda' - ver comandos"
+                    else:
+                        return "❌ Código incorrecto o expirado.\n\nGenera un nuevo código en la app web o envía tu contraseña:"
+                except Exception as e:
+                    return f"❌ Error al verificar código.\n\nGenera un nuevo código en la app web o envía tu contraseña:"
+            else:
+                # Es una contraseña
+                try:
+                    result = await api_client.verify_user(email, user_input)
+                    if result and result.get("token"):
+                        # Autenticación exitosa con contraseña
+                        create_or_update_whatsapp_user(
+                            phone_number=phone_number,
+                            user_id=result.get("user", {}).get("id"),
+                            auth_token=result.get("token"),
+                            email=email,
+                            is_verified=True
+                        )
+                        clear_pending_action(phone_number)
+                        
+                        name = result.get("user", {}).get("name", email.split("@")[0])
+                        return f"✅ ¡Autenticación exitosa!\n\nHola {name} 👋\n\nAhora puedes:\n• 'mis goals' - ver goals\n• 'nuevo goal [desc]' - crear goal\n• 'leaderboard' - ver ranking\n• 'ayuda' - ver comandos"
+                    else:
+                        return "❌ Credenciales incorrectas.\n\nEnvía 'login' para intentar de nuevo."
+                except Exception as e:
+                    return f"❌ Error de autenticación.\n\nEnvía 'login' para intentar de nuevo."
         
         if pending.action_type == "AUTH_PASSWORD":
             # Verificar credenciales
