@@ -5,6 +5,7 @@ import { verify } from 'hono/jwt';
 import { jsx } from 'hono/jsx';
 import type { Bindings } from './types';
 import { getNotFoundPage, getVotePage } from './html-templates';
+import { getMarketplacePage } from './marketplace-page';
 
 // JWT Secret for token verification
 const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
@@ -1924,8 +1925,33 @@ app.get('/project/:id', async (c) => {
 });
 
 // Marketplace Page
-app.get('/marketplace', (c) => {
-  return c.html(`
+app.get('/marketplace', async (c) => {
+  // Check authentication
+  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  
+  let userName = 'Guest';
+  let userAvatar: string | undefined;
+  
+  if (authToken) {
+    try {
+      const payload = await verify(authToken, JWT_SECRET) as any;
+      if (payload && payload.userId) {
+        const user = await c.env.DB.prepare(`
+          SELECT name, avatar_url FROM users WHERE id = ?
+        `).bind(payload.userId).first() as any;
+        
+        if (user) {
+          userName = user.name;
+          userAvatar = user.avatar_url;
+        }
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+    }
+  }
+  
+  return c.html(getMarketplacePage(userName, userAvatar));
+});
 <!DOCTYPE html>
 <html lang="en">
 <head>
