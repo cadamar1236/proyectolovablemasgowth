@@ -58,7 +58,7 @@ app.route('/api/chat-agent', chatAgent);
 // Page Routes (mount sub-apps for authenticated pages)
 app.route('/dashboard', dashboardPage);
 
-// Marketplace page
+// Marketplace page - ASTAR Hub Dashboard
 app.get('/marketplace', async (c) => {
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
   
@@ -70,8 +70,9 @@ app.get('/marketplace', async (c) => {
     const payload = await verify(authToken, c.env.JWT_SECRET || JWT_SECRET) as any;
     const userName = payload.userName || payload.email || 'Usuario';
     const userAvatar = payload.avatar_url;
+    const userRole = payload.role || 'founder';
     
-    const html = getMarketplacePage(userName, userAvatar);
+    const html = getMarketplacePage({ userName, userAvatar, userRole });
     return c.html(html);
   } catch (error) {
     return c.redirect('/api/auth/google');
