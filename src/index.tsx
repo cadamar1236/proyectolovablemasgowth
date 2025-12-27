@@ -58,7 +58,7 @@ app.route('/api/chat-agent', chatAgent);
 // Page Routes (mount sub-apps for authenticated pages)
 app.route('/dashboard', dashboardPage);
 
-// Marketplace page
+// Marketplace page - ASTAR Hub Dashboard
 app.get('/marketplace', async (c) => {
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
   
@@ -70,8 +70,9 @@ app.get('/marketplace', async (c) => {
     const payload = await verify(authToken, c.env.JWT_SECRET || JWT_SECRET) as any;
     const userName = payload.userName || payload.email || 'Usuario';
     const userAvatar = payload.avatar_url;
+    const userRole = payload.role || 'founder';
     
-    const html = getMarketplacePage(userName, userAvatar);
+    const html = getMarketplacePage({ userName, userAvatar, userRole });
     return c.html(html);
   } catch (error) {
     return c.redirect('/api/auth/google');
@@ -119,7 +120,7 @@ app.get('/vote/:projectId', async (c) => {
   }
 });
 
-// Frontend Routes
+// Frontend Routes - ASTAR* Labs Landing Page
 app.get('/', (c) => {
   return c.html(`
 <!DOCTYPE html>
@@ -127,20 +128,28 @@ app.get('/', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ValidAI Studio - Validación IA + Venture Studio</title>
+    <title>ASTAR* Labs - Launch Your Startup to the Stars</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              primary: '#FF6154',
-              secondary: '#FB651E',
-              accent: '#F26522',
+              primary: '#8B5CF6',
+              secondary: '#06B6D4',
+              accent: '#F59E0B',
+              cosmic: {
+                dark: '#0a0a1a',
+                darker: '#050510',
+                purple: '#1a1a3e',
+                blue: '#0d1b2a'
+              }
             },
             fontFamily: {
-              sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              display: ['Space Grotesk', 'system-ui', 'sans-serif'],
             }
           }
         }
@@ -148,9 +157,13 @@ app.get('/', (c) => {
     </script>
     <style>
       * {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        font-family: 'Inter', system-ui, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+      }
+      
+      h1, h2, h3, h4, .font-display {
+        font-family: 'Space Grotesk', system-ui, sans-serif;
       }
       
       .scrollbar-hide {
@@ -161,104 +174,317 @@ app.get('/', (c) => {
         display: none;
       }
       
-      .hero-gradient {
-        background: linear-gradient(135deg, #FF6154 0%, #FB651E 50%, #F26522 100%);
+      /* Cosmic Background */
+      .cosmic-bg {
+        background: linear-gradient(180deg, #050510 0%, #0a0a1a 50%, #1a1a3e 100%);
+        position: relative;
+        overflow: hidden;
       }
       
-      .mesh-gradient {
+      /* Stars Animation */
+      .stars {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 0;
+      }
+      
+      .stars::before,
+      .stars::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
         background-image: 
-          radial-gradient(at 27% 37%, hsla(215, 98%, 61%, 0.1) 0px, transparent 50%),
-          radial-gradient(at 97% 21%, hsla(125, 98%, 72%, 0.05) 0px, transparent 50%),
-          radial-gradient(at 52% 99%, hsla(354, 98%, 61%, 0.05) 0px, transparent 50%),
-          radial-gradient(at 10% 29%, hsla(256, 96%, 67%, 0.1) 0px, transparent 50%),
-          radial-gradient(at 97% 96%, hsla(38, 60%, 74%, 0.05) 0px, transparent 50%),
-          radial-gradient(at 33% 50%, hsla(222, 67%, 73%, 0.05) 0px, transparent 50%),
-          radial-gradient(at 79% 53%, hsla(343, 68%, 79%, 0.05) 0px, transparent 50%);
+          radial-gradient(2px 2px at 20px 30px, #fff, transparent),
+          radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+          radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+          radial-gradient(2px 2px at 160px 120px, rgba(255,255,255,0.9), transparent),
+          radial-gradient(1px 1px at 230px 80px, #fff, transparent),
+          radial-gradient(2px 2px at 300px 150px, rgba(255,255,255,0.7), transparent),
+          radial-gradient(1px 1px at 370px 200px, #fff, transparent),
+          radial-gradient(2px 2px at 450px 60px, rgba(255,255,255,0.8), transparent),
+          radial-gradient(1px 1px at 520px 180px, #fff, transparent),
+          radial-gradient(2px 2px at 600px 100px, rgba(255,255,255,0.9), transparent),
+          radial-gradient(1px 1px at 680px 250px, #fff, transparent),
+          radial-gradient(2px 2px at 750px 30px, rgba(255,255,255,0.7), transparent),
+          radial-gradient(1px 1px at 830px 170px, #fff, transparent),
+          radial-gradient(2px 2px at 900px 220px, rgba(255,255,255,0.8), transparent),
+          radial-gradient(1px 1px at 970px 90px, #fff, transparent);
+        background-repeat: repeat;
+        background-size: 1000px 300px;
+        animation: twinkle 8s ease-in-out infinite;
       }
       
-      .card-hover {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      .stars::after {
+        background-image: 
+          radial-gradient(1px 1px at 50px 100px, #fff, transparent),
+          radial-gradient(2px 2px at 120px 200px, rgba(255,255,255,0.6), transparent),
+          radial-gradient(1px 1px at 200px 50px, #fff, transparent),
+          radial-gradient(2px 2px at 280px 180px, rgba(255,255,255,0.8), transparent),
+          radial-gradient(1px 1px at 350px 130px, #fff, transparent),
+          radial-gradient(2px 2px at 420px 80px, rgba(255,255,255,0.7), transparent),
+          radial-gradient(1px 1px at 500px 240px, #fff, transparent),
+          radial-gradient(2px 2px at 580px 160px, rgba(255,255,255,0.9), transparent),
+          radial-gradient(1px 1px at 660px 40px, #fff, transparent),
+          radial-gradient(2px 2px at 740px 280px, rgba(255,255,255,0.6), transparent);
+        background-size: 800px 350px;
+        animation: twinkle 12s ease-in-out infinite reverse;
       }
       
-      .card-hover:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
+      @keyframes twinkle {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
       }
       
-      .btn-primary {
-        background: linear-gradient(135deg, #FF6154 0%, #FB651E 100%);
-        transition: all 0.3s ease;
+      /* Nebula Effect */
+      .nebula {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.4;
+        animation: nebula-float 20s ease-in-out infinite;
       }
       
-      .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 24px -8px rgba(255, 97, 84, 0.4);
+      .nebula-1 {
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(circle, rgba(139, 92, 246, 0.4) 0%, transparent 70%);
+        top: -200px;
+        right: -100px;
+        animation-delay: 0s;
       }
       
-      .text-gradient {
-        background: linear-gradient(135deg, #FF6154 0%, #FB651E 100%);
+      .nebula-2 {
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(6, 182, 212, 0.3) 0%, transparent 70%);
+        bottom: 10%;
+        left: -150px;
+        animation-delay: -5s;
+      }
+      
+      .nebula-3 {
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 70%);
+        top: 40%;
+        right: 10%;
+        animation-delay: -10s;
+      }
+      
+      @keyframes nebula-float {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        25% { transform: translate(30px, -30px) scale(1.05); }
+        50% { transform: translate(-20px, 20px) scale(0.95); }
+        75% { transform: translate(20px, 30px) scale(1.02); }
+      }
+      
+      /* Glow Effects */
+      .glow-purple {
+        box-shadow: 0 0 40px rgba(139, 92, 246, 0.3), 0 0 80px rgba(139, 92, 246, 0.2);
+      }
+      
+      .glow-cyan {
+        box-shadow: 0 0 40px rgba(6, 182, 212, 0.3), 0 0 80px rgba(6, 182, 212, 0.2);
+      }
+      
+      .text-glow {
+        text-shadow: 0 0 40px rgba(139, 92, 246, 0.5), 0 0 80px rgba(139, 92, 246, 0.3);
+      }
+      
+      /* Gradient Text */
+      .text-gradient-cosmic {
+        background: linear-gradient(135deg, #8B5CF6 0%, #06B6D4 50%, #F59E0B 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
       }
       
-      .feature-icon {
-        background: linear-gradient(135deg, rgba(255, 97, 84, 0.1) 0%, rgba(251, 101, 30, 0.1) 100%);
-        backdrop-filter: blur(10px);
+      .text-gradient-purple {
+        background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
       }
       
+      /* Button Styles */
+      .btn-cosmic {
+        background: linear-gradient(135deg, #8B5CF6 0%, #06B6D4 100%);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .btn-cosmic::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+      }
+      
+      .btn-cosmic:hover::before {
+        left: 100%;
+      }
+      
+      .btn-cosmic:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 20px 40px -10px rgba(139, 92, 246, 0.5);
+      }
+      
+      .btn-outline-cosmic {
+        border: 2px solid rgba(139, 92, 246, 0.5);
+        background: rgba(139, 92, 246, 0.1);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+      }
+      
+      .btn-outline-cosmic:hover {
+        border-color: #8B5CF6;
+        background: rgba(139, 92, 246, 0.2);
+        box-shadow: 0 0 30px rgba(139, 92, 246, 0.3);
+      }
+      
+      /* Card Styles */
+      .card-cosmic {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      .card-cosmic:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(139, 92, 246, 0.3);
+        transform: translateY(-8px);
+        box-shadow: 0 25px 50px -12px rgba(139, 92, 246, 0.25);
+      }
+      
+      /* Navigation */
+      .nav-cosmic {
+        backdrop-filter: blur(20px);
+        background: rgba(10, 10, 26, 0.8);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      /* Floating Animation */
       @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-20px); }
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(2deg); }
       }
       
       .float-animation {
         animation: float 6s ease-in-out infinite;
       }
       
-      .nav-blur {
-        backdrop-filter: blur(12px);
-        background-color: rgba(255, 255, 255, 0.8);
+      /* Planet/Orbit Animation */
+      @keyframes orbit {
+        0% { transform: rotate(0deg) translateX(150px) rotate(0deg); }
+        100% { transform: rotate(360deg) translateX(150px) rotate(-360deg); }
+      }
+      
+      .orbit-animation {
+        animation: orbit 30s linear infinite;
+      }
+      
+      /* Pulse Animation */
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.4); }
+        50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.8), 0 0 60px rgba(6, 182, 212, 0.4); }
+      }
+      
+      .pulse-glow {
+        animation: pulse-glow 3s ease-in-out infinite;
+      }
+      
+      /* Shooting Star */
+      @keyframes shooting-star {
+        0% { transform: translateX(0) translateY(0); opacity: 1; }
+        70% { opacity: 1; }
+        100% { transform: translateX(300px) translateY(300px); opacity: 0; }
+      }
+      
+      .shooting-star {
+        position: absolute;
+        width: 100px;
+        height: 2px;
+        background: linear-gradient(90deg, #fff, transparent);
+        animation: shooting-star 3s ease-in-out infinite;
+      }
+      
+      /* Stats Counter */
+      .stat-number {
+        font-variant-numeric: tabular-nums;
+      }
+      
+      /* Responsive */
+      @media (max-width: 768px) {
+        .nebula {
+          opacity: 0.2;
+        }
+        .nebula-1 { width: 300px; height: 300px; }
+        .nebula-2 { width: 250px; height: 250px; }
+        .nebula-3 { width: 200px; height: 200px; }
       }
     </style>
 </head>
-<body class="bg-white min-h-screen mesh-gradient">
+<body class="cosmic-bg min-h-screen text-white">
+    <!-- Cosmic Background Effects -->
+    <div class="stars"></div>
+    <div class="nebula nebula-1"></div>
+    <div class="nebula nebula-2"></div>
+    <div class="nebula nebula-3"></div>
+    
+    <!-- Shooting Stars -->
+    <div class="shooting-star" style="top: 10%; left: 20%; animation-delay: 0s;"></div>
+    <div class="shooting-star" style="top: 30%; left: 60%; animation-delay: 2s;"></div>
+    <div class="shooting-star" style="top: 50%; left: 10%; animation-delay: 4s;"></div>
+
     <!-- Navigation -->
-    <nav class="nav-blur sticky top-0 z-50 border-b border-gray-200/50 relative">
+    <nav class="nav-cosmic sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 relative">
+            <div class="flex justify-between h-20 relative">
                 <div class="flex items-center">
-                    <span class="text-2xl font-bold text-gradient">
-                        ⚡ ValidAI Studio
-                    </span>
+                    <a href="/" class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-purple">
+                            <span class="text-white font-bold text-xl">✦</span>
+                        </div>
+                        <span class="text-2xl font-display font-bold text-gradient-cosmic">
+                            ASTAR* Labs
+                        </span>
+                    </a>
                 </div>
                 
                 <!-- Desktop Navigation -->
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="#dashboard" class="text-gray-700 hover:text-primary transition font-semibold">How It Works</a>
-                    <a href="#validation" onclick="showValidationForm();return false;" class="text-gray-700 hover:text-primary transition font-semibold">Validation</a>
-                    <a href="/leaderboard" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
+                    <a href="#journey" class="text-gray-300 hover:text-white transition font-medium">Journey</a>
+                    <a href="#features" class="text-gray-300 hover:text-white transition font-medium">Features</a>
+                    <a href="/marketplace" class="text-gray-300 hover:text-white transition font-medium flex items-center">
+                        <i class="fas fa-rocket mr-2 text-primary"></i>Hub
                     </a>
-                    <a href="/marketplace" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
+                    <a href="/leaderboard" class="text-gray-300 hover:text-white transition font-medium flex items-center">
+                        <i class="fas fa-trophy mr-2 text-accent"></i>Leaderboard
                     </a>
-                    <a href="/pricing" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-tag mr-1 text-green-500"></i>Pricing
-                    </a>
-                    <div class="nav-auth-buttons flex items-center space-x-3">
-                        <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-primary transition font-semibold px-4 py-2">
+                    <div class="nav-auth-buttons flex items-center space-x-3 ml-4">
+                        <button onclick="showAuthModal('login')" class="text-gray-300 hover:text-white transition font-medium px-4 py-2">
                             Sign In
                         </button>
-                        <button onclick="showAuthModal('register')" class="btn-primary text-white px-6 py-2.5 rounded-lg font-semibold shadow-sm">
-                            Get Started
+                        <button onclick="showAuthModal('register')" class="btn-cosmic text-white px-6 py-2.5 rounded-xl font-semibold">
+                            Launch Now
                         </button>
                     </div>
                 </div>
                 
                 <!-- Mobile menu toggle -->
                 <div class="md:hidden flex items-center">
-                    <button id="mobile-menu-button" class="cursor-pointer p-2 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 hover:from-primary hover:to-secondary hover:text-white transition-all duration-200 text-primary font-bold">
+                    <button id="mobile-menu-button" class="cursor-pointer p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-200 text-white">
                         <i class="fas fa-bars text-xl" id="menu-icon-bars"></i>
                         <i class="fas fa-times text-xl hidden" id="menu-icon-close"></i>
                     </button>
@@ -267,29 +493,26 @@ app.get('/', (c) => {
         </div>
 
         <!-- Mobile Navigation Menu -->
-        <div class="hidden md:hidden bg-white border-t border-gray-200 shadow-lg" id="mobile-menu-container">
-            <div class="max-w-7xl mx-auto px-4 py-4 space-y-3 max-h-[calc(100vh-4rem)] overflow-y-auto">
-                <a href="#dashboard" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
-                    <i class="fas fa-tachometer-alt mr-3 text-lg"></i>How It Works
+        <div class="hidden md:hidden bg-cosmic-dark/95 backdrop-blur-xl border-t border-white/10" id="mobile-menu-container">
+            <div class="max-w-7xl mx-auto px-4 py-6 space-y-2">
+                <a href="#journey" class="flex items-center px-4 py-3 text-gray-300 hover:text-white hover:bg-white/5 transition rounded-xl font-medium">
+                    <i class="fas fa-route mr-3 text-lg text-primary"></i>Journey
                 </a>
-                <a href="#validation" onclick="showValidationForm();return false;" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
-                    <i class="fas fa-check-circle mr-3 text-lg"></i>Validation
+                <a href="#features" class="flex items-center px-4 py-3 text-gray-300 hover:text-white hover:bg-white/5 transition rounded-xl font-medium">
+                    <i class="fas fa-star mr-3 text-lg text-secondary"></i>Features
                 </a>
-                <a href="/leaderboard" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
-                    <i class="fas fa-trophy mr-3 text-yellow-500 text-lg"></i>Leaderboard
+                <a href="/marketplace" class="flex items-center px-4 py-3 text-gray-300 hover:text-white hover:bg-white/5 transition rounded-xl font-medium">
+                    <i class="fas fa-rocket mr-3 text-lg text-primary"></i>Hub
                 </a>
-                <a href="/marketplace" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
-                    <i class="fas fa-star mr-3 text-yellow-500 text-lg"></i>Marketplace
+                <a href="/leaderboard" class="flex items-center px-4 py-3 text-gray-300 hover:text-white hover:bg-white/5 transition rounded-xl font-medium">
+                    <i class="fas fa-trophy mr-3 text-accent text-lg"></i>Leaderboard
                 </a>
-                <a href="/pricing" class="flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold">
-                    <i class="fas fa-tag mr-3 text-green-500 text-lg"></i>Pricing
-                </a>
-                <div class="border-t pt-3 mt-3 space-y-2">
-                    <button onclick="showAuthModal('login');" class="w-full flex items-center px-4 py-3 text-gray-700 hover:text-primary hover:bg-primary/5 transition rounded-lg font-semibold text-left">
+                <div class="border-t border-white/10 pt-4 mt-4 space-y-2">
+                    <button onclick="showAuthModal('login');" class="w-full flex items-center px-4 py-3 text-gray-300 hover:text-white hover:bg-white/5 transition rounded-xl font-medium text-left">
                         <i class="fas fa-sign-in-alt mr-3 text-lg"></i>Sign In
                     </button>
-                    <button onclick="showAuthModal('register');" class="w-full flex items-center px-4 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg hover:shadow-lg transition font-bold text-left">
-                        <i class="fas fa-user-plus mr-3 text-lg"></i>Get Started
+                    <button onclick="showAuthModal('register');" class="w-full flex items-center px-4 py-3 btn-cosmic text-white rounded-xl font-bold text-left justify-center">
+                        <i class="fas fa-rocket mr-3 text-lg"></i>Launch Now
                     </button>
                 </div>
             </div>
@@ -310,7 +533,6 @@ app.get('/', (c) => {
                 menuIconClose.classList.toggle('hidden');
             });
             
-            // Close menu when clicking on a link
             const menuLinks = mobileMenuContainer.querySelectorAll('a, button');
             menuLinks.forEach(link => {
                 link.addEventListener('click', function() {
@@ -323,772 +545,493 @@ app.get('/', (c) => {
     </script>
 
     <!-- Hero Section -->
-    <div class="relative overflow-hidden bg-white">
-        <div class="max-w-7xl mx-auto px-4 py-20 sm:py-24 md:py-32 sm:px-6 lg:px-8">
-            <div class="text-center relative z-10">
-                <div class="inline-block mb-6">
-                    <span class="bg-orange-50 text-primary px-4 py-2 rounded-full text-sm font-bold border border-primary/20">
-                        🚀 500+ Expert Validators Available
+    <section class="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 py-20 sm:py-32 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center">
+                <!-- Badge -->
+                <div class="inline-flex items-center mb-8">
+                    <span class="px-5 py-2.5 rounded-full text-sm font-semibold border border-primary/30 bg-primary/10 backdrop-blur-sm text-primary flex items-center space-x-2">
+                        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                        <span>Where Startups Become Stars</span>
+                        <span>✦</span>
                     </span>
                 </div>
-                <h1 class="text-5xl sm:text-6xl md:text-7xl font-black mb-6 leading-tight text-gray-900 tracking-tight">
-                    Build & Validate<br/>
-                    <span class="text-gradient">Winning Startups 10x Faster</span>
+                
+                <!-- Main Headline -->
+                <h1 class="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight tracking-tight">
+                    <span class="text-white">Launch Your</span><br/>
+                    <span class="text-gradient-cosmic text-glow">Startup to the Stars</span>
                 </h1>
-                <p class="text-xl sm:text-2xl mb-4 text-gray-600 font-semibold max-w-3xl mx-auto">
-                    AI Platform + Venture Studio + Expert Validator Marketplace
+                
+                <!-- Subheadline -->
+                <p class="text-xl sm:text-2xl mb-6 text-gray-300 font-medium max-w-3xl mx-auto leading-relaxed">
+                    The <span class="text-primary font-semibold">Venture Studio</span> that transforms ideas into 
+                    <span class="text-secondary font-semibold">validated startups</span> using AI & Expert Networks
                 </p>
-                <p class="text-base sm:text-lg mb-10 max-w-2xl mx-auto text-gray-500">
-                    From idea to actionable insights in 48 hours. Connect with expert validators, get real feedback, and scale with confidence.
+                
+                <p class="text-base sm:text-lg mb-12 max-w-2xl mx-auto text-gray-400">
+                    From concept to market validation in 48 hours. Connect with 500+ expert validators 
+                    and accelerate your journey through the startup universe.
                 </p>
-                <div class="flex flex-col sm:flex-row justify-center gap-4 mb-12">
-                    <button onclick="showValidationForm()" class="btn-primary text-white px-8 py-4 rounded-xl font-black text-lg shadow-lg inline-flex items-center justify-center">
-                        <i class="fas fa-lightbulb mr-2"></i>Pitch your Idea
+                
+                <!-- CTA Buttons -->
+                <div class="flex flex-col sm:flex-row justify-center gap-5 mb-16">
+                    <button onclick="showValidationForm()" class="btn-cosmic text-white px-10 py-5 rounded-2xl font-bold text-lg inline-flex items-center justify-center group">
+                        <i class="fas fa-rocket mr-3 group-hover:animate-bounce"></i>
+                        Launch Your Idea
                     </button>
-                    <button onclick="showUploadProductForm()" class="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-4 rounded-xl font-black text-lg shadow-lg hover:shadow-2xl transition-all inline-flex items-center justify-center">
-                        <i class="fas fa-upload mr-2"></i>Upload My Product
-                    </button>
-                    <a href="/marketplace" class="bg-gray-900 text-white px-8 py-4 rounded-xl font-black text-lg hover:bg-gray-800 transition inline-flex items-center justify-center">
-                        <i class="fas fa-users mr-2"></i>Browse Validators
+                    <a href="/marketplace" class="btn-outline-cosmic text-white px-10 py-5 rounded-2xl font-bold text-lg inline-flex items-center justify-center">
+                        <i class="fas fa-compass mr-3"></i>
+                        Explore Hub
                     </a>
                 </div>
-                    </a>
-                </div>
-                <div class="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-600 font-semibold">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
+                
+                <!-- Trust Indicators -->
+                <div class="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-400 font-medium">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <i class="fas fa-check text-green-400 text-sm"></i>
+                        </div>
                         <span>48h Validation</span>
                     </div>
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span>10K+ Products Validated</span>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                            <i class="fas fa-users text-primary text-sm"></i>
+                        </div>
+                        <span>500+ Validators</span>
                     </div>
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span>100% Guarantee</span>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
+                            <i class="fas fa-shield-alt text-secondary text-sm"></i>
+                        </div>
+                        <span>AI-Powered</span>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+        
+        <!-- Floating Elements -->
+        <div class="absolute top-1/4 left-10 w-4 h-4 rounded-full bg-primary float-animation opacity-60" style="animation-delay: 0s;"></div>
+        <div class="absolute top-1/3 right-20 w-3 h-3 rounded-full bg-secondary float-animation opacity-50" style="animation-delay: 1s;"></div>
+        <div class="absolute bottom-1/4 left-1/4 w-5 h-5 rounded-full bg-accent float-animation opacity-40" style="animation-delay: 2s;"></div>
+        <div class="absolute bottom-1/3 right-1/4 w-2 h-2 rounded-full bg-white float-animation opacity-60" style="animation-delay: 3s;"></div>
+    </section>
 
     <!-- Stats Section -->
-    <div class="max-w-7xl mx-auto px-4 py-20 sm:px-6 lg:px-8 bg-gray-50">
-        <div class="text-center mb-16">
-            <h2 class="text-4xl font-black text-gray-900 mb-3">Results That Speak for Themselves</h2>
-            <p class="text-xl text-gray-600 font-medium">Join thousands of founders who trust ValidAI Studio</p>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div class="text-center">
-                <div class="text-6xl font-black text-gradient mb-2">48h</div>
-                <div class="text-gray-900 font-bold text-lg">Full Validation</div>
-                <div class="text-gray-500 text-sm mt-1 font-medium">Guaranteed results</div>
-            </div>
-            <div class="text-center">
-                <div class="text-6xl font-black text-gradient mb-2">90%</div>
-                <div class="text-gray-900 font-bold text-lg">Faster</div>
-                <div class="text-gray-500 text-sm mt-1 font-medium">vs. traditional methods</div>
-            </div>
-            <div class="text-center">
-                <div class="text-6xl font-black text-gradient mb-2">500+</div>
-                <div class="text-gray-900 font-bold text-lg">Validators</div>
-                <div class="text-gray-500 text-sm mt-1 font-medium">Certified experts</div>
-            </div>
-            <div class="text-center">
-                <div class="text-6xl font-black text-gradient mb-2">10K+</div>
-                <div class="text-gray-900 font-bold text-lg">Products</div>
-                <div class="text-gray-500 text-sm mt-1 font-medium">Successfully validated</div>
+    <section class="relative py-24 border-t border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div class="text-center p-8 card-cosmic rounded-2xl">
+                    <div class="text-5xl sm:text-6xl font-display font-bold text-gradient-cosmic mb-3 stat-number">48h</div>
+                    <div class="text-white font-semibold text-lg mb-1">Full Validation</div>
+                    <div class="text-gray-400 text-sm">From idea to insights</div>
+                </div>
+                <div class="text-center p-8 card-cosmic rounded-2xl">
+                    <div class="text-5xl sm:text-6xl font-display font-bold text-gradient-cosmic mb-3 stat-number">90%</div>
+                    <div class="text-white font-semibold text-lg mb-1">Faster</div>
+                    <div class="text-gray-400 text-sm">Than traditional methods</div>
+                </div>
+                <div class="text-center p-8 card-cosmic rounded-2xl">
+                    <div class="text-5xl sm:text-6xl font-display font-bold text-gradient-cosmic mb-3 stat-number">500+</div>
+                    <div class="text-white font-semibold text-lg mb-1">Validators</div>
+                    <div class="text-gray-400 text-sm">Expert network</div>
+                </div>
+                <div class="text-center p-8 card-cosmic rounded-2xl">
+                    <div class="text-5xl sm:text-6xl font-display font-bold text-gradient-cosmic mb-3 stat-number">10K+</div>
+                    <div class="text-white font-semibold text-lg mb-1">Startups</div>
+                    <div class="text-gray-400 text-sm">Successfully launched</div>
+                </div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- Main Content -->
-    <div id="app" class="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <!-- Features Section -->
-        <div id="dashboard" class="mb-20 bg-white py-20">
-            <h2 class="text-5xl font-black text-gray-900 mb-4 text-center">How It Works</h2>
-            <p class="text-xl text-gray-600 mb-16 text-center max-w-3xl mx-auto font-medium">
-                From idea to actionable data in 5 automated steps with expert validators
-            </p>
+    <!-- Journey Section -->
+    <section id="journey" class="relative py-32">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-20">
+                <span class="text-primary font-semibold text-sm tracking-wider uppercase mb-4 block">Your Cosmic Journey</span>
+                <h2 class="font-display text-4xl sm:text-5xl font-bold text-white mb-6">
+                    From Idea to <span class="text-gradient-cosmic">Orbit</span>
+                </h2>
+                <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                    Navigate through the startup universe with our proven 5-step launch sequence
+                </p>
+            </div>
             
             <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
-                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                <div class="card-cosmic rounded-2xl p-8 text-center group">
+                    <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center pulse-glow">
                         <span class="text-2xl font-bold text-white">1</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Idea Input</h3>
-                    <p class="text-gray-600 mb-4">Fill out the form with your idea details and target market</p>
+                    <h3 class="text-xl font-display font-bold mb-3 text-white group-hover:text-primary transition">Ignition</h3>
+                    <p class="text-gray-400 mb-4 text-sm">Share your idea and target market details</p>
                     <div class="text-primary font-semibold text-sm">
                         <i class="fas fa-clock mr-1"></i>5 minutes
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
-                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                <div class="card-cosmic rounded-2xl p-8 text-center group">
+                    <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center pulse-glow" style="animation-delay: 0.5s;">
                         <span class="text-2xl font-bold text-white">2</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">AI Analysis</h3>
-                    <p class="text-gray-600 mb-4">Our AI analyzes competitors, trends, and opportunities in real-time</p>
-                    <div class="text-primary font-semibold text-sm">
+                    <h3 class="text-xl font-display font-bold mb-3 text-white group-hover:text-primary transition">AI Analysis</h3>
+                    <p class="text-gray-400 mb-4 text-sm">Our AI scans the market universe for opportunities</p>
+                    <div class="text-secondary font-semibold text-sm">
                         <i class="fas fa-robot mr-1"></i>Instant
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
-                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                <div class="card-cosmic rounded-2xl p-8 text-center group">
+                    <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center pulse-glow" style="animation-delay: 1s;">
                         <span class="text-2xl font-bold text-white">3</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Validators</h3>
-                    <p class="text-gray-600 mb-4">Connect with marketplace experts to receive specialized feedback</p>
-                    <div class="text-primary font-semibold text-sm">
+                    <h3 class="text-xl font-display font-bold mb-3 text-white group-hover:text-primary transition">Validation</h3>
+                    <p class="text-gray-400 mb-4 text-sm">Expert validators provide stellar feedback</p>
+                    <div class="text-accent font-semibold text-sm">
                         <i class="fas fa-users mr-1"></i>24-48h
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
-                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                <div class="card-cosmic rounded-2xl p-8 text-center group">
+                    <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center pulse-glow" style="animation-delay: 1.5s;">
                         <span class="text-2xl font-bold text-white">4</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Beta Testing</h3>
-                    <p class="text-gray-600 mb-4">Pre-selected panel tests your product and provides detailed feedback</p>
-                    <div class="text-primary font-semibold text-sm">
+                    <h3 class="text-xl font-display font-bold mb-3 text-white group-hover:text-primary transition">Beta Testing</h3>
+                    <p class="text-gray-400 mb-4 text-sm">Real users test your product in the wild</p>
+                    <div class="text-green-400 font-semibold text-sm">
                         <i class="fas fa-vial mr-1"></i>1 week
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-sm p-8 card-hover border border-gray-100">
-                    <div class="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-6 shadow-md">
+                <div class="card-cosmic rounded-2xl p-8 text-center group">
+                    <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center pulse-glow" style="animation-delay: 2s;">
                         <span class="text-2xl font-bold text-white">5</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3 text-gray-900">Results</h3>
-                    <p class="text-gray-600 mb-4">Clear metrics, validator insights, and actionable recommendations</p>
+                    <h3 class="text-xl font-display font-bold mb-3 text-white group-hover:text-primary transition">Orbit</h3>
+                    <p class="text-gray-400 mb-4 text-sm">Launch with data-driven confidence</p>
                     <div class="text-primary font-semibold text-sm">
                         <i class="fas fa-chart-line mr-1"></i>Dashboard
                     </div>
                 </div>
             </div>
             
-            <!-- Marketplace CTA -->
-            <div class="mt-16 bg-gradient-to-r from-primary to-secondary rounded-2xl p-10 text-white shadow-xl">
-                <div class="flex flex-col md:flex-row items-center justify-between">
-                    <div class="mb-6 md:mb-0 text-center md:text-left">
-                        <h3 class="text-3xl font-black mb-2">
-                            <i class="fas fa-star mr-2"></i>
-                            Validator Marketplace
+            <!-- CTA Card -->
+            <div class="mt-20 card-cosmic rounded-3xl p-10 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20"></div>
+                <div class="relative z-10 flex flex-col md:flex-row items-center justify-between">
+                    <div class="mb-8 md:mb-0 text-center md:text-left">
+                        <h3 class="font-display text-3xl font-bold text-white mb-3 flex items-center justify-center md:justify-start">
+                            <span class="text-4xl mr-3">✦</span>
+                            ASTAR Hub
                         </h3>
-                        <p class="text-lg opacity-90 font-medium">Connect directly with 500+ certified experts in your industry</p>
+                        <p class="text-xl text-gray-300">Your mission control for startup success</p>
                     </div>
-                    <a href="/marketplace" class="bg-white text-primary px-8 py-4 rounded-xl font-black text-lg hover:shadow-2xl transition transform hover:scale-105 whitespace-nowrap">
-                        Browse Validators <i class="fas fa-arrow-right ml-2"></i>
+                    <a href="/marketplace" class="btn-cosmic text-white px-10 py-5 rounded-2xl font-bold text-lg inline-flex items-center">
+                        Enter Hub <i class="fas fa-arrow-right ml-3"></i>
                     </a>
                 </div>
             </div>
         </div>
+    </section>
 
-        <!-- Validation Form (Hidden by default) -->
-        <!-- Quick Pitch Section - Simplified Customer Journey -->
-        <div id="validation-form-section" class="mb-20 hidden">
-            <div class="max-w-4xl mx-auto">
-                <!-- Step Indicator -->
-                <div class="flex justify-center items-center mb-8 space-x-4">
-                    <div class="flex items-center">
-                        <div id="step-indicator-1" class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold">1</div>
-                        <span class="ml-2 font-semibold text-gray-900">Pitch</span>
+        <!-- Validation Form (Hidden by default) - Cosmic Theme -->
+        <div id="validation-form-section" class="hidden fixed inset-0 z-50 overflow-y-auto" style="background: rgba(5, 5, 16, 0.95); backdrop-filter: blur(10px);">
+            <div class="min-h-screen flex items-center justify-center p-4">
+                <div class="max-w-2xl w-full">
+                    <!-- Close Button -->
+                    <button onclick="hideValidationForm()" class="absolute top-6 right-6 text-gray-400 hover:text-white transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                    
+                    <!-- Step Indicator -->
+                    <div class="flex justify-center items-center mb-8 space-x-3 flex-wrap">
+                        <div class="flex items-center">
+                            <div id="step-indicator-1" class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">1</div>
+                            <span class="ml-2 font-medium text-white text-sm">Pitch</span>
+                        </div>
+                        <div class="w-8 h-0.5 bg-white/20"></div>
+                        <div class="flex items-center">
+                            <div id="step-indicator-2" class="w-10 h-10 rounded-full bg-white/10 text-gray-400 flex items-center justify-center font-bold text-sm">2</div>
+                            <span class="ml-2 font-medium text-gray-400 text-sm">Analysis</span>
+                        </div>
+                        <div class="w-8 h-0.5 bg-white/20"></div>
+                        <div class="flex items-center">
+                            <div id="step-indicator-3" class="w-10 h-10 rounded-full bg-white/10 text-gray-400 flex items-center justify-center font-bold text-sm">3</div>
+                            <span class="ml-2 font-medium text-gray-400 text-sm">Hub</span>
+                        </div>
+                        <div class="w-8 h-0.5 bg-white/20"></div>
+                        <div class="flex items-center">
+                            <div id="step-indicator-4" class="w-10 h-10 rounded-full bg-white/10 text-gray-400 flex items-center justify-center font-bold text-sm">4</div>
+                            <span class="ml-2 font-medium text-gray-400 text-sm">Launch</span>
+                        </div>
                     </div>
-                    <div class="w-12 h-1 bg-gray-300"></div>
-                    <div class="flex items-center">
-                        <div id="step-indicator-2" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">2</div>
-                        <span class="ml-2 font-semibold text-gray-600">AI Analysis</span>
-                    </div>
-                    <div class="w-12 h-1 bg-gray-300"></div>
-                    <div class="flex items-center">
-                        <div id="step-indicator-3" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">3</div>
-                        <span class="ml-2 font-semibold text-gray-600">Marketplace</span>
-                    </div>
-                    <div class="w-12 h-1 bg-gray-300"></div>
-                    <div class="flex items-center">
-                        <div id="step-indicator-4" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">4</div>
-                        <span class="ml-2 font-semibold text-gray-600">Dashboard</span>
-                    </div>
-                </div>
 
-                <!-- Step 1: Pitch Form -->
-                <div id="quick-pitch-step-1" class="bg-white rounded-2xl shadow-xl p-8">
-                    <div class="text-center mb-8">
-                        <h2 class="text-4xl font-black text-gray-900 mb-3">🚀 Pitch Your Startup Idea</h2>
-                        <p class="text-xl text-gray-600 font-medium">Get instant AI analysis and join our marketplace</p>
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mt-4 inline-block">
-                            <div class="flex items-center">
-                                <i class="fas fa-magic text-green-600 mr-2"></i>
-                                <span class="text-green-800 font-bold">Free AI Analysis + Auto-publish to Marketplace</span>
+                    <!-- Step 1: Pitch Form -->
+                    <div id="quick-pitch-step-1" class="card-cosmic rounded-3xl p-8">
+                        <div class="text-center mb-8">
+                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-4 pulse-glow">
+                                <i class="fas fa-rocket text-white text-2xl"></i>
+                            </div>
+                            <h2 class="font-display text-3xl font-bold text-white mb-3">Launch Your Idea</h2>
+                            <p class="text-gray-400">Get instant AI analysis and join the ASTAR Hub</p>
+                            <div class="inline-flex items-center mt-4 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30">
+                                <i class="fas fa-sparkles text-green-400 mr-2"></i>
+                                <span class="text-green-400 font-medium text-sm">Free AI Analysis</span>
                             </div>
                         </div>
-                    </div>
-                    
-                    <form id="quick-pitch-form" class="space-y-6" onsubmit="event.preventDefault(); submitQuickPitchForm();">
-                        <div>
-                            <label class="block text-sm font-bold text-gray-900 mb-2">
-                                💡 What's your startup idea?
-                            </label>
-                            <textarea id="pitch-idea" required rows="3"
-                                      class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none transition"
-                                      placeholder="Example: A mobile app that connects freelance designers with small businesses..."></textarea>
-                        </div>
                         
-                        <div>
-                            <label class="block text-sm font-bold text-gray-900 mb-2">
-                                🎯 What problem does it solve?
-                            </label>
-                            <textarea id="pitch-problem" required rows="3"
-                                      class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none transition"
-                                      placeholder="Example: Small businesses struggle to find affordable, quality design services..."></textarea>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-bold text-gray-900 mb-2">
-                                👥 Who is your target market?
-                            </label>
-                            <input id="pitch-market" type="text" required
-                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none transition"
-                                   placeholder="Example: Small businesses with 10-50 employees in the US" />
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-bold text-gray-900 mb-2">
-                                💰 What's your pricing model?
-                            </label>
-                            <select id="pitch-pricing-model" required
-                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none transition bg-white">
-                                <option value="">Select pricing model...</option>
-                                <option value="free">Free</option>
-                                <option value="freemium">Freemium (Free + Paid tiers)</option>
-                                <option value="one_time">One-time Payment</option>
-                                <option value="subscription_monthly">Monthly Subscription</option>
-                                <option value="subscription_yearly">Yearly Subscription</option>
-                                <option value="usage_based">Usage-based / Pay-as-you-go</option>
-                                <option value="enterprise">Enterprise / Custom Pricing</option>
-                            </select>
-                        </div>
-                        
-                        <button type="submit"
-                                class="w-full bg-gradient-to-r from-primary to-secondary text-white px-8 py-5 rounded-xl font-black text-xl hover:shadow-2xl transition-all transform hover:scale-105">
-                            <i class="fas fa-magic mr-2"></i>Analyze with AI - Free
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Step 2: AI Analysis -->
-                <div id="quick-pitch-step-2" class="hidden bg-white rounded-2xl shadow-xl p-8">
-                    <div class="text-center">
-                        <div class="animate-pulse mb-6">
-                            <div class="w-24 h-24 bg-gradient-to-r from-primary to-secondary rounded-full mx-auto flex items-center justify-center mb-4">
-                                <i class="fas fa-brain text-white text-5xl"></i>
-                            </div>
-                            <h3 class="text-3xl font-black text-gray-900 mb-2">🤖 AI is analyzing your idea...</h3>
-                            <p class="text-xl text-gray-600">Creating project, analyzing market fit, generating insights</p>
-                        </div>
-                        
-                        <div class="flex justify-center space-x-2 mt-8">
-                            <div class="w-4 h-4 bg-primary rounded-full animate-bounce" style="animation-delay: 0ms;"></div>
-                            <div class="w-4 h-4 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms;"></div>
-                            <div class="w-4 h-4 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 3: Results & Marketplace -->
-                <div id="quick-pitch-step-3" class="hidden bg-white rounded-2xl shadow-xl p-8">
-                    <div class="text-center mb-6">
-                        <div class="w-20 h-20 bg-green-500 rounded-full mx-auto flex items-center justify-center mb-4">
-                            <i class="fas fa-check text-white text-4xl"></i>
-                        </div>
-                        <h3 class="text-3xl font-black text-gray-900 mb-2">✨ Analysis Complete!</h3>
-                        <p class="text-lg text-gray-600">Your project is now live in the marketplace</p>
-                    </div>
-                    
-                    <div id="analysis-results-container" class="space-y-6">
-                        <!-- AI analysis results will be inserted here -->
-                    </div>
-
-                    <div class="mt-8 text-center">
-                        <p class="text-lg font-bold text-primary mb-4">
-                            <i class="fas fa-arrow-right mr-2"></i>
-                            Redirecting to your dashboard in <span id="redirect-countdown">5</span> seconds...
-                        </p>
-                        <button onclick="redirectToDashboard()" class="bg-gradient-to-r from-primary to-secondary text-white px-8 py-4 rounded-xl font-bold hover:shadow-xl transition">
-                            Go to Dashboard Now
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Upload Product Form Section -->
-        <div id="upload-product-form-section" class="mb-20 hidden">
-            <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl p-8">
-                <div class="text-center mb-8">
-                    <div class="w-20 h-20 bg-gradient-to-r from-green-600 to-green-700 rounded-full mx-auto flex items-center justify-center mb-4">
-                        <i class="fas fa-upload text-white text-4xl"></i>
-                    </div>
-                    <h2 class="text-4xl font-black text-gray-900 mb-4">📦 Upload Your Product</h2>
-                    <p class="text-xl text-gray-600">
-                        Already have a product ready? List it directly in the marketplace and get validated by the community!
-                    </p>
-                </div>
-
-                <form id="upload-product-form" class="space-y-6">
-                    <!-- Product Name -->
-                    <div>
-                        <label for="product-name" class="block text-sm font-bold text-gray-700 mb-2">
-                            🏷️ Product Name *
-                        </label>
-                        <input
-                            type="text"
-                            id="product-name"
-                            name="product-name"
-                            required
-                            placeholder="e.g., TaskMaster Pro, FitTracker AI..."
-                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
-                        />
-                    </div>
-
-                    <!-- Product Description -->
-                    <div>
-                        <label for="product-description" class="block text-sm font-bold text-gray-700 mb-2">
-                            📝 Product Description *
-                        </label>
-                        <textarea
-                            id="product-description"
-                            name="product-description"
-                            required
-                            rows="4"
-                            placeholder="Describe your product, its key features, and what makes it unique..."
-                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
-                        ></textarea>
-                    </div>
-
-                    <!-- Product URL -->
-                    <div>
-                        <label for="product-url" class="block text-sm font-bold text-gray-700 mb-2">
-                            🔗 Product URL *
-                        </label>
-                        <input
-                            type="url"
-                            id="product-url"
-                            name="product-url"
-                            required
-                            placeholder="https://yourproduct.com"
-                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
-                        />
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Category -->
-                        <div>
-                            <label for="product-category" class="block text-sm font-bold text-gray-700 mb-2">
-                                🎯 Category *
-                            </label>
-                            <select
-                                id="product-category"
-                                name="product-category"
-                                required
-                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
-                            >
-                                <option value="">Select a category</option>
-                                <option value="saas">SaaS</option>
-                                <option value="marketplace">Marketplace</option>
-                                <option value="ai">AI/ML</option>
-                                <option value="fintech">Fintech</option>
-                                <option value="ecommerce">E-commerce</option>
-                                <option value="education">Education</option>
-                                <option value="health">Health</option>
-                                <option value="productivity">Productivity</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-
-                        <!-- Product Stage -->
-                        <div>
-                            <label for="product-stage" class="block text-sm font-bold text-gray-700 mb-2">
-                                🚀 Product Stage *
-                            </label>
-                            <select
-                                id="product-stage"
-                                name="product-stage"
-                                required
-                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
-                            >
-                                <option value="">Select stage</option>
-                                <option value="mvp">MVP</option>
-                                <option value="beta">Beta</option>
-                                <option value="launched">Launched</option>
-                                <option value="growth">Growth Stage</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Pricing Model -->
-                    <div>
-                        <label for="product-pricing-model" class="block text-sm font-bold text-gray-700 mb-2">
-                            💰 Pricing Model *
-                        </label>
-                        <select
-                            id="product-pricing-model"
-                            name="product-pricing-model"
-                            required
-                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
-                        >
-                            <option value="">Select pricing model</option>
-                            <option value="free">Free</option>
-                            <option value="freemium">Freemium</option>
-                            <option value="one_time">One-Time Payment</option>
-                            <option value="subscription_monthly">Monthly Subscription</option>
-                            <option value="subscription_yearly">Yearly Subscription</option>
-                            <option value="usage_based">Usage-Based</option>
-                            <option value="enterprise">Enterprise/Custom</option>
-                        </select>
-                    </div>
-
-                    <!-- Compensation for Validators -->
-                    <div class="bg-blue-50 rounded-xl p-6 space-y-4">
-                        <h3 class="text-lg font-bold text-gray-900">💎 Validator Compensation</h3>
-                        <p class="text-sm text-gray-600">Reward validators who provide feedback on your product</p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <form id="quick-pitch-form" class="space-y-5" onsubmit="event.preventDefault(); submitQuickPitchForm();">
                             <div>
-                                <label for="compensation-type" class="block text-sm font-bold text-gray-700 mb-2">
-                                    Compensation Type *
+                                <label class="block text-sm font-semibold text-gray-300 mb-2">
+                                    <i class="fas fa-lightbulb text-primary mr-2"></i>What's your startup idea?
                                 </label>
-                                <select
-                                    id="compensation-type"
-                                    name="compensation-type"
-                                    required
-                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none"
-                                >
-                                    <option value="free_access">Free Access</option>
-                                    <option value="discount">Discount Code</option>
-                                    <option value="cash">Cash Payment</option>
-                                    <option value="equity">Equity</option>
+                                <textarea id="pitch-idea" required rows="3"
+                                          class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                                          placeholder="A mobile app that connects freelance designers with small businesses..."></textarea>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-300 mb-2">
+                                    <i class="fas fa-crosshairs text-secondary mr-2"></i>What problem does it solve?
+                                </label>
+                                <textarea id="pitch-problem" required rows="3"
+                                          class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                                          placeholder="Small businesses struggle to find affordable, quality design services..."></textarea>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-300 mb-2">
+                                    <i class="fas fa-users text-accent mr-2"></i>Who is your target market?
+                                </label>
+                                <input id="pitch-market" type="text" required
+                                       class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                                       placeholder="Small businesses with 10-50 employees in the US" />
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-300 mb-2">
+                                    <i class="fas fa-dollar-sign text-green-400 mr-2"></i>What's your pricing model?
+                                </label>
+                                <select id="pitch-pricing-model" required
+                                        class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition appearance-none cursor-pointer">
+                                    <option value="" class="bg-cosmic-dark">Select pricing model...</option>
+                                    <option value="free" class="bg-cosmic-dark">Free</option>
+                                    <option value="freemium" class="bg-cosmic-dark">Freemium (Free + Paid tiers)</option>
+                                    <option value="one_time" class="bg-cosmic-dark">One-time Payment</option>
+                                    <option value="subscription_monthly" class="bg-cosmic-dark">Monthly Subscription</option>
+                                    <option value="subscription_yearly" class="bg-cosmic-dark">Yearly Subscription</option>
+                                    <option value="usage_based" class="bg-cosmic-dark">Usage-based / Pay-as-you-go</option>
+                                    <option value="enterprise" class="bg-cosmic-dark">Enterprise / Custom Pricing</option>
                                 </select>
                             </div>
+                            
+                            <button type="submit"
+                                    class="w-full btn-cosmic text-white px-8 py-5 rounded-xl font-bold text-lg">
+                                <i class="fas fa-rocket mr-2"></i>Launch Analysis
+                            </button>
+                        </form>
+                    </div>
 
-                            <div>
-                                <label for="compensation-amount" class="block text-sm font-bold text-gray-700 mb-2">
-                                    Amount/Details *
-                                </label>
-                                <input
-                                    type="text"
-                                    id="compensation-amount"
-                                    name="compensation-amount"
-                                    required
-                                    placeholder="e.g., 6 months, $50, 0.1%..."
-                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none"
-                                />
+                    <!-- Step 2: AI Analysis -->
+                    <div id="quick-pitch-step-2" class="hidden card-cosmic rounded-3xl p-8">
+                        <div class="text-center">
+                            <div class="relative w-32 h-32 mx-auto mb-6">
+                                <div class="absolute inset-0 rounded-full bg-gradient-to-r from-primary to-secondary animate-spin" style="animation-duration: 3s;"></div>
+                                <div class="absolute inset-2 rounded-full bg-cosmic-dark flex items-center justify-center">
+                                    <i class="fas fa-brain text-primary text-4xl"></i>
+                                </div>
+                            </div>
+                            <h3 class="font-display text-2xl font-bold text-white mb-3">Analyzing Your Idea...</h3>
+                            <p class="text-gray-400">Our AI is scanning the market universe for opportunities</p>
+                            
+                            <div class="flex justify-center space-x-2 mt-8">
+                                <div class="w-3 h-3 bg-primary rounded-full animate-bounce" style="animation-delay: 0ms;"></div>
+                                <div class="w-3 h-3 bg-secondary rounded-full animate-bounce" style="animation-delay: 150ms;"></div>
+                                <div class="w-3 h-3 bg-accent rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Validation Settings -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="max-validators" class="block text-sm font-bold text-gray-700 mb-2">
-                                👥 Max Validators *
-                            </label>
-                            <input
-                                type="number"
-                                id="max-validators"
-                                name="max-validators"
-                                required
-                                min="1"
-                                max="100"
-                                value="10"
-                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
-                            />
+                    <!-- Step 3: Results -->
+                    <div id="quick-pitch-step-3" class="hidden card-cosmic rounded-3xl p-8">
+                        <div class="text-center mb-6">
+                            <div class="w-20 h-20 bg-green-500 rounded-full mx-auto flex items-center justify-center mb-4">
+                                <i class="fas fa-check text-white text-3xl"></i>
+                            </div>
+                            <h3 class="font-display text-2xl font-bold text-white mb-2">Analysis Complete!</h3>
+                            <p class="text-gray-400">Your project is now live in the ASTAR Hub</p>
+                        </div>
+                        
+                        <div id="analysis-results-container" class="space-y-4 text-white">
+                            <!-- AI analysis results will be inserted here -->
                         </div>
 
-                        <div>
-                            <label for="duration-days" class="block text-sm font-bold text-gray-700 mb-2">
-                                ⏱️ Duration (days) *
-                            </label>
-                            <input
-                                type="number"
-                                id="duration-days"
-                                name="duration-days"
-                                required
-                                min="1"
-                                max="90"
-                                value="30"
-                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-primary focus:outline-none text-lg"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <div class="flex gap-4">
-                        <button
-                            type="button"
-                            onclick="hideUploadProductForm()"
-                            class="flex-1 bg-gray-300 text-gray-700 px-8 py-4 rounded-xl font-bold hover:bg-gray-400 transition"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            class="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-4 rounded-xl font-bold hover:shadow-xl transition"
-                        >
-                            <i class="fas fa-upload mr-2"></i>
-                            Upload Product
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Upload Product Success Screen -->
-        <div id="upload-product-success" class="mb-20 hidden">
-            <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl p-8">
-                <div class="text-center mb-6">
-                    <div class="w-20 h-20 bg-green-500 rounded-full mx-auto flex items-center justify-center mb-4">
-                        <i class="fas fa-check text-white text-4xl"></i>
-                    </div>
-                    <h3 class="text-3xl font-black text-gray-900 mb-2">🎉 Product Uploaded Successfully!</h3>
-                    <p class="text-lg text-gray-600">Your product is now live in the marketplace</p>
-                </div>
-
-                <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 mb-6">
-                    <div class="flex items-center justify-center mb-4">
-                        <i class="fas fa-rocket text-4xl text-primary mr-4"></i>
-                        <div class="text-left">
-                            <h4 class="text-xl font-bold text-gray-900">What's Next?</h4>
-                            <p class="text-gray-600">Manage your product and track validator feedback</p>
+                        <div class="mt-8 text-center">
+                            <p class="text-primary font-medium mb-4">
+                                <i class="fas fa-rocket mr-2"></i>
+                                Launching in <span id="redirect-countdown">5</span> seconds...
+                            </p>
+                            <button onclick="redirectToDashboard()" class="btn-cosmic text-white px-8 py-4 rounded-xl font-bold">
+                                Go to Mission Control
+                            </button>
                         </div>
                     </div>
                 </div>
-
-                <div class="mt-8 text-center">
-                    <p class="text-lg font-bold text-primary mb-4">
-                        <i class="fas fa-arrow-right mr-2"></i>
-                        Redirecting to your dashboard in <span id="upload-redirect-countdown">5</span> seconds...
-                    </p>
-                    <button onclick="redirectToDashboard()" class="bg-gradient-to-r from-primary to-secondary text-white px-8 py-4 rounded-xl font-bold hover:shadow-xl transition">
-                        Go to Dashboard Now
-                    </button>
-                </div>
             </div>
         </div>
 
-        <!-- Projects Dashboard -->
-        <div id="projects-section" class="mb-20">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-3xl font-bold text-gray-900">My Projects</h2>
-                <button onclick="showValidationForm()" class="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition">
-                    <i class="fas fa-plus mr-2"></i>New Project
-                </button>
-            </div>
-            
-            <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Projects will be loaded here -->
-            </div>
-        </div>
-
-        <!-- Beta Users Panel -->
-        <div id="beta-panel" class="mb-20">
-            <h2 class="text-3xl font-bold text-gray-900 mb-4 text-center">Beta User Panel</h2>
-            <p class="text-xl text-gray-600 mb-8 text-center font-medium">
-                Access 10,000+ pre-qualified beta users in your niche
-            </p>
-            
-            <div id="beta-users-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Beta users will be loaded here -->
-            </div>
-        </div>
-
-        <!-- Pricing Section -->
-        <div id="pricing" class="mb-20 bg-white py-20">
-            <h2 class="text-5xl font-black text-gray-900 mb-4 text-center">Pricing Plans</h2>
-            <p class="text-xl text-gray-600 mb-12 text-center max-w-3xl mx-auto font-medium">Choose the perfect plan for your growth stage</p>
-            
-            <!-- Plan Type Selector -->
-            <div class="flex justify-center mb-8">
-                <div class="bg-gray-100 rounded-xl p-1 inline-flex">
-                    <button id="platform-plans-btn" onclick="switchPlanType('platform')" class="px-6 py-3 rounded-lg font-bold transition bg-white shadow-sm text-gray-900">
-                        🎯 Full Platform
-                        <span class="block text-xs font-normal mt-1 text-gray-600">MVP + AI + Marketplace</span>
-                    </button>
-                    <button id="marketplace-plans-btn" onclick="switchPlanType('marketplace')" class="px-6 py-3 rounded-lg font-bold transition text-gray-700 hover:bg-white/50">
-                        🏪 Marketplace Only
-                        <span class="block text-xs font-normal mt-1 text-gray-600">Validator Network</span>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Description based on plan type -->
-            <div id="platform-description" class="text-center mb-8 max-w-3xl mx-auto">
-                <p class="text-gray-600 font-medium">
-                    <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                    Includes: AI MVP Generator, Automated Validation, Analytics, and full Marketplace access
+    <!-- Features Section -->
+    <section id="features" class="relative py-32">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-20">
+                <span class="text-secondary font-semibold text-sm tracking-wider uppercase mb-4 block">Superpowers</span>
+                <h2 class="font-display text-4xl sm:text-5xl font-bold text-white mb-6">
+                    Your <span class="text-gradient-cosmic">Cosmic Toolkit</span>
+                </h2>
+                <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                    Everything you need to navigate the startup universe
                 </p>
             </div>
             
-            <div id="marketplace-description" class="hidden text-center mb-8 max-w-3xl mx-auto">
-                <p class="text-gray-600 font-medium">
-                    <i class="fas fa-info-circle text-primary mr-2"></i>
-                    Marketplace access only. <strong>Perfect if you already have your product</strong> and just need expert feedback.
-                </p>
-            </div>
-            
-            <!-- Billing Toggle -->
-            <div class="flex justify-center mb-12">
-                <div class="bg-gray-100 rounded-xl p-1 inline-flex">
-                    <button id="monthly-billing-btn" onclick="switchBillingCycle('monthly')" class="px-6 py-2 rounded-lg font-bold transition bg-white shadow-sm text-gray-900">
-                        Monthly
-                    </button>
-                    <button id="yearly-billing-btn" onclick="switchBillingCycle('yearly')" class="px-6 py-2 rounded-lg font-bold transition text-gray-700 hover:bg-white/50">
-                        Annual <span class="text-green-600 text-xs ml-1 font-bold">-20%</span>
-                    </button>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="card-cosmic rounded-2xl p-8 group">
+                    <div class="w-14 h-14 mb-6 rounded-2xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition">
+                        <i class="fas fa-brain text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">AI Analysis Engine</h3>
+                    <p class="text-gray-400 leading-relaxed">Advanced AI that analyzes market trends, competitors, and opportunities in real-time</p>
                 </div>
-            </div>
-            
-            <!-- Plans Grid (will be populated dynamically) -->
-            <div id="pricing-plans-grid" class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                <!-- Loading state -->
-                <div class="col-span-3 text-center py-12">
-                    <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p class="text-gray-600">Cargando planes...</p>
-                </div>
-            </div>
-
-            <!-- Managed Services -->
-            <div class="mt-20 bg-gray-50 rounded-2xl p-10">
-                <h3 class="text-3xl font-black text-gray-900 mb-3 text-center">Managed Services</h3>
-                <p class="text-gray-600 mb-12 text-center font-medium">Our experts do the work for you</p>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition">
-                        <h4 class="text-xl font-bold text-gray-900 mb-2">Express Validation</h4>
-                        <div class="text-4xl font-black text-gray-900 mb-6">$2,997</div>
-                        <ul class="space-y-3 text-gray-700 font-medium">
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>Deep market analysis</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>20+ user interviews</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>2-week delivery</span>
-                            </li>
-                        </ul>
+                <div class="card-cosmic rounded-2xl p-8 group">
+                    <div class="w-14 h-14 mb-6 rounded-2xl bg-secondary/20 flex items-center justify-center group-hover:bg-secondary/30 transition">
+                        <i class="fas fa-users text-secondary text-2xl"></i>
                     </div>
-                    
-                    <div class="bg-white rounded-xl shadow-sm border-2 border-primary p-8 hover:shadow-md transition relative">
-                        <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-primary to-secondary text-white px-4 py-1 rounded-full text-sm font-bold">
-                            Most Popular
-                        </div>
-                        <h4 class="text-xl font-bold text-gray-900 mb-2">MVP + Growth Launch</h4>
-                        <div class="text-4xl font-black text-gray-900 mb-6">$14,997</div>
-                        <ul class="space-y-3 text-gray-700 font-medium">
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>Full functional MVP</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>Growth Marketing Launch</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>6-8 week delivery</span>
-                            </li>
-                        </ul>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">Expert Validators</h3>
+                    <p class="text-gray-400 leading-relaxed">Connect with 500+ industry experts who provide actionable feedback</p>
+                </div>
+                
+                <div class="card-cosmic rounded-2xl p-8 group">
+                    <div class="w-14 h-14 mb-6 rounded-2xl bg-accent/20 flex items-center justify-center group-hover:bg-accent/30 transition">
+                        <i class="fas fa-chart-line text-accent text-2xl"></i>
                     </div>
-                    
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition">
-                        <h4 class="text-xl font-bold text-gray-900 mb-2">Growth Retainer</h4>
-                        <div class="text-4xl font-black text-gray-900 mb-6">$3,997<span class="text-xl text-gray-500">/mo</span></div>
-                        <ul class="space-y-3 text-gray-700 font-medium">
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>Startup ($3,997/mo)</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>Scale-up ($7,997/mo)</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check text-green-500 mr-3 mt-1"></i>
-                                <span>Enterprise ($14,997/mes)</span>
-                            </li>
-                        </ul>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">Growth Dashboard</h3>
+                    <p class="text-gray-400 leading-relaxed">Track your metrics, goals, and progress with beautiful visualizations</p>
+                </div>
+                
+                <div class="card-cosmic rounded-2xl p-8 group">
+                    <div class="w-14 h-14 mb-6 rounded-2xl bg-green-500/20 flex items-center justify-center group-hover:bg-green-500/30 transition">
+                        <i class="fas fa-comments text-green-400 text-2xl"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">Direct Messaging</h3>
+                    <p class="text-gray-400 leading-relaxed">Communicate directly with validators and mentors in real-time</p>
+                </div>
+                
+                <div class="card-cosmic rounded-2xl p-8 group">
+                    <div class="w-14 h-14 mb-6 rounded-2xl bg-pink-500/20 flex items-center justify-center group-hover:bg-pink-500/30 transition">
+                        <i class="fas fa-robot text-pink-400 text-2xl"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">AI Marketing Agent</h3>
+                    <p class="text-gray-400 leading-relaxed">Get personalized marketing strategies powered by AI</p>
+                </div>
+                
+                <div class="card-cosmic rounded-2xl p-8 group">
+                    <div class="w-14 h-14 mb-6 rounded-2xl bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/30 transition">
+                        <i class="fas fa-trophy text-blue-400 text-2xl"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">Leaderboard</h3>
+                    <p class="text-gray-400 leading-relaxed">Compete with other startups and climb the rankings</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="relative py-32">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="card-cosmic rounded-3xl p-12 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10"></div>
+                <div class="relative z-10">
+                    <h2 class="font-display text-4xl sm:text-5xl font-bold text-white mb-6">
+                        Ready to Launch?
+                    </h2>
+                    <p class="text-xl text-gray-400 mb-10 max-w-xl mx-auto">
+                        Join thousands of founders who are already building the future with ASTAR* Labs
+                    </p>
+                    <div class="flex flex-col sm:flex-row justify-center gap-4">
+                        <button onclick="showValidationForm()" class="btn-cosmic text-white px-10 py-5 rounded-2xl font-bold text-lg inline-flex items-center justify-center">
+                            <i class="fas fa-rocket mr-3"></i>
+                            Start Your Journey
+                        </button>
+                        <a href="/marketplace" class="btn-outline-cosmic text-white px-10 py-5 rounded-2xl font-bold text-lg inline-flex items-center justify-center">
+                            <i class="fas fa-compass mr-3"></i>
+                            Explore Hub
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
-            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+    <!-- Auth Modal - Cosmic Theme -->
+    <div id="auth-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(5, 5, 16, 0.95); backdrop-filter: blur(10px);">
+        <div class="card-cosmic rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white z-10 transition">
                 <i class="fas fa-times text-xl"></i>
             </button>
-            <div id="auth-modal-content" class="p-6 sm:p-8">
+            <div id="auth-modal-content" class="p-8">
                 <!-- Auth form will be inserted here -->
             </div>
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="bg-gray-900 text-white py-16">
+    <!-- Footer - Cosmic Theme -->
+    <footer class="relative border-t border-white/5 py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-                <div>
-                    <h3 class="text-2xl font-black mb-4">ValidAI Studio</h3>
-                    <p class="text-gray-400 leading-relaxed font-medium">We validate and launch successful startups 10x faster using AI and the studio model.</p>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+                <div class="md:col-span-1">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                            <span class="text-white font-bold text-xl">✦</span>
+                        </div>
+                        <span class="text-xl font-display font-bold text-gradient-cosmic">ASTAR* Labs</span>
+                    </div>
+                    <p class="text-gray-400 leading-relaxed">Launching startups to the stars with AI-powered validation and expert networks.</p>
                 </div>
                 <div>
-                    <h4 class="font-bold mb-4 text-white">Product</h4>
-                    <ul class="space-y-3 text-gray-400 font-medium">
-                        <li><a href="#" class="hover:text-white transition">Platform</a></li>
-                        <li><a href="#" class="hover:text-white transition">Venture Studio</a></li>
-                        <li><a href="#pricing" class="hover:text-white transition">Pricing</a></li>
+                    <h4 class="font-display font-bold mb-6 text-white">Product</h4>
+                    <ul class="space-y-4 text-gray-400">
+                        <li><a href="#journey" class="hover:text-primary transition">Journey</a></li>
+                        <li><a href="#features" class="hover:text-primary transition">Features</a></li>
+                        <li><a href="/marketplace" class="hover:text-primary transition">ASTAR Hub</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-bold mb-4 text-white">Resources</h4>
-                    <ul class="space-y-3 text-gray-400 font-medium">
-                        <li><a href="#" class="hover:text-white transition">Blog</a></li>
-                        <li><a href="#" class="hover:text-white transition">Success Stories</a></li>
-                        <li><a href="#" class="hover:text-white transition">Documentation</a></li>
+                    <h4 class="font-display font-bold mb-6 text-white">Resources</h4>
+                    <ul class="space-y-4 text-gray-400">
+                        <li><a href="#" class="hover:text-primary transition">Blog</a></li>
+                        <li><a href="#" class="hover:text-primary transition">Success Stories</a></li>
+                        <li><a href="#" class="hover:text-primary transition">Documentation</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-bold mb-4 text-white">Company</h4>
-                    <ul class="space-y-3 text-gray-400 font-medium">
-                        <li><a href="#" class="hover:text-white transition">About</a></li>
-                        <li><a href="#" class="hover:text-white transition">Join the Team</a></li>
-                        <li><a href="#" class="hover:text-white transition">Contact</a></li>
+                    <h4 class="font-display font-bold mb-6 text-white">Company</h4>
+                    <ul class="space-y-4 text-gray-400">
+                        <li><a href="#" class="hover:text-primary transition">About</a></li>
+                        <li><a href="#" class="hover:text-primary transition">Careers</a></li>
+                        <li><a href="#" class="hover:text-primary transition">Contact</a></li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-                <p class="text-gray-400 text-sm font-medium">&copy; 2025 ValidAI Studio. All rights reserved.</p>
+            <div class="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-500 text-sm">&copy; 2025 ASTAR* Labs. All rights reserved.</p>
                 <div class="flex gap-6 mt-4 md:mt-0">
-                    <a href="#" class="text-gray-400 hover:text-white transition">
+                    <a href="#" class="text-gray-400 hover:text-primary transition">
                         <i class="fab fa-twitter text-xl"></i>
                     </a>
-                    <a href="#" class="text-gray-400 hover:text-white transition">
+                    <a href="#" class="text-gray-400 hover:text-primary transition">
                         <i class="fab fa-linkedin text-xl"></i>
                     </a>
-                    <a href="#" class="text-gray-400 hover:text-white transition">
+                    <a href="#" class="text-gray-400 hover:text-primary transition">
                         <i class="fab fa-github text-xl"></i>
                     </a>
                 </div>
@@ -1175,12 +1118,26 @@ app.get('/', (c) => {
         });
       });
 
-      // Show validation form
+      // Show validation form - Cosmic Modal
       function showValidationForm() {
         const section = document.getElementById('validation-form-section');
         if (section) {
           section.classList.remove('hidden');
-          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          document.body.style.overflow = 'hidden';
+        }
+      }
+      
+      // Hide validation form
+      function hideValidationForm() {
+        const section = document.getElementById('validation-form-section');
+        if (section) {
+          section.classList.add('hidden');
+          document.body.style.overflow = '';
+          // Reset form
+          document.getElementById('quick-pitch-step-1')?.classList.remove('hidden');
+          document.getElementById('quick-pitch-step-2')?.classList.add('hidden');
+          document.getElementById('quick-pitch-step-3')?.classList.add('hidden');
+          updateStepIndicator(1);
         }
       }
 
@@ -1235,7 +1192,7 @@ app.get('/', (c) => {
           '</div>';
       }
 
-      // Show auth modal
+      // Show auth modal - Cosmic Theme
       function showAuthModal(mode) {
         const modal = document.getElementById('auth-modal');
         const modalContent = document.getElementById('auth-modal-content');
@@ -1246,35 +1203,39 @@ app.get('/', (c) => {
 
         if (mode === 'login') {
           const loginHtml = '<div class="text-center">' +
-            '<i class="fas fa-sign-in-alt text-5xl mb-4" style="background: linear-gradient(45deg, #FF6154, #FB651E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>' +
-            '<h2 class="text-3xl font-black text-gray-900 mb-2">Sign In</h2>' +
-            '<p class="text-gray-600 mb-6 font-medium">Access your ValidAI Studio account</p>' +
-            '<button onclick="showRoleSelection(\\\'login\\\')" class="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3 mb-6">' +
-              '<i class="fab fa-google text-2xl"></i>' +
+            '<div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">' +
+              '<i class="fas fa-rocket text-white text-2xl"></i>' +
+            '</div>' +
+            '<h2 class="font-display text-3xl font-bold text-white mb-2">Welcome Back</h2>' +
+            '<p class="text-gray-400 mb-8">Continue your journey through the stars</p>' +
+            '<button onclick="showRoleSelection(\\\'login\\\')" class="w-full btn-cosmic text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-3 mb-6">' +
+              '<i class="fab fa-google text-xl"></i>' +
               '<span class="text-lg">Continue with Google</span>' +
             '</button>' +
-            '<p class="text-sm text-gray-600 mt-4">' +
-              'Don&apos;t have an account? <a href="#" onclick="showAuthModal(\\\'register\\\')" class="text-primary hover:underline font-bold">Sign Up</a>' +
+            '<p class="text-sm text-gray-400">' +
+              'New to ASTAR*? <a href="#" onclick="showAuthModal(\\\'register\\\')" class="text-primary hover:text-primary/80 font-semibold">Create Account</a>' +
             '</p>' +
           '</div>';
           modalContent.innerHTML = loginHtml;
         } else if (mode === 'register') {
           const registerHtml = '<div class="text-center">' +
-            '<i class="fas fa-user-plus text-5xl mb-4" style="background: linear-gradient(45deg, #FF6154, #FB651E); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>' +
-            '<h2 class="text-3xl font-black text-gray-900 mb-2">Get Started</h2>' +
-            '<p class="text-gray-600 mb-8 font-medium">Choose your role to register</p>' +
+            '<div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">' +
+              '<span class="text-white text-2xl">✦</span>' +
+            '</div>' +
+            '<h2 class="font-display text-3xl font-bold text-white mb-2">Join ASTAR*</h2>' +
+            '<p class="text-gray-400 mb-8">Choose your mission</p>' +
             '<div class="space-y-4">' +
-              '<button onclick="loginAsFounder()" class="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">' +
-                '<i class="fas fa-lightbulb text-2xl"></i>' +
-                '<span class="text-lg">Founder - Create & Validate</span>' +
+              '<button onclick="loginAsFounder()" class="w-full btn-cosmic text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-3">' +
+                '<i class="fas fa-rocket text-xl"></i>' +
+                '<span class="text-lg">Founder - Launch Ideas</span>' +
               '</button>' +
-              '<button onclick="loginAsValidator()" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-xl text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-3">' +
-                '<i class="fas fa-star text-2xl"></i>' +
-                '<span class="text-lg">Validator - Vote & Rate</span>' +
+              '<button onclick="loginAsValidator()" class="w-full btn-outline-cosmic text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-3">' +
+                '<i class="fas fa-star text-xl"></i>' +
+                '<span class="text-lg">Validator - Guide Startups</span>' +
               '</button>' +
             '</div>' +
-            '<p class="text-sm text-gray-600 mt-6">' +
-              'Already have an account? <a href="#" onclick="showAuthModal(\\\'login\\\')" class="text-primary hover:underline font-bold">Sign In</a>' +
+            '<p class="text-sm text-gray-400 mt-6">' +
+              'Already aboard? <a href="#" onclick="showAuthModal(\\\'login\\\')" class="text-primary hover:text-primary/80 font-semibold">Sign In</a>' +
             '</p>' +
           '</div>';
           modalContent.innerHTML = registerHtml;
@@ -1360,26 +1321,29 @@ app.get('/', (c) => {
         }
       }
 
-      // Update authentication UI
+      // Update authentication UI - Cosmic Theme
       function updateAuthUI() {
         const authToken = localStorage.getItem('authToken');
         const navButtons = document.querySelectorAll('.nav-auth-buttons');
 
         if (authToken) {
-          // User is logged in - show logout option
-          const logoutHtml = '<button onclick="logout()" class="text-gray-700 hover:text-primary transition">' +
-            '<i class="fas fa-sign-out-alt mr-1"></i>Cerrar Sesión' +
+          // User is logged in - show hub and logout options
+          const logoutHtml = '<a href="/marketplace" class="text-gray-300 hover:text-white transition font-medium mr-4">' +
+            '<i class="fas fa-rocket mr-2 text-primary"></i>Hub' +
+            '</a>' +
+            '<button onclick="logout()" class="text-gray-300 hover:text-white transition font-medium">' +
+            '<i class="fas fa-sign-out-alt mr-2"></i>Sign Out' +
             '</button>';
           navButtons.forEach(btn => {
             btn.innerHTML = logoutHtml;
           });
         } else {
           // User is not logged in - show login/register options
-          const loginHtml = '<button onclick="showAuthModal(\\\'login\\\')" class="text-gray-700 hover:text-primary transition">' +
-            '<i class="fas fa-sign-in-alt mr-1"></i>Iniciar Sesión' +
+          const loginHtml = '<button onclick="showAuthModal(\\\'login\\\')" class="text-gray-300 hover:text-white transition font-medium px-4 py-2">' +
+            'Sign In' +
             '</button>' +
-            '<button onclick="showAuthModal(\\\'register\\\')" class="ml-4 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">' +
-            '<i class="fas fa-user-plus mr-1"></i>Registrarse' +
+            '<button onclick="showAuthModal(\\\'register\\\')" class="btn-cosmic text-white px-6 py-2.5 rounded-xl font-semibold">' +
+            'Launch Now' +
             '</button>';
           navButtons.forEach(btn => {
             btn.innerHTML = loginHtml;
@@ -1394,47 +1358,7 @@ app.get('/', (c) => {
         alert('Sesión cerrada exitosamente');
       }
 
-      // Switch plan type
-      function switchPlanType(type) {
-        const platformBtn = document.getElementById('platform-plans-btn');
-        const marketplaceBtn = document.getElementById('marketplace-plans-btn');
-        const platformDesc = document.getElementById('platform-description');
-        const marketplaceDesc = document.getElementById('marketplace-description');
-        
-        if (type === 'platform') {
-          platformBtn.classList.add('bg-white', 'text-primary');
-          platformBtn.classList.remove('text-white', 'hover:bg-white/10');
-          marketplaceBtn.classList.remove('bg-white', 'text-primary');
-          marketplaceBtn.classList.add('text-white', 'hover:bg-white/10');
-          platformDesc.classList.remove('hidden');
-          marketplaceDesc.classList.add('hidden');
-        } else {
-          marketplaceBtn.classList.add('bg-white', 'text-primary');
-          marketplaceBtn.classList.remove('text-white', 'hover:bg-white/10');
-          platformBtn.classList.remove('bg-white', 'text-primary');
-          platformBtn.classList.add('text-white', 'hover:bg-white/10');
-          marketplaceDesc.classList.remove('hidden');
-          platformDesc.classList.add('hidden');
-        }
-      }
 
-      // Switch billing cycle
-      function switchBillingCycle(cycle) {
-        const monthlyBtn = document.getElementById('monthly-billing-btn');
-        const yearlyBtn = document.getElementById('yearly-billing-btn');
-        
-        if (cycle === 'monthly') {
-          monthlyBtn.classList.add('bg-primary', 'text-white');
-          monthlyBtn.classList.remove('text-gray-700', 'hover:bg-gray-100');
-          yearlyBtn.classList.remove('bg-primary', 'text-white');
-          yearlyBtn.classList.add('text-gray-700', 'hover:bg-gray-100');
-        } else {
-          yearlyBtn.classList.add('bg-primary', 'text-white');
-          yearlyBtn.classList.remove('text-gray-700', 'hover:bg-gray-100');
-          monthlyBtn.classList.remove('bg-primary', 'text-white');
-          monthlyBtn.classList.add('text-gray-700', 'hover:bg-gray-100');
-        }
-      }
 
       // Check for product parameter and redirect to marketplace, and handle OAuth callback
       document.addEventListener('DOMContentLoaded', () => {
@@ -1579,124 +1503,25 @@ app.get('/', (c) => {
         }
       }
 
-      // Upload Product Form Functions
+      // Upload Product - Redirect to Hub
       function showUploadProductForm() {
-        // Check if user is authenticated
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-          alert('Please sign up or log in to upload your product');
-          window.location.href = '/marketplace#signup';
-          return;
-        }
-
-        const section = document.getElementById('upload-product-form-section');
-        if (section) {
-          section.classList.remove('hidden');
-          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        window.location.href = '/marketplace';
       }
 
-      function hideUploadProductForm() {
-        const section = document.getElementById('upload-product-form-section');
-        if (section) {
-          section.classList.add('hidden');
-        }
-      }
-
-      // Handle Upload Product form submission
-      document.getElementById('upload-product-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-          alert('Please sign up or log in first');
-          window.location.href = '/marketplace#signup';
-          return;
-        }
-
-        const productName = document.getElementById('product-name').value.trim();
-        const productDescription = document.getElementById('product-description').value.trim();
-        const productUrl = document.getElementById('product-url').value.trim();
-        const productCategory = document.getElementById('product-category').value;
-        const productStage = document.getElementById('product-stage').value;
-        const pricingModel = document.getElementById('product-pricing-model').value;
-        const compensationType = document.getElementById('compensation-type').value;
-        const compensationAmount = document.getElementById('compensation-amount').value.trim();
-        const maxValidators = parseInt(document.getElementById('max-validators').value);
-        const durationDays = parseInt(document.getElementById('duration-days').value);
-
-        // Validation
-        if (!productName || !productDescription || !productUrl || !productCategory || 
-            !productStage || !pricingModel || !compensationType || !compensationAmount) {
-          alert('Please fill in all required fields');
-          return;
-        }
-
-        try {
-          const response = await axios.post('/api/marketplace/products', {
-            title: productName,
-            description: productDescription,
-            url: productUrl,
-            category: productCategory,
-            stage: productStage,
-            pricing_model: pricingModel,
-            compensation_type: compensationType,
-            compensation_amount: compensationAmount,
-            validators_needed: maxValidators,
-            duration_days: durationDays,
-            status: 'active'
-          }, {
-            headers: {
-              'Authorization': 'Bearer ' + token,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (response.data.success) {
-            // Reset form
-            document.getElementById('upload-product-form').reset();
-            
-            // Hide form
-            hideUploadProductForm();
-            
-            // Show success screen
-            const successScreen = document.getElementById('upload-product-success');
-            if (successScreen) {
-              successScreen.classList.remove('hidden');
-              successScreen.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-            
-            // Start countdown for auto-redirect
-            startUploadRedirectCountdown();
-          } else {
-            throw new Error(response.data.error || 'Failed to upload product');
-          }
-        } catch (error) {
-          console.error('Error uploading product:', error);
-          
-          if (error.response && error.response.status === 401) {
-            alert('Session expired. Please log in again.');
-            window.location.href = '/marketplace#login';
-            return;
-          }
-          
-          alert('Error uploading product: ' + (error.response?.data?.error || error.message || 'Please try again'));
-        }
-      });
-
+      // Update step indicator - Cosmic Theme
       function updateStepIndicator(activeStep) {
         for (let i = 1; i <= 4; i++) {
           const indicator = document.getElementById('step-indicator-' + i);
           if (!indicator) continue;
 
           if (i < activeStep) {
-            indicator.className = 'w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold';
+            indicator.className = 'w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-sm';
             indicator.innerHTML = '<i class="fas fa-check"></i>';
           } else if (i === activeStep) {
-            indicator.className = 'w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold';
+            indicator.className = 'w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm';
             indicator.textContent = i;
           } else {
-            indicator.className = 'w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold';
+            indicator.className = 'w-10 h-10 rounded-full bg-white/10 text-gray-400 flex items-center justify-center font-bold text-sm';
             indicator.textContent = i;
           }
         }
@@ -1781,22 +1606,7 @@ app.get('/', (c) => {
         }, 1000);
       }
 
-      function startUploadRedirectCountdown() {
-        let countdown = 5;
-        const countdownEl = document.getElementById('upload-redirect-countdown');
-        
-        const interval = setInterval(() => {
-          countdown--;
-          if (countdownEl) {
-            countdownEl.textContent = countdown;
-          }
-          
-          if (countdown <= 0) {
-            clearInterval(interval);
-            redirectToDashboard();
-          }
-        }, 1000);
-      }
+
 
       function redirectToDashboard() {
         // Redirect to marketplace personal dashboard with goals
