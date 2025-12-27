@@ -4,6 +4,9 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   plan TEXT DEFAULT 'starter',
+  role TEXT DEFAULT 'user',
+  bio TEXT,
+  company TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
