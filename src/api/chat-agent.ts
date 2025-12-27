@@ -38,7 +38,7 @@ app.get('/history', jwtMiddleware, async (c) => {
   
   try {
     const messages = await c.env.DB.prepare(`
-      SELECT * FROM chat_messages
+      SELECT * FROM agent_chat_messages
       WHERE user_id = ?
       ORDER BY created_at DESC
       LIMIT 50
@@ -66,7 +66,7 @@ app.post('/message', jwtMiddleware, async (c) => {
   try {
     // Save user message
     await c.env.DB.prepare(`
-      INSERT INTO chat_messages (user_id, project_id, role, content, created_at)
+      INSERT INTO agent_chat_messages (user_id, project_id, role, content, created_at)
       VALUES (?, ?, 'user', ?, datetime('now'))
     `).bind(user.userId, projectId || null, message).run();
 
@@ -108,7 +108,7 @@ app.post('/message', jwtMiddleware, async (c) => {
 
     // Save assistant response
     await c.env.DB.prepare(`
-      INSERT INTO chat_messages (user_id, project_id, role, content, created_at)
+      INSERT INTO agent_chat_messages (user_id, project_id, role, content, created_at)
       VALUES (?, ?, 'assistant', ?, datetime('now'))
     `).bind(user.userId, projectId || null, assistantMessage).run();
 
@@ -237,7 +237,7 @@ app.delete('/history', jwtMiddleware, async (c) => {
 
   try {
     await c.env.DB.prepare(`
-      DELETE FROM chat_messages WHERE user_id = ?
+      DELETE FROM agent_chat_messages WHERE user_id = ?
     `).bind(user.userId).run();
 
     return c.json({ success: true });
@@ -274,7 +274,7 @@ app.post('/analyze-goals', jwtMiddleware, async (c) => {
 
     // Save as chat message
     await c.env.DB.prepare(`
-      INSERT INTO chat_messages (user_id, role, content, created_at)
+      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
       VALUES (?, 'assistant', ?, datetime('now'))
     `).bind(user.userId, analysis).run();
 
@@ -309,7 +309,7 @@ app.post('/marketing-plan', jwtMiddleware, async (c) => {
 
     // Save as chat message
     await c.env.DB.prepare(`
-      INSERT INTO chat_messages (user_id, role, content, created_at)
+      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
       VALUES (?, 'assistant', ?, datetime('now'))
     `).bind(user.userId, plan).run();
 
@@ -348,7 +348,7 @@ app.post('/content-ideas', jwtMiddleware, async (c) => {
 
     // Save as chat message
     await c.env.DB.prepare(`
-      INSERT INTO chat_messages (user_id, role, content, created_at)
+      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
       VALUES (?, 'assistant', ?, datetime('now'))
     `).bind(user.userId, ideas).run();
 
@@ -387,7 +387,7 @@ app.post('/competition-analysis', jwtMiddleware, async (c) => {
 
     // Save as chat message
     await c.env.DB.prepare(`
-      INSERT INTO chat_messages (user_id, role, content, created_at)
+      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
       VALUES (?, 'assistant', ?, datetime('now'))
     `).bind(user.userId, analysis).run();
 
