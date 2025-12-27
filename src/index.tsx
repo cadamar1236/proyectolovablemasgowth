@@ -178,7 +178,7 @@ app.get('/', (c) => {
       .cosmic-bg {
         background: linear-gradient(180deg, #050510 0%, #0a0a1a 50%, #1a1a3e 100%);
         position: relative;
-        overflow: hidden;
+        overflow-x: hidden;
       }
       
       /* Stars Animation */
