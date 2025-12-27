@@ -1944,18 +1944,25 @@ app.get('/project/:id', async (c) => {
   `);
 });
 
-// Marketplace Page - Redirect to dashboard for now (uses same layout)
+// Marketplace Page - ASTAR Hub Dashboard for Startups
 app.get('/marketplace', async (c) => {
-  // Check authentication
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
   
   if (!authToken) {
     return c.redirect('/api/auth/google');
   }
-  
-  // For now, redirect to dashboard which has the sidebar layout
-  // TODO: Create marketplace-specific content while keeping the layout
-  return c.redirect('/dashboard');
+
+  try {
+    const payload = await verify(authToken, c.env.JWT_SECRET || JWT_SECRET) as any;
+    const userName = payload.userName || payload.email || 'Usuario';
+    const userAvatar = payload.avatar_url;
+    const userRole = payload.role || 'founder';
+    
+    const html = getMarketplacePage(userName, userAvatar, userRole);
+    return c.html(html);
+  } catch (error) {
+    return c.redirect('/api/auth/google');
+  }
 });
 
 // Leaderboard Page (continuará en el siguiente mensaje debido a límites de longitud)

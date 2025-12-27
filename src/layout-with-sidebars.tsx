@@ -296,6 +296,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
     </div>
 
     <script>
+        // Configure axios to send cookies
+        axios.defaults.withCredentials = true;
+
         // Chat Sidebar Toggle
         let chatSidebarOpen = true;
 
@@ -341,17 +344,33 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             try {
                 const response = await axios.post('/api/chat-agent/message', {
                     message: message
+                }, {
+                    withCredentials: true
                 });
 
                 // Hide loading
                 document.getElementById('chat-loading').classList.add('hidden');
 
                 // Add assistant response
-                addMessageToChat('assistant', response.data.message);
+                if (response.data && response.data.message) {
+                    addMessageToChat('assistant', response.data.message);
+                } else {
+                    addMessageToChat('assistant', 'Recibí tu mensaje pero no pude generar una respuesta.');
+                }
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', 'Lo siento, hubo un error. Por favor intenta de nuevo.');
                 console.error('Chat error:', error);
+                
+                // More detailed error message
+                let errorMessage = 'Lo siento, hubo un error. Por favor intenta de nuevo.';
+                if (error.response) {
+                    if (error.response.status === 401) {
+                        errorMessage = 'Tu sesión ha expirado. Por favor recarga la página.';
+                    } else if (error.response.data && error.response.data.error) {
+                        errorMessage = 'Error: ' + error.response.data.error;
+                    }
+                }
+                addMessageToChat('assistant', errorMessage);
             }
         }
 
@@ -386,13 +405,16 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             document.getElementById('chat-loading').classList.remove('hidden');
             
             try {
-                const response = await axios.post('/api/chat-agent/analyze-goals', {});
+                const response = await axios.post('/api/chat-agent/analyze-goals', {}, {
+                    withCredentials: true
+                });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', response.data.analysis);
+                addMessageToChat('assistant', response.data.analysis || 'Análisis completado.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', 'Error al analizar objetivos');
+                console.error('Error analyzing goals:', error);
+                addMessageToChat('assistant', 'Error al analizar objetivos. Por favor intenta de nuevo.');
             }
         }
 
@@ -403,13 +425,16 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             try {
                 const response = await axios.post('/api/chat-agent/marketing-plan', {
                     timeframe: '30 días'
+                }, {
+                    withCredentials: true
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', response.data.plan);
+                addMessageToChat('assistant', response.data.plan || 'Plan generado.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', 'Error al generar plan de marketing');
+                console.error('Error generating plan:', error);
+                addMessageToChat('assistant', 'Error al generar plan de marketing. Por favor intenta de nuevo.');
             }
         }
 
@@ -421,13 +446,16 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 const response = await axios.post('/api/chat-agent/content-ideas', {
                     platform: 'redes sociales',
                     quantity: 10
+                }, {
+                    withCredentials: true
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', response.data.ideas);
+                addMessageToChat('assistant', response.data.ideas || 'Ideas generadas.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', 'Error al generar ideas de contenido');
+                console.error('Error generating content ideas:', error);
+                addMessageToChat('assistant', 'Error al generar ideas de contenido. Por favor intenta de nuevo.');
             }
         }
 
@@ -439,13 +467,16 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 const response = await axios.post('/api/chat-agent/competition-analysis', {
                     competitors: [],
                     industry: ''
+                }, {
+                    withCredentials: true
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', response.data.analysis);
+                addMessageToChat('assistant', response.data.analysis || 'Análisis completado.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', 'Error al analizar competencia');
+                console.error('Error analyzing competition:', error);
+                addMessageToChat('assistant', 'Error al analizar competencia. Por favor intenta de nuevo.');
             }
         }
 
@@ -453,7 +484,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             if (!confirm('¿Estás seguro de que quieres limpiar el historial del chat?')) return;
             
             try {
-                await axios.delete('/api/chat-agent/history');
+                await axios.delete('/api/chat-agent/history', {
+                    withCredentials: true
+                });
                 
                 document.getElementById('chat-messages').innerHTML = \`
                     <div class="text-center text-gray-500 text-sm">
@@ -464,6 +497,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 \`;
             } catch (error) {
                 console.error('Error clearing chat:', error);
+                alert('Error al limpiar el historial del chat.');
             }
         }
 
@@ -481,18 +515,32 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         // Load chat history on page load
         window.addEventListener('load', async function() {
             try {
-                const response = await axios.get('/api/chat-agent/history');
+                const response = await axios.get('/api/chat-agent/history', {
+                    withCredentials: true
+                });
                 
                 if (response.data.messages && response.data.messages.length > 0) {
                     const messagesContainer = document.getElementById('chat-messages');
                     messagesContainer.innerHTML = '';
                     
-                    response.data.messages.reverse().forEach(msg => {
+                    // Messages are already in correct order from API
+                    response.data.messages.forEach(msg => {
                         addMessageToChat(msg.role, msg.content);
                     });
                 }
             } catch (error) {
                 console.error('Error loading chat history:', error);
+                // Show default message on error
+                const messagesContainer = document.getElementById('chat-messages');
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = \`
+                        <div class="text-center text-gray-500 text-sm">
+                            <i class="fas fa-robot text-3xl text-gray-300 mb-2"></i>
+                            <p class="font-semibold">Start chatting with your Marketing Agent</p>
+                            <p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>
+                        </div>
+                    \`;
+                }
             }
         });
     </script>
