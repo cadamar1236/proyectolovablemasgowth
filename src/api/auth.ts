@@ -85,7 +85,7 @@ auth.post('/register', async (c) => {
         role,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
-      JWT_SECRET
+      c.env.JWT_SECRET || JWT_SECRET
     );
     
     return c.json({
@@ -136,7 +136,7 @@ auth.post('/login', async (c) => {
         role: user.role,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
-      JWT_SECRET
+      c.env.JWT_SECRET || JWT_SECRET
     );
     
     return c.json({
@@ -506,17 +506,21 @@ auth.get('/google/callback', async (c) => {
       {
         userId,
         email: userData.email,
+        userName: userData.name,
         role: userRole,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
-      JWT_SECRET
+      c.env.JWT_SECRET || JWT_SECRET
     );
 
-    // Redirect to frontend with token
+    // Set cookie and redirect
     const frontendUrl = new URL(c.req.url).origin;
-    const baseUrl = redirectPath ? `${frontendUrl}${redirectPath}` : `${frontendUrl}/`;
-    const separator = redirectPath.includes('?') ? '&' : '?';
-    return c.redirect(`${baseUrl}${separator}token=${token}&role=${userRole}&new_user=${!existingUser}`);
+    const finalRedirect = redirectPath || '/dashboard';
+    
+    // Set the cookie (HttpOnly for security)
+    c.header('Set-Cookie', `authToken=${token}; Path=/; Max-Age=${60 * 60 * 24 * 7}; HttpOnly; SameSite=Lax; Secure`);
+    
+    return c.redirect(finalRedirect);
 
   } catch (error) {
     console.error('Google OAuth callback error:', error);

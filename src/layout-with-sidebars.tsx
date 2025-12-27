@@ -151,12 +151,12 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     <span class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
                 </a>
 
-                <a href="#traction" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="/dashboard#traction" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-chart-line mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Traction</span>
                 </a>
 
-                <a href="#inbox" class="nav-item ${currentPage === 'inbox' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="/dashboard#inbox" class="nav-item ${currentPage === 'inbox' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-inbox mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Inbox</span>
                 </a>
@@ -341,10 +341,6 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             try {
                 const response = await axios.post('/api/chat-agent/message', {
                     message: message
-                }, {
-                    headers: {
-                        'Authorization': 'Bearer ' + getCookie('authToken')
-                    }
                 });
 
                 // Hide loading
@@ -390,9 +386,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             document.getElementById('chat-loading').classList.remove('hidden');
             
             try {
-                const response = await axios.post('/api/chat-agent/analyze-goals', {}, {
-                    headers: { 'Authorization': 'Bearer ' + getCookie('authToken') }
-                });
+                const response = await axios.post('/api/chat-agent/analyze-goals', {});
                 
                 document.getElementById('chat-loading').classList.add('hidden');
                 addMessageToChat('assistant', response.data.analysis);
@@ -409,8 +403,6 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             try {
                 const response = await axios.post('/api/chat-agent/marketing-plan', {
                     timeframe: '30 días'
-                }, {
-                    headers: { 'Authorization': 'Bearer ' + getCookie('authToken') }
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
@@ -429,8 +421,6 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 const response = await axios.post('/api/chat-agent/content-ideas', {
                     platform: 'redes sociales',
                     quantity: 10
-                }, {
-                    headers: { 'Authorization': 'Bearer ' + getCookie('authToken') }
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
@@ -449,8 +439,6 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 const response = await axios.post('/api/chat-agent/competition-analysis', {
                     competitors: [],
                     industry: ''
-                }, {
-                    headers: { 'Authorization': 'Bearer ' + getCookie('authToken') }
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
@@ -465,9 +453,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             if (!confirm('¿Estás seguro de que quieres limpiar el historial del chat?')) return;
             
             try {
-                await axios.delete('/api/chat-agent/history', {
-                    headers: { 'Authorization': 'Bearer ' + getCookie('authToken') }
-                });
+                await axios.delete('/api/chat-agent/history');
                 
                 document.getElementById('chat-messages').innerHTML = \`
                     <div class="text-center text-gray-500 text-sm">
@@ -495,9 +481,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         // Load chat history on page load
         window.addEventListener('load', async function() {
             try {
-                const response = await axios.get('/api/chat-agent/history', {
-                    headers: { 'Authorization': 'Bearer ' + getCookie('authToken') }
-                });
+                const response = await axios.get('/api/chat-agent/history');
                 
                 if (response.data.messages && response.data.messages.length > 0) {
                     const messagesContainer = document.getElementById('chat-messages');

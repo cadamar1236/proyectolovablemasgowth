@@ -11,23 +11,39 @@ type Variables = {
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// Enable CORS
-app.use('*', cors());
+// Enable CORS with credentials
+app.use('*', cors({
+  origin: (origin) => origin,
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'Cookie']
+}));
 
 // JWT middleware
 const jwtMiddleware = async (c: any, next: any) => {
   const authToken = c.req.header('Authorization')?.replace('Bearer ', '') ||
-                   c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+                   c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1] ||
+                   c.req.header('Cookie')?.match(/authToken=([^;]+)/)?.[1];
+
+  console.log('JWT Middleware - Headers:', {
+    authorization: c.req.header('Authorization'),
+    cookie: c.req.header('cookie'),
+    Cookie: c.req.header('Cookie'),
+    allHeaders: Object.fromEntries([...c.req.raw.headers.entries()])
+  });
 
   if (!authToken) {
+    console.log('JWT Middleware - No token found');
     return c.json({ error: 'No authentication token provided' }, 401);
   }
 
   try {
-    const payload = await verify(authToken, c.env.JWT_SECRET) as AuthContext;
+    const payload = await verify(authToken, c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var') as AuthContext;
+    console.log('JWT Middleware - Token verified for user:', payload.userId);
     c.set('user', payload);
     await next();
   } catch (error) {
+    console.log('JWT Middleware - Token verification failed:', error);
     return c.json({ error: 'Invalid authentication token' }, 401);
   }
 };
@@ -82,8 +98,19 @@ app.post('/message', jwtMiddleware, async (c) => {
     // Build agent context
     const agentContext = buildAgentContext(user.userId, goals as any);
 
+    // Check if API key is available
+    const apiKey = c.env.GROQ_API_KEY || c.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      const assistantMessage = 'Lo siento, el servicio de IA no está disponible en este momento. Por favor, contacta al administrador.';
+      await c.env.DB.prepare(`
+        INSERT INTO agent_chat_messages (user_id, project_id, role, content, created_at)
+        VALUES (?, ?, 'assistant', ?, datetime('now'))
+      `).bind(user.userId, projectId || null, assistantMessage).run();
+      return c.json({ message: assistantMessage, goalsUpdated: false });
+    }
+
     // Initialize marketing orchestrator with Groq
-    const marketingAgent = new MarketingOrchestrator(c.env.GROQ_API_KEY || c.env.OPENAI_API_KEY);
+    const marketingAgent = new MarketingOrchestrator(apiKey);
 
     // Check for special commands
     const { command, params } = extractCommand(message);
@@ -264,12 +291,17 @@ app.post('/analyze-goals', jwtMiddleware, async (c) => {
     `).bind(user.userId).all();
 
     const goals = goalsResult.results || [];
+    
+    // Check if API key is available
+    const apiKey = c.env.GROQ_API_KEY || c.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return c.json({ 
+        analysis: `📊 Análisis de Objetivos:\n\nTienes ${goals.length} objetivo(s) registrado(s).\n\n${goals.length > 0 ? '✓ Continúa trabajando en tus objetivos actuales.\n✓ Mantén un seguimiento regular de tu progreso.\n✓ Ajusta las metas según sea necesario.' : '• Crea tu primer objetivo para comenzar tu seguimiento.\n• Define metas claras y medibles.\n• Establece plazos realistas.'}` 
+      });
+    }
+
     const agentContext = buildAgentContext(user.userId, goals as any);
-
-    // Initialize marketing agent
-    const marketingAgent = new MarketingOrchestrator(c.env.GROQ_API_KEY || c.env.OPENAI_API_KEY);
-
-    // Get analysis and recommendations
+    const marketingAgent = new MarketingOrchestrator(apiKey);
     const analysis = await marketingAgent.analyzeGoalsAndSuggest(agentContext);
 
     // Save as chat message
