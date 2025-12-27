@@ -140,23 +140,23 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
             <!-- Navigation Links -->
             <nav class="flex-1 p-4 overflow-y-auto">
-                <a href="/dashboard" class="nav-item ${currentPage === 'dashboard' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('home'); return false;" class="nav-item sidebar-nav-home flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-home mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Home (HQ)</span>
                 </a>
 
-                <a href="/dashboard" class="nav-item ${currentPage === 'notifications' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('home'); return false;" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-bell mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Notifications</span>
                     <span class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
                 </a>
 
-                <a href="/dashboard#traction" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('traction'); return false;" class="nav-item sidebar-nav-traction flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-chart-line mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Traction</span>
                 </a>
 
-                <a href="/dashboard#inbox" class="nav-item ${currentPage === 'inbox' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('inbox'); return false;" class="nav-item sidebar-nav-inbox flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-inbox mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Inbox</span>
                 </a>
@@ -166,17 +166,17 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     <span class="font-semibold">Leaderboard</span>
                 </a>
 
-                <a href="/marketplace" class="nav-item ${currentPage === 'marketplace' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('marketplace'); return false;" class="nav-item sidebar-nav-marketplace flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-store mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Marketplace</span>
                 </a>
 
-                <a href="/marketplace" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('marketplace'); return false;" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-fire mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Trending Products</span>
                 </a>
 
-                <a href="/dashboard" class="nav-item ${currentPage === 'planner' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('home'); return false;" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-calendar-alt mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Planner</span>
                 </a>
@@ -313,6 +313,28 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             }
             return config;
         }, error => Promise.reject(error));
+
+        // Update sidebar active state when tab changes
+        function updateSidebarActiveState(tab) {
+            // Remove active from all sidebar nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // Add active to the corresponding sidebar item
+            const sidebarItem = document.querySelector('.sidebar-nav-' + tab);
+            if (sidebarItem) {
+                sidebarItem.classList.add('active');
+            }
+        }
+        
+        // Override switchTab to also update sidebar
+        const originalSwitchTab = window.switchTab;
+        window.switchTab = function(tab) {
+            if (typeof originalSwitchTab === 'function') {
+                originalSwitchTab(tab);
+            }
+            updateSidebarActiveState(tab);
+        };
 
         // Chat Sidebar Toggle
         let chatSidebarOpen = true;

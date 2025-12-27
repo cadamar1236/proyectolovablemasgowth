@@ -517,10 +517,15 @@ auth.get('/google/callback', async (c) => {
     const frontendUrl = new URL(c.req.url).origin;
     const finalRedirect = redirectPath || '/dashboard';
     
-    // Set the cookie (HttpOnly for security)
-    c.header('Set-Cookie', `authToken=${token}; Path=/; Max-Age=${60 * 60 * 24 * 7}; HttpOnly; SameSite=Lax; Secure`);
+    // Set the cookie (NOT HttpOnly so JavaScript can read it for API calls)
+    c.header('Set-Cookie', `authToken=${token}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`);
     
-    return c.redirect(finalRedirect);
+    // Also pass token in URL as backup (for first load)
+    const redirectWithToken = finalRedirect.includes('?') 
+      ? `${finalRedirect}&token=${token}` 
+      : `${finalRedirect}?token=${token}`;
+    
+    return c.redirect(redirectWithToken);
 
   } catch (error) {
     console.error('Google OAuth callback error:', error);
