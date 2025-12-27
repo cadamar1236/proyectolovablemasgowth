@@ -4,39 +4,102 @@ import { requireAuth } from './auth';
 
 const dashboard = new Hono<{ Bindings: Bindings; Variables: AuthContext }>();
 
-// Get user's goals
+// Get user's goals (supports both goals and dashboard_goals tables)
 dashboard.get('/goals', requireAuth, async (c) => {
   const userId = c.get('userId');
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM goals WHERE user_id = ? ORDER BY created_at DESC'
-  ).bind(userId).all();
+  
+  try {
+    // Try dashboard_goals first (new table with extended fields)
+    const { results: dashboardGoals } = await c.env.DB.prepare(
+      'SELECT * FROM dashboard_goals WHERE user_id = ? AND status != ? ORDER BY created_at DESC'
+    ).bind(userId, 'deleted').all();
 
-  return c.json({ goals: results });
+    if (dashboardGoals && dashboardGoals.length > 0) {
+      return c.json({ goals: dashboardGoals });
+    }
+  } catch (e) {
+    // Table might not exist yet, continue to fallback
+    console.log('dashboard_goals table not available, using goals table');
+  }
+
+  try {
+    // Fallback to goals table
+    const { results } = await c.env.DB.prepare(
+      'SELECT id, user_id, description, status, created_at, updated_at, COALESCE(target_value, 100) as target_value, COALESCE(current_value, 0) as current_value, deadline, COALESCE(category, \'general\') as category FROM goals WHERE user_id = ? ORDER BY created_at DESC'
+    ).bind(userId).all();
+
+    return c.json({ goals: results || [] });
+  } catch (e) {
+    console.error('Error fetching goals:', e);
+    return c.json({ goals: [] });
+  }
 });
 
-// Add a new goal
+// Add a new goal (with extended fields support)
 dashboard.post('/goals', requireAuth, async (c) => {
   const userId = c.get('userId');
-  const { description } = await c.req.json();
+  const body = await c.req.json();
+  const { description, target_value, current_value, deadline, category } = body;
 
-  const result = await c.env.DB.prepare(
-    'INSERT INTO goals (user_id, description) VALUES (?, ?) RETURNING *'
-  ).bind(userId, description).first();
+  try {
+    // Try to insert into dashboard_goals first
+    const result = await c.env.DB.prepare(
+      `INSERT INTO dashboard_goals (user_id, description, target_value, current_value, deadline, category, status) 
+       VALUES (?, ?, ?, ?, ?, ?, 'in_progress') RETURNING *`
+    ).bind(
+      userId, 
+      description, 
+      target_value || 100, 
+      current_value || 0, 
+      deadline || null, 
+      category || 'general'
+    ).first();
 
-  return c.json({ goal: result }, 201);
+    return c.json({ goal: result, success: true }, 201);
+  } catch (e) {
+    console.log('dashboard_goals insert failed, trying goals table:', e);
+    
+    // Fallback to goals table
+    try {
+      const result = await c.env.DB.prepare(
+        'INSERT INTO goals (user_id, description) VALUES (?, ?) RETURNING *'
+      ).bind(userId, description).first();
+
+      return c.json({ goal: result, success: true }, 201);
+    } catch (e2) {
+      console.error('Error creating goal:', e2);
+      return c.json({ error: 'Failed to create goal' }, 500);
+    }
+  }
 });
 
-// Update goal status
+// Update goal status or progress
 dashboard.put('/goals/:id', requireAuth, async (c) => {
   const userId = c.get('userId');
   const goalId = c.req.param('id');
-  const { status } = await c.req.json();
+  const body = await c.req.json();
+  const { status, current_value, target_value } = body;
 
-  await c.env.DB.prepare(
-    'UPDATE goals SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?'
-  ).bind(status, goalId, userId).run();
+  try {
+    // Try dashboard_goals first
+    await c.env.DB.prepare(
+      `UPDATE dashboard_goals 
+       SET status = COALESCE(?, status), 
+           current_value = COALESCE(?, current_value),
+           target_value = COALESCE(?, target_value),
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE id = ? AND user_id = ?`
+    ).bind(status, current_value, target_value, goalId, userId).run();
 
-  return c.json({ success: true });
+    return c.json({ success: true });
+  } catch (e) {
+    // Fallback to goals table
+    await c.env.DB.prepare(
+      'UPDATE goals SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?'
+    ).bind(status || 'active', goalId, userId).run();
+
+    return c.json({ success: true });
+  }
 });
 
 // Mark goal as completed
@@ -44,9 +107,17 @@ dashboard.post('/goals/complete', requireAuth, async (c) => {
   const userId = c.get('userId');
   const { goalId } = await c.req.json();
 
-  await c.env.DB.prepare(
-    'UPDATE goals SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?'
-  ).bind('completed', goalId, userId).run();
+  try {
+    // Try dashboard_goals first
+    await c.env.DB.prepare(
+      'UPDATE dashboard_goals SET status = ?, current_value = target_value, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?'
+    ).bind('completed', goalId, userId).run();
+  } catch (e) {
+    // Fallback to goals table
+    await c.env.DB.prepare(
+      'UPDATE goals SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?'
+    ).bind('completed', goalId, userId).run();
+  }
 
   return c.json({ success: true });
 });
