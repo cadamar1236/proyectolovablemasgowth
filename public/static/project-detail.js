@@ -198,6 +198,248 @@ function renderProjectDetails(data) {
           </div>
           
           <button class="w-full bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg hover:opacity-90 transition font-semibold">
+            <i class="fas fa-rocket mr-2"></i>Desplegar MVP
+          </button>
+        </div>
+      </div>
+      ` : '<div class="bg-gray-100 rounded-xl p-8 text-center text-gray-600">Prototipo MVP no disponible</div>'}
+
+      <!-- Test Results -->
+      ${testResults && testResults.length > 0 ? `
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-6">
+          <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mr-4">
+            <i class="fas fa-flask text-green-600 text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Resultados de Pruebas</h2>
+            <p class="text-sm text-gray-600">${testResults.length} validaciones completadas</p>
+          </div>
+        </div>
+        
+        <div class="space-y-4">
+          ${testResults.slice(0, 5).map(test => `
+            <div class="border border-gray-200 rounded-lg p-4">
+              <div class="flex justify-between items-start mb-2">
+                <div class="font-semibold text-gray-900">${escapeHtml(test.beta_user_name)}</div>
+                <div class="flex items-center">
+                  <span class="text-yellow-400 mr-1">★</span>
+                  <span class="font-bold text-lg">${test.rating}/5</span>
+                </div>
+              </div>
+              <p class="text-gray-600 text-sm mb-2">${escapeHtml(test.feedback)}</p>
+              <div class="flex items-center text-sm text-gray-500">
+                <i class="fas fa-dollar-sign mr-1"></i>
+                Dispuesto a pagar: ${test.would_pay ? 'Sí' : 'No'}
+                ${test.suggested_price ? ` - Precio sugerido: $${test.suggested_price}` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Growth Strategies -->
+      ${growthStrategies && growthStrategies.length > 0 ? `
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-6">
+          <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+            <i class="fas fa-rocket text-blue-600 text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Estrategias de Crecimiento</h2>
+            <p class="text-sm text-gray-600">Recomendaciones para escalar</p>
+          </div>
+        </div>
+        
+        <div class="space-y-4">
+          ${growthStrategies.map(strategy => `
+            <div class="border border-gray-200 rounded-lg p-4">
+              <div class="flex justify-between items-start mb-2">
+                <div>
+                  <h3 class="font-semibold text-gray-900">${escapeHtml(strategy.title)}</h3>
+                  <p class="text-sm text-gray-600">${escapeHtml(strategy.description)}</p>
+                </div>
+                <span class="px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(strategy.priority)}">
+                  ${getPriorityText(strategy.priority)}
+                </span>
+              </div>
+              
+              <div class="mt-3">
+                <h4 class="font-medium text-gray-700 mb-2">Canales Recomendados</h4>
+                <div class="flex flex-wrap gap-2">
+                  ${strategy.channels.map(channel => `
+                    <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                      ${escapeHtml(channel)}
+                    </span>
+                  `).join('')}
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200">
+                <div>
+                  <span class="text-sm text-gray-600">CAC Estimado</span>
+                  <p class="font-semibold text-gray-900">${escapeHtml(strategy.estimated_cac)}</p>
+                </div>
+                <div>
+                  <span class="text-sm text-gray-600">LTV Estimado</span>
+                  <p class="font-semibold text-gray-900">${escapeHtml(strategy.estimated_ltv)}</p>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+    <!-- Metrics Dashboard -->
+    ${metrics && metrics.length > 0 ? `
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      ${renderMetricCard('Interés Validado', metrics.find(m => m.metric_type === 'interest')?.value || 0, '%', 'text-green-600', 'fas fa-heart')}
+      ${renderMetricCard('Retención Usuarios', metrics.find(m => m.metric_type === 'retention')?.value || 0, '%', 'text-blue-600', 'fas fa-users')}
+      ${renderMetricCard('CAC', metrics.find(m => m.metric_type === 'cac')?.value || 0, '$', 'text-purple-600', 'fas fa-dollar-sign')}
+      ${renderMetricCard('Probabilidad de Éxito', metrics.find(m => m.metric_type === 'success_probability')?.value || 0, '%', 'text-yellow-600', 'fas fa-chart-line')}
+    </div>
+    ` : ''}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <!-- Market Analysis -->
+      ${marketAnalysis ? `
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-6">
+          <div class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mr-4">
+            <i class="fas fa-chart-bar text-primary text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Análisis de Mercado</h2>
+            <p class="text-sm text-gray-600">Powered by Cloudflare AI</p>
+          </div>
+        </div>
+        
+        <div class="space-y-6">
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-2">Tamaño de Mercado</h3>
+            <p class="text-2xl font-bold text-primary">${escapeHtml(marketAnalysis.market_size)}</p>
+            <p class="text-sm text-gray-600">Crecimiento: ${escapeHtml(marketAnalysis.growth_rate)}</p>
+          </div>
+          
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-2">Probabilidad de Éxito</h3>
+            <div class="flex items-center">
+              <div class="flex-1 bg-gray-200 rounded-full h-4 mr-4">
+                <div class="bg-gradient-to-r from-green-400 to-green-600 h-4 rounded-full" 
+                     style="width: ${marketAnalysis.success_probability * 100}%"></div>
+              </div>
+              <span class="text-2xl font-bold text-green-600">${(marketAnalysis.success_probability * 100).toFixed(0)}%</span>
+            </div>
+          </div>
+          
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-3">Competidores Principales</h3>
+            <div class="flex flex-wrap gap-2">
+              ${marketAnalysis.competitors.map(comp => `
+                <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">${escapeHtml(comp)}</span>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-3">Tendencias de Mercado</h3>
+            <ul class="space-y-2">
+              ${marketAnalysis.market_trends.slice(0, 5).map(trend => `
+                <li class="flex items-start">
+                  <i class="fas fa-arrow-trend-up text-green-500 mt-1 mr-2"></i>
+                  <span class="text-gray-700 text-sm">${escapeHtml(trend)}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <h3 class="font-semibold text-green-600 mb-3">Oportunidades</h3>
+              <ul class="space-y-2">
+                ${marketAnalysis.opportunities.slice(0, 3).map(opp => `
+                  <li class="text-sm text-gray-700 flex items-start">
+                    <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                    ${escapeHtml(opp)}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            <div>
+              <h3 class="font-semibold text-red-600 mb-3">Amenazas</h3>
+              <ul class="space-y-2">
+                ${marketAnalysis.threats.slice(0, 3).map(threat => `
+                  <li class="text-sm text-gray-700 flex items-start">
+                    <i class="fas fa-exclamation-triangle text-red-500 mt-1 mr-2"></i>
+                    ${escapeHtml(threat)}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      ` : '<div class="bg-gray-100 rounded-xl p-8 text-center text-gray-600">Análisis de mercado no disponible</div>'}
+
+      <!-- MVP Prototype -->
+      ${mvpPrototype ? `
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-6">
+          <div class="w-12 h-12 bg-secondary/10 rounded-full flex items-center justify-center mr-4">
+            <i class="fas fa-code text-secondary text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Prototipo MVP</h2>
+            <p class="text-sm text-gray-600">${escapeHtml(mvpPrototype.name)}</p>
+          </div>
+        </div>
+        
+        <div class="space-y-6">
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-2">Descripción</h3>
+            <p class="text-gray-600">${escapeHtml(mvpPrototype.description)}</p>
+          </div>
+          
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-3">Funcionalidades Core</h3>
+            <ul class="space-y-2">
+              ${mvpPrototype.features.map(feature => `
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
+                  <span class="text-gray-700 text-sm">${escapeHtml(feature)}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+          
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-3">Tech Stack Recomendado</h3>
+            <div class="flex flex-wrap gap-2">
+              ${mvpPrototype.tech_stack.map(tech => `
+                <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                  ${escapeHtml(tech)}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+            <div>
+              <h3 class="font-semibold text-gray-700 mb-2">Tiempo Estimado</h3>
+              <p class="text-xl font-bold text-primary">${escapeHtml(mvpPrototype.estimated_time)}</p>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-700 mb-2">Costo Estimado</h3>
+              <p class="text-xl font-bold text-secondary">${escapeHtml(mvpPrototype.estimated_cost)}</p>
+            </div>
+          </div>
+          
+          <button class="w-full bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-lg hover:opacity-90 transition font-semibold">
             <i class="fas fa-rocket mr-2"></i>Solicitar Desarrollo
           </button>
         </div>

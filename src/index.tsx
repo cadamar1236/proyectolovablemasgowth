@@ -25,6 +25,8 @@ import chat from './api/chat';
 import notifications from './api/notifications';
 import quickPitch from './api/quick-pitch';
 import whatsapp from './api/whatsapp';
+import chatAgent from './api/chat-agent';
+import dashboardPage from './dashboard-page';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -50,6 +52,10 @@ app.route('/api/chat', chat);
 app.route('/api/notifications', notifications);
 app.route('/api/quick-pitch', quickPitch);
 app.route('/api/whatsapp', whatsapp);
+app.route('/api/chat-agent', chatAgent);
+
+// Dashboard page
+app.route('/', dashboardPage);
 
 // Vote page for QR codes
 app.get('/vote/:projectId', async (c) => {

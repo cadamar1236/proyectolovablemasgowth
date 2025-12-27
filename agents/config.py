@@ -17,9 +17,9 @@ class Config:
     WEBAPP_API_URL = os.getenv("WEBAPP_API_URL", "https://webapp.pages.dev/api")
     WEBAPP_API_TOKEN = os.getenv("WEBAPP_API_TOKEN")  # Token JWT para autenticación
     
-    # Groq (LLM Provider)
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")  # Modelo rápido y capaz
+    # OpenAI (LLM Provider - GPT-4o)
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Modelo económico y eficiente
     
     # Server
     HOST = os.getenv("HOST", "0.0.0.0")
