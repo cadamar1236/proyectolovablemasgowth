@@ -11,10 +11,11 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // Enable CORS with credentials
 app.use('*', cors({
-  origin: (origin) => origin,
+  origin: (origin) => origin || '*',
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'Cookie']
+  allowHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+  exposeHeaders: ['Set-Cookie']
 }));
 
 // JWT middleware

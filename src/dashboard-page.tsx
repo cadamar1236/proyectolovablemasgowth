@@ -72,11 +72,19 @@ app.get('/', async (c) => {
       const urlParams = new URLSearchParams(window.location.search);
       const urlToken = urlParams.get('token');
       if (urlToken) {
-        // Save token as cookie
-        document.cookie = \`authToken=\${urlToken}; path=/; max-age=\${60 * 60 * 24 * 7}; SameSite=Lax\`;
+        // Save token as cookie - use more permissive settings for cross-origin
+        document.cookie = \`authToken=\${urlToken}; path=/; max-age=\${60 * 60 * 24 * 7}; SameSite=Lax; Secure\`;
+        // Also save in localStorage as backup
+        localStorage.setItem('authToken', urlToken);
         // Clean up URL
         const cleanUrl = window.location.pathname + window.location.hash;
         window.history.replaceState({}, document.title, cleanUrl);
+      }
+      
+      // Get token from cookie or localStorage
+      function getAuthToken() {
+        const cookieMatch = document.cookie.match(/authToken=([^;]+)/);
+        return cookieMatch ? cookieMatch[1] : localStorage.getItem('authToken');
       }
 
       const userId = ${payload.userId};
@@ -85,6 +93,15 @@ app.get('/', async (c) => {
       // Configure axios to send cookies automatically
       axios.defaults.withCredentials = true;
       axios.defaults.headers.common['Content-Type'] = 'application/json';
+      
+      // Add auth token to all requests
+      axios.interceptors.request.use(config => {
+        const token = getAuthToken();
+        if (token) {
+          config.headers.Authorization = \`Bearer \${token}\`;
+        }
+        return config;
+      }, error => Promise.reject(error));
       
       // Add request interceptor to log requests
       axios.interceptors.request.use(config => {

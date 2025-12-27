@@ -145,7 +145,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     <span class="font-semibold">Home (HQ)</span>
                 </a>
 
-                <a href="#notifications" class="nav-item ${currentPage === 'notifications' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="/dashboard" class="nav-item ${currentPage === 'notifications' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-bell mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Notifications</span>
                     <span class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
@@ -171,12 +171,12 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     <span class="font-semibold">Marketplace</span>
                 </a>
 
-                <a href="#trending" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="/marketplace" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-fire mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Trending Products</span>
                 </a>
 
-                <a href="/planner" class="nav-item ${currentPage === 'planner' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="/dashboard" class="nav-item ${currentPage === 'planner' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-calendar-alt mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Planner</span>
                 </a>
@@ -298,6 +298,21 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
     <script>
         // Configure axios to send cookies
         axios.defaults.withCredentials = true;
+        
+        // Helper to get auth token from cookie or localStorage
+        function getAuthToken() {
+            const cookieMatch = document.cookie.match(/authToken=([^;]+)/);
+            return cookieMatch ? cookieMatch[1] : localStorage.getItem('authToken');
+        }
+        
+        // Add auth token to all axios requests
+        axios.interceptors.request.use(config => {
+            const token = getAuthToken();
+            if (token) {
+                config.headers.Authorization = \`Bearer \${token}\`;
+            }
+            return config;
+        }, error => Promise.reject(error));
 
         // Chat Sidebar Toggle
         let chatSidebarOpen = true;
