@@ -338,7 +338,37 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
     </div>
 
     <script>
+      // Handle token from URL (OAuth redirect)
+      (function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        if (urlToken) {
+          // Save to cookie
+          document.cookie = 'authToken=' + urlToken + '; path=/; max-age=' + (60 * 60 * 24 * 7) + '; SameSite=Lax';
+          // Save to localStorage as backup
+          localStorage.setItem('authToken', urlToken);
+          // Clean URL
+          const cleanUrl = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      })();
+      
+      // Helper to get auth token
+      function getAuthToken() {
+        const cookieMatch = document.cookie.match(/authToken=([^;]+)/);
+        return cookieMatch ? cookieMatch[1] : localStorage.getItem('authToken');
+      }
+      
       axios.defaults.withCredentials = true;
+      
+      // Add auth token interceptor
+      axios.interceptors.request.use(config => {
+        const token = getAuthToken();
+        if (token) {
+          config.headers.Authorization = 'Bearer ' + token;
+        }
+        return config;
+      }, error => Promise.reject(error));
       
       let allGoals = [], metricsHistory = [], conversations = [], currentConversation = null;
       let currentFilter = 'all';
