@@ -1924,33 +1924,18 @@ app.get('/project/:id', async (c) => {
   `);
 });
 
-// Marketplace Page
+// Marketplace Page - Redirect to dashboard for now (uses same layout)
 app.get('/marketplace', async (c) => {
   // Check authentication
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
   
-  let userName = 'Guest';
-  let userAvatar: string | undefined;
-  
-  if (authToken) {
-    try {
-      const payload = await verify(authToken, JWT_SECRET) as any;
-      if (payload && payload.userId) {
-        const user = await c.env.DB.prepare(`
-          SELECT name, avatar_url FROM users WHERE id = ?
-        `).bind(payload.userId).first() as any;
-        
-        if (user) {
-          userName = user.name;
-          userAvatar = user.avatar_url;
-        }
-      }
-    } catch (error) {
-      console.error('Auth error:', error);
-    }
+  if (!authToken) {
+    return c.redirect('/api/auth/google');
   }
   
-  return c.html(getMarketplacePage(userName, userAvatar));
+  // For now, redirect to dashboard which has the sidebar layout
+  // TODO: Create marketplace-specific content while keeping the layout
+  return c.redirect('/dashboard');
 });
 
 
