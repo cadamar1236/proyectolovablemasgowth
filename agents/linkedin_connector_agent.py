@@ -14,7 +14,6 @@ from datetime import datetime
 
 # Agno Framework (versión moderna)
 from agno.agent import Agent
-from agno.models.openai import OpenAI
 
 # Apify para web scraping
 from apify_client import ApifyClient
@@ -52,7 +51,7 @@ class LinkedInConnectorTeam:
         # Initialize agents with modern agno API
         self.investor_agent = Agent(
             name="Investor Matching Agent",
-            model=OpenAI(id=self.config.openai_model),
+            model="openai:gpt-4o-mini",
             description="Expert in startup fundraising and investor relations",
             instructions=[
                 "Find the most relevant investors for startups",
@@ -62,7 +61,7 @@ class LinkedInConnectorTeam:
         
         self.talent_agent = Agent(
             name="Talent Acquisition Agent",
-            model=OpenAI(id=self.config.openai_model),
+            model="openai:gpt-4o-mini",
             description="Expert technical recruiter",
             instructions=[
                 "Find exceptional talent for startups",
@@ -72,7 +71,7 @@ class LinkedInConnectorTeam:
         
         self.customer_agent = Agent(
             name="Customer Discovery Agent",
-            model=OpenAI(id=self.config.openai_model),
+            model="openai:gpt-4o-mini",
             description="Expert in B2B sales",
             instructions=[
                 "Identify ideal customer profiles",
@@ -82,7 +81,7 @@ class LinkedInConnectorTeam:
         
         self.partnership_agent = Agent(
             name="Partnership Agent",
-            model=OpenAI(id=self.config.openai_model),
+            model="openai:gpt-4o-mini",
             description="Expert in business development",
             instructions=[
                 "Find strategic partnership opportunities",
