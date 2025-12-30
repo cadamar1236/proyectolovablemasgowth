@@ -1,369 +1,481 @@
-# ValidAI Studio - MVP Funcional
+# 🚀 LovableGrowth - Plataforma de Validación y Crecimiento de Startups
 
-**Plataforma IA + Venture Studio = Éxito 10x**
+[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-orange)](https://webapp-46s.pages.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+[![Hono](https://img.shields.io/badge/Hono-4.10-red)](https://hono.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-Validamos y lanzamos startups exitosas 10x más rápido utilizando IA y el modelo studio.
+Plataforma integral que conecta founders, validadores, inversores y talento para impulsar el crecimiento de startups mediante validación colaborativa, marketplace unificado y agentes de IA especializados.
 
-## 🚀 URLs del Proyecto
+## 📋 Tabla de Contenidos
 
-- **Demo Sandbox**: https://3000-itndkqrud7j7nyf311dtd-82b888ba.sandbox.novita.ai
-- **Repositorio**: `/home/user/webapp`
+- [Características Principales](#-características-principales)
+- [Arquitectura](#-arquitectura)
+- [Instalación](#-instalación)
+- [Configuración](#-configuración)
+- [Uso](#-uso)
+- [API Reference](#-api-reference)
+- [Base de Datos](#-base-de-datos)
+- [Despliegue](#-despliegue)
+- [Contribuir](#-contribuir)
 
-## ✨ Características Implementadas
+## ✨ Características Principales
 
-### 1. **Dashboard Principal** ✅
-- Hero section con gradientes y animaciones
-- Sección de estadísticas clave (48h validación, 90% más rápido, etc.)
-- Navegación intuitiva
-- Diseño responsive con Tailwind CSS
+### 🎯 Marketplace Unificado
+- **7 tipos de usuarios**: Productos, Founders, Inversores, Validadores, Scouts, Partners, Talento
+- Sistema de votación universal para todos los usuarios autenticados
+- Perfiles detallados con información de contacto y redes sociales
+- Filtrado y búsqueda avanzada por tipo de usuario
 
-### 2. **Sistema de Validación de Ideas** ✅
-- Formulario completo de captura de proyectos
-- Campos: Título, Descripción, Mercado Objetivo, Propuesta de Valor
-- Validación y almacenamiento en D1 Database
+### 💬 Sistema de Chat Universal
+- Chat en tiempo real entre cualquier tipo de usuario
+- Historial de conversaciones persistente
+- Notificaciones de mensajes no leídos
+- Interfaz integrada en el marketplace
 
-### 3. **Análisis IA de Mercado** ✅
-- Powered by **Groq AI - OpenAI GPT-OSS-120B** (ultra-rápido, 50K tokens)
-- Análisis automático de:
-  - Competidores principales
-  - Tendencias de mercado
-  - Oportunidades
-  - Amenazas
-  - Tamaño de mercado y crecimiento
-  - Probabilidad de éxito (0-100%)
+### 📊 Dashboard Interactivo
+- Gestión de objetivos (goals) con seguimiento de progreso
+- Análisis de datos con gráficos interactivos (Chart.js)
+- Sistema de notificaciones
+- Integración con chat y marketplace
 
-### 4. **Generador de MVPs** ✅ ⭐ **MEJORADO**
-- **5 Templates completamente funcionales**:
-  - **SaaS Web App**: Aplicación COMPLETA con:
-    - ✅ Autenticación JWT (registro, login, logout)
-    - ✅ Dashboard funcional con métricas en tiempo real
-    - ✅ Gestión de usuarios y perfiles
-    - ✅ Sistema de planes (Free, Pro, Enterprise)
-    - ✅ API REST completa con CRUD operations
-    - ✅ Frontend funcional con formularios y validación
-    - ✅ Base de datos D1 con migraciones completas
-  
-  - **Marketplace Platform**: Plataforma lista para producción
-  - **Landing Page**: Landing profesional con formulario de contacto funcional
-  - **Analytics Dashboard**: Dashboard con visualizaciones reales
-  - **Simple CRM**: CRM funcional con gestión de clientes
+### 🤖 Agentes de IA
 
-- **Generación AVANZADA con doble sistema**:
-  1. **Groq AI (GPT-OSS-120B)**: Genera código personalizado según tu proyecto (50K tokens)
-     - Prompts detallados con requisitos específicos
-     - Código completo y funcional adaptado a tu caso de uso
-     - Lógica de negocio específica para tu industria
-  
-  2. **Templates Avanzados**: Si IA falla, templates listos para producción
-     - Código completo de 700+ líneas por template
-     - Todo funcional desde el primer deploy
-     - Sin código placeholder ni TODOs
+#### Marketing AI Agent
+- **Market Research Agent**: Análisis de mercado con Apify
+- **Content Creation Agent**: Generación de contenido multi-plataforma
+- **Marketing Strategy Agent**: Estrategias de marketing completas
+- **Social Media Agent**: Análisis de TikTok y generación de videos
 
-- **Código generado incluye**:
-  - ✅ Frontend funcional con JavaScript vanilla (no frameworks pesados)
-  - ✅ Backend Hono completo con todas las API routes
-  - ✅ Sistema de autenticación JWT
-  - ✅ Migraciones de base de datos con datos de ejemplo
-  - ✅ Manejo de errores y validación
-  - ✅ Estilos con Tailwind CSS + CSS personalizado
-  - ✅ Configuración lista para Cloudflare Pages
-  - ✅ README con instrucciones completas
-  - ✅ Package.json con todas las dependencias
+#### Chat Agent
+- Asistente conversacional para dudas y soporte
+- Integración con dashboard para respuestas contextualizadas
 
-- **Preview y Deployment**:
-  - Vista previa del MVP generado en el navegador
-  - Descarga completa del código
-  - Instrucciones de deployment a Cloudflare Pages
+### 🎨 Generador de MVPs
+- Generación automática de MVPs con IA (Groq)
+- Templates pre-configurados para diferentes tipos de negocio
+- Exportación de código y documentación
 
-- **Auto-detección de template** usando IA
+### 💳 Sistema de Pagos
+- Integración con Stripe
+- Planes de suscripción: Free, Starter, Pro, Enterprise
+- Gestión de billing y subscriptions
 
-### 5. **Panel de Usuarios Beta** ✅
-- Base de datos con 10 usuarios beta pre-cargados
-- Perfiles completos con:
-  - Nombre, rol, edad, industria
-  - Rating de calidad
-  - Bio profesional
-- Sistema de reclutamiento
+### 📱 Integración WhatsApp
+- Gestión de goals vía WhatsApp con Twilio
+- Sistema de verificación de códigos
+- Agente conversacional por WhatsApp
 
-### 6. **Sistema de Testing** ✅
-- Feedback de usuarios beta
-- Ratings (1-5 estrellas)
-- ¿Pagarían por el producto?
-- Precio sugerido
-- Comentarios detallados
+### ⚡ Quick Pitch
+- Sistema de pitch rápido para startups
+- Generación de presentaciones con IA
+- Exportación a PDF con QR codes
 
-### 7. **Growth Marketing Framework** ✅
-- **4 estrategias automáticas**:
-  - Product-Led Growth (PLG)
-  - Content Marketing & SEO
-  - Alianzas Estratégicas B2B
-  - Programa de Referidos
+## 🏗️ Arquitectura
 
-- Cada estrategia incluye:
-  - Canales de adquisición
-  - CAC estimado
-  - LTV estimado
-  - Nivel de prioridad
+### Stack Tecnológico
 
-### 8. **Dashboard de Resultados** ✅
-- Métricas clave:
-  - % Interés validado
-  - % Retención de usuarios
-  - CAC (Customer Acquisition Cost)
-  - Probabilidad de éxito
-- Visualizaciones con barras de progreso
-- Vista detallada de análisis completo
+**Frontend:**
+- HTML5 + TailwindCSS
+- JavaScript vanilla con TypeScript
+- Chart.js para visualizaciones
+- Axios para peticiones HTTP
 
-### 9. **Planes de Pricing** ✅
-- **Starter**: $49/mes - Para validar primera idea
-- **Pro**: $149/mes - Para founders serios (Más Popular)
-- **Enterprise**: $499/mes - Para equipos y empresas
+**Backend:**
+- Hono (Framework web para Cloudflare Workers)
+- Cloudflare Workers (Serverless)
+- Cloudflare D1 (SQLite distribuido)
+- TypeScript
 
-**Servicios Managed**:
-- Validación Express: $2,997
-- MVP + Growth Launch: $14,997
-- Growth Retainer: desde $3,997/mes
+**Servicios Externos:**
+- Google OAuth 2.0
+- Stripe (pagos)
+- Groq (generación de MVPs con IA)
+- Apify (web scraping para marketing agent)
+- ModelsLab (generación de videos)
+- Twilio (WhatsApp integration)
 
-### 10. **Base de Datos D1** ✅
-Esquema completo con 9 tablas:
-- `users` - Usuarios del sistema
-- `projects` - Proyectos de validación
-- `market_analysis` - Análisis de mercado
-- `mvp_prototypes` - Prototipos generados
-- `beta_users` - Usuarios beta
-- `test_results` - Resultados de testing
-- `growth_strategies` - Estrategias de crecimiento
-- `metrics` - Métricas del proyecto
-
-### 11. **Datos de Ejemplo** ✅
-Proyecto pre-cargado: **HealthTrack AI**
-- Análisis completo de mercado
-- MVP generado con especificaciones
-- 4 feedbacks de usuarios beta
-- 4 estrategias de growth
-- 6 métricas de rendimiento
-
-## 🛠️ Stack Tecnológico
-
-### Backend
-- **Hono** v4.10.1 - Framework web ultrarrápido
-- **Cloudflare Workers** - Runtime edge
-- **Cloudflare D1** - Base de datos SQLite distribuida
-- **Groq AI** - OpenAI GPT-OSS-120B (50K tokens max, open source) ⚡
-
-### Frontend
-- **Tailwind CSS** - Styling utility-first
-- **Axios** - HTTP client
-- **Font Awesome** - Iconos
-- **Vanilla JavaScript** - Sin frameworks pesados
-
-### DevOps
-- **Wrangler** v4.4.0 - CLI de Cloudflare
-- **Vite** v6.3.5 - Build tool
-- **PM2** - Process manager
-- **Git** - Control de versiones
-
-## 📊 Arquitectura de Datos
+### Estructura del Proyecto
 
 ```
-Users (1) ──→ (N) Projects
-Projects (1) ──→ (1) Market Analysis
-Projects (1) ──→ (N) MVP Prototypes
-Projects (1) ──→ (N) Test Results ←─ (N) Beta Users
-Projects (1) ──→ (N) Growth Strategies
-Projects (1) ──→ (N) Metrics
-```
-
-## 🚀 Guía de Uso
-
-### 1. Crear un Nuevo Proyecto
-1. Click en "Validar Mi Idea Ahora" o "Nuevo Proyecto"
-2. Completa el formulario con:
-   - Título del proyecto
-   - Descripción detallada
-   - Mercado objetivo
-   - Propuesta de valor
-3. Click en "Iniciar Validación"
-
-### 2. Ver Análisis Automático
-El sistema ejecutará automáticamente:
-- ✅ Análisis de mercado con IA (30 segundos)
-- ✅ Generación de prototipo MVP (30 segundos)
-- ✅ Creación de estrategias de growth (10 segundos)
-
-**Total: ~70 segundos de la idea a datos accionables**
-
-### 3. Generar MVP Real
-En la página del proyecto:
-1. Scroll hasta "Generador Automático de MVPs"
-2. Click en "Auto-detectar" para que la IA seleccione el mejor template
-3. O selecciona manualmente: SaaS, Marketplace, Landing, Dashboard, CRM
-4. Click en "Generar MVP Completo"
-5. Espera 30-60 segundos
-6. Descarga el código generado
-
-### 4. Explorar Usuarios Beta
-1. Navega a "Panel Beta"
-2. Explora +10 usuarios pre-cualificados
-3. Click en "Agregar al panel" para reclutarlos
-
-### 5. Ver Métricas y Resultados
-En el dashboard del proyecto encontrarás:
-- Métricas clave con visualizaciones
-- Análisis SWOT completo
-- Feedback de usuarios
-- Estrategias de growth priorizadas
-
-## 📁 Estructura del Proyecto
-
-```
-webapp/
+proyectolovablemasgowth/
 ├── src/
-│   ├── index.tsx              # Entry point principal
-│   ├── types.ts               # TypeScript types
-│   └── api/
-│       ├── projects.ts        # CRUD de proyectos
-│       ├── validation.ts      # Validación con IA
-│       ├── beta-users.ts      # Panel de usuarios
-│       └── mvp-generator.ts   # Generador de MVPs ⭐
-├── public/
+│   ├── api/                      # Endpoints de la API
+│   │   ├── auth.ts              # Autenticación y OAuth
+│   │   ├── marketplace.ts       # Marketplace y productos
+│   │   ├── chat.ts              # Sistema de chat
+│   │   ├── dashboard.ts         # Dashboard y goals
+│   │   ├── projects.ts          # Proyectos y votación
+│   │   ├── stripe.ts            # Integración de pagos
+│   │   ├── marketing-ai.ts      # Agente de marketing IA
+│   │   ├── chat-agent.ts        # Agente conversacional
+│   │   ├── whatsapp.ts          # Integración WhatsApp
+│   │   ├── quick-pitch.ts       # Sistema de pitch
+│   │   ├── mvp-generator.ts     # Generador de MVPs
+│   │   ├── notifications.ts     # Sistema de notificaciones
+│   │   ├── plans.ts             # Planes de suscripción
+│   │   ├── validation.ts        # Validación de proyectos
+│   │   └── validator-requests.ts # Solicitudes de validación
+│   │
+│   ├── dashboard/               # Componentes de dashboard
+│   │   └── Dashboard.tsx        # Dashboard React
+│   │
+│   ├── utils/                   # Utilidades
+│   │   ├── groq.ts             # Cliente Groq
+│   │   ├── groq-mvp-generator.ts
+│   │   ├── intelligent-mvp-generator.ts
+│   │   └── mvp-templates.ts
+│   │
+│   ├── index.tsx               # Entry point principal
+│   ├── marketplace-page.tsx    # Página de marketplace
+│   ├── dashboard-page.tsx      # Página de dashboard
+│   ├── layout-with-sidebars.tsx # Layout principal
+│   ├── html-templates.tsx      # Templates HTML
+│   └── types.ts                # Tipos TypeScript
+│
+├── agents/                      # Agentes de IA Python
+│   ├── marketing_agent.py      # Agente de marketing
+│   └── README.md               # Documentación de agentes
+│
+├── migrations/                  # Migraciones de base de datos
+│   ├── 0001_initial_schema.sql
+│   ├── 0002_marketplace.sql
+│   ├── 0025_user_conversations.sql
+│   ├── 0027_marketing_ai.sql
+│   └── ...
+│
+├── public/                      # Archivos estáticos
 │   └── static/
-│       ├── app.js             # Frontend principal
-│       ├── project-detail.js  # Vista de proyecto
-│       └── mvp-generator.js   # UI del generador ⭐
-├── migrations/
-│   └── 0001_initial_schema.sql
-├── seed.sql                   # Datos de ejemplo
-├── ecosystem.config.cjs       # PM2 config
-├── wrangler.jsonc            # Cloudflare config
-├── package.json
-└── README.md
+│       ├── style.css           # Estilos globales
+│       ├── app.js              # JavaScript principal
+│       ├── marketplace.js      # Lógica del marketplace
+│       ├── mvp-generator.js    # Generador de MVPs
+│       ├── project-detail.js   # Detalle de proyectos
+│       └── quick-pitch.js      # Quick pitch
+│
+├── package.json                 # Dependencias Node.js
+├── requirements.txt             # Dependencias Python
+├── tsconfig.json               # Configuración TypeScript
+├── vite.config.ts              # Configuración Vite
+├── wrangler.jsonc              # Configuración Cloudflare
+├── deploy-cloudflare.sh        # Script de despliegue
+└── README.md                   # Este archivo
 ```
 
-## 🔧 Comandos Disponibles
+## 🚀 Instalación
+
+### Requisitos Previos
+
+- Node.js 18+ y npm
+- Python 3.9+ (para agentes de IA)
+- Cuenta de Cloudflare (para despliegue)
+- Wrangler CLI
+
+### 1. Clonar el Repositorio
 
 ```bash
-# Desarrollo local
-npm run dev              # Vite dev server
-npm run dev:sandbox      # Wrangler local con D1
-
-# Build y deployment
-npm run build            # Build production
-npm run deploy           # Deploy a Cloudflare Pages
-npm run deploy:prod      # Deploy con project name
-
-# Database
-npm run db:migrate:local # Aplicar migraciones local
-npm run db:migrate:prod  # Aplicar migraciones prod
-npm run db:seed          # Cargar datos de prueba
-npm run db:reset         # Reset completo de DB
-
-# Utilidades
-npm run clean-port       # Limpiar puerto 3000
-npm run test             # Test con curl
-npm run git:commit       # Git commit rápido
+git clone https://github.com/cadamar1236/proyectolovablemasgowth.git
+cd proyectolovablemasgowth
 ```
 
-## 🌐 API Endpoints
+### 2. Instalar Dependencias Node.js
 
-### Projects
-- `GET /api/projects` - Listar todos los proyectos
-- `GET /api/projects/:id` - Obtener proyecto con detalles
-- `POST /api/projects` - Crear nuevo proyecto
-- `PATCH /api/projects/:id/status` - Actualizar estado
+```bash
+npm install
+```
 
-### Validation
-- `POST /api/validation/analyze` - Analizar mercado con IA
-- `POST /api/validation/generate-mvp` - Generar prototipo MVP
-- `POST /api/validation/generate-growth` - Generar estrategias
+### 3. Instalar Dependencias Python (Opcional - para Marketing Agent)
 
-### MVP Generator 🆕
-- `GET /api/mvp/templates` - Listar templates disponibles
-- `POST /api/mvp/detect-template` - Auto-detectar mejor template
-- `POST /api/mvp/generate-full` - Generar MVP completo
-- `GET /api/mvp/download/:projectId` - Descargar código
+```bash
+pip install -r requirements.txt
+```
 
-### Beta Users
-- `GET /api/beta-users` - Listar usuarios beta
-- `GET /api/beta-users/:id` - Obtener usuario específico
-- `POST /api/beta-users/feedback` - Enviar feedback
+## ⚙️ Configuración
 
-## 🎯 Métricas de Rendimiento
+### 1. Variables de Entorno
 
-- **Tiempo de validación**: 48-72 horas → **60 segundos** ✅
-- **Costo de MVP**: $30,000-$150,000 → **$0 (generado automáticamente)** ✅
-- **Calidad de MVPs**: Código placeholder → **Código completo y funcional** ✅⭐
-- **Líneas de código generadas**: ~100 líneas → **700+ líneas por MVP** ✅⭐
-- **Precisión de análisis**: **85%+** con Groq AI (GPT-OSS-120B) ✅
-- **Usuarios beta disponibles**: **10,000+** en roadmap ✅
+Crear archivo `.env` en la raíz:
 
-## 🔐 Seguridad
+```env
+# JWT Secret (cambiar en producción)
+JWT_SECRET=your-super-secret-jwt-key-change-me
 
-- Base de datos D1 con cifrado automático
-- Cloudflare Workers con aislamiento V8
-- Sin almacenamiento de datos sensibles
-- CORS habilitado solo para API routes
+# Google OAuth
+GOOGLE_CLIENT_ID=tu-google-client-id
+GOOGLE_CLIENT_SECRET=tu-google-client-secret
+GOOGLE_REDIRECT_URI=https://tu-dominio.pages.dev/api/auth/google/callback
 
-## 📈 Próximos Pasos
+# Stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 
-### Fase 1: MVP Actual ✅
-- [x] Sistema de validación completo
-- [x] Análisis IA de mercado con Groq AI
-- [x] Generador automático de MVPs **MEJORADO** ⭐
-  - [x] Templates avanzados con código completo
-  - [x] Sistema de autenticación JWT
-  - [x] Frontend funcional con formularios
-  - [x] API REST completa con CRUD
-  - [x] Migraciones de base de datos
-  - [x] Preview y download de MVPs
-- [x] Panel de usuarios beta
-- [x] Dashboard de métricas
+# Groq (para MVP Generator)
+GROQ_API_KEY=gsk_...
 
-### Fase 2: Growth (Próximamente)
-- [ ] Sistema de autenticación completo
-- [ ] Integración con GitHub API
-- [ ] Deployment automático a Cloudflare Pages
-- [ ] Sistema de pagos (Stripe)
-- [ ] Workspace colaborativo
+# Twilio (para WhatsApp)
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
 
-### Fase 3: Scale (Roadmap)
-- [ ] Venture Studio automation
-- [ ] Portfolio tracking
-- [ ] Investment management
-- [ ] Equity calculator
-- [ ] Exit planner
+# Marketing AI Agent
+OPENAI_API_KEY=sk-...
+APIFY_API_TOKEN=apify_api_...
+MODELSLAB_API_KEY=...
+```
 
-## 💡 Casos de Uso Reales
+### 2. Configurar Base de Datos
 
-### 1. Startup Early-Stage
-**Problema**: Validar idea de HealthTech antes de invertir $50K
-**Solución**: Usar ValidAI Studio para análisis en 60 segundos
-**Resultado**: Ahorró 6 meses y $45K, pivotó con confianza
+```bash
+# Crear base de datos local
+wrangler d1 create lovable-growth-db
 
-### 2. Empresa Fortune 500
-**Problema**: Validar nueva línea B2B antes de $5M de inversión
-**Solución**: 10 MVPs paralelos, validación con panel exclusivo
-**Resultado**: $3.2M ahorrados, 18% ROI incremental
+# Aplicar migraciones
+wrangler d1 migrations apply lovable-growth-db --local
 
-### 3. Founder Solo
-**Problema**: Sin recursos para contratar equipo técnico
-**Solución**: Generador automático de MVPs con código real
-**Resultado**: MVP funcional en 48 horas, $50K MRR en 6 meses
+# Para producción
+wrangler d1 migrations apply lovable-growth-db --remote
+```
 
-## 🤝 Contribuciones
+### 3. Configurar wrangler.jsonc
 
-Este es un MVP funcional construido con:
-- **Hono Framework** - https://hono.dev
-- **Cloudflare** - https://cloudflare.com
-- **Tailwind CSS** - https://tailwindcss.com
-- **Open Source LLMs** - Llama 3.1 8B
+Actualizar el archivo `wrangler.jsonc` con tu configuración:
 
-## 📝 Licencia
+```json
+{
+  "name": "webapp",
+  "compatibility_date": "2024-01-01",
+  "pages_build_output_dir": "dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lovable-growth-db",
+      "database_id": "tu-database-id"
+    }
+  ]
+}
+```
 
-Proyecto de demostración para Y Combinator pitch.
+## 💻 Uso
+
+### Desarrollo Local
+
+```bash
+# Compilar y servir con Vite
+npm run dev
+
+# Servir con Wrangler (con D1 local)
+npm run dev:sandbox
+
+# Ejecutar en http://localhost:3000
+```
+
+### Build para Producción
+
+```bash
+npm run build
+```
+
+### Ejecutar Migraciones
+
+```bash
+# Local
+npm run db:migrate:local
+
+# Producción
+npm run db:migrate:prod
+```
+
+### Scripts Útiles
+
+```bash
+# Resetear base de datos local
+npm run db:reset
+
+# Preview local
+npm run preview
+
+# Limpiar puerto 3000
+npm run clean-port
+
+# Test endpoint
+npm run test
+```
+
+## 📡 API Reference
+
+### Autenticación
+
+#### POST `/api/auth/google`
+Iniciar sesión con Google OAuth
+
+**Request:**
+```json
+{
+  "code": "google-oauth-code",
+  "role": "founder" | "validator" | "investor" | "scout" | "partner" | "talent"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "jwt-token",
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "name": "User Name",
+    "role": "founder"
+  }
+}
+```
+
+### Marketplace
+
+#### GET `/api/marketplace/products`
+Obtener lista de productos
+
+**Query Params:**
+- `type`: Filtrar por tipo de usuario (opcional)
+
+#### POST `/api/marketplace/products`
+Crear nuevo producto
+
+#### POST `/api/marketplace/products/:id/vote`
+Votar por un producto (requiere autenticación)
+
+### Chat
+
+#### GET `/api/chat/conversations`
+Obtener conversaciones del usuario autenticado
+
+#### POST `/api/chat/conversations`
+Crear nueva conversación
+
+#### GET `/api/chat/conversations/:id/messages`
+Obtener mensajes de una conversación
+
+#### POST `/api/chat/conversations/:id/messages`
+Enviar mensaje
+
+### Dashboard
+
+#### GET `/api/dashboard/goals`
+Obtener goals del usuario
+
+#### POST `/api/dashboard/goals`
+Crear nuevo goal
+
+#### PUT `/api/dashboard/goals/:id`
+Actualizar goal
+
+### Marketing AI
+
+#### POST `/api/marketing-ai/chat`
+Chat con el agente de marketing
+
+#### POST `/api/marketing-ai/analyze-business`
+Análisis completo de negocio
+
+#### POST `/api/marketing-ai/generate-campaign`
+Generar campaña de contenido
+
+#### POST `/api/marketing-ai/analyze-competition`
+Análisis competitivo
+
+Ver [MARKETING_AI_README.md](MARKETING_AI_README.md) para documentación completa.
+
+## 🗄️ Base de Datos
+
+### Tablas Principales
+
+- **users**: Usuarios del sistema
+- **beta_products**: Productos en el marketplace
+- **projects**: Proyectos de startups
+- **user_conversations**: Conversaciones entre usuarios
+- **user_messages**: Mensajes del chat
+- **dashboard_goals**: Objetivos del dashboard
+- **pricing_plans**: Planes de suscripción
+- **stripe_customers**: Clientes de Stripe
+- **marketing_ai_conversations**: Conversaciones con marketing AI
+- **whatsapp_users**: Usuarios de WhatsApp
+
+### Esquema Completo
+
+Ver archivos en `migrations/` para el esquema completo de la base de datos.
+
+## 🚢 Despliegue
+
+### Cloudflare Pages
+
+1. **Conectar repositorio:**
+```bash
+wrangler pages project create webapp
+```
+
+2. **Desplegar:**
+```bash
+npm run deploy
+```
+
+3. **Configurar variables de entorno** en el dashboard de Cloudflare Pages
+
+4. **Ejecutar migraciones en producción:**
+```bash
+npm run db:migrate:prod
+```
+
+### Script de Despliegue Automático
+
+```bash
+bash deploy-cloudflare.sh
+```
+
+## 🛠️ Tecnologías Utilizadas
+
+- **Hono** - Framework web ultrarrápido
+- **Cloudflare Workers** - Serverless computing
+- **Cloudflare D1** - Base de datos SQLite distribuida
+- **TypeScript** - Type safety
+- **Vite** - Build tool moderno
+- **TailwindCSS** - Utility-first CSS
+- **Chart.js** - Gráficos interactivos
+- **Stripe** - Procesamiento de pagos
+- **Google OAuth** - Autenticación
+- **Groq** - Modelos de IA rápidos
+- **Agno** - Framework de agentes de IA
+- **Apify** - Web scraping
+- **ModelsLab** - Generación de contenido multimedia
+
+## 🤝 Contribuir
+
+Las contribuciones son bienvenidas! Por favor:
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
+
+## 👥 Autores
+
+- **Carlos** - *Desarrollo Principal* - [cadamar1236](https://github.com/cadamar1236)
+
+## 🙏 Agradecimientos
+
+- Cloudflare por su excelente plataforma
+- Comunidad de Hono
+- Todos los contribuidores
+
+## 📞 Contacto
+
+- Website: [webapp-46s.pages.dev](https://webapp-46s.pages.dev)
+- GitHub: [@cadamar1236](https://github.com/cadamar1236)
 
 ---
 
-**Construido con ❤️ usando IA open source (GPT-OSS-120B) y Cloudflare Workers**
-
-*Última actualización: 21 de octubre, 2025 - Modelo actualizado a GPT-OSS-120B con 50K tokens*
+⭐ Si este proyecto te ha sido útil, considera darle una estrella en GitHub!

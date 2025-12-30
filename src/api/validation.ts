@@ -483,4 +483,54 @@ validation.post('/generate-growth', async (c) => {
   });
 });
 
+// Get all available validators
+validation.get('/validators', async (c) => {
+  console.log('[VALIDATION] Getting validators list');
+  const db = c.env.DB;
+  
+  try {
+    // First check if validators table exists
+    const tableCheck = await db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='validators'
+    `).first();
+    
+    if (!tableCheck) {
+      console.log('[VALIDATION] Validators table does not exist yet');
+      return c.json([]);
+    }
+    
+    // Get all validators with user info
+    const result = await db.prepare(`
+      SELECT 
+        v.id,
+        v.user_id,
+        v.title,
+        v.expertise,
+        v.bio,
+        v.rating,
+        v.total_validations,
+        v.response_rate,
+        v.avg_response_time,
+        v.available,
+        v.hourly_rate,
+        u.name,
+        u.email,
+        u.avatar_url,
+        u.created_at
+      FROM validators v
+      JOIN users u ON v.user_id = u.id
+      WHERE v.available = 1
+      ORDER BY v.rating DESC, v.total_validations DESC
+    `).all();
+    
+    console.log('[VALIDATION] Found validators:', result.results?.length || 0);
+    
+    return c.json(result.results || []);
+  } catch (error) {
+    console.error('[VALIDATION] Error fetching validators:', error);
+    // Return empty array instead of error to prevent UI breaking
+    return c.json([]);
+  }
+});
+
 export default validation;

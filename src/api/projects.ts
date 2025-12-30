@@ -14,7 +14,7 @@ projects.get('/', async (c) => {
   return c.json({ projects: results });
 });
 
-// Get single project with full details
+// Get single project with full details (including product info if exists)
 projects.get('/:id', async (c) => {
   const projectId = c.req.param('id');
   
@@ -26,6 +26,19 @@ projects.get('/:id', async (c) => {
   if (!project) {
     return c.json({ error: 'Project not found' }, 404);
   }
+
+  // Get associated beta_product if exists
+  const betaProduct = await c.env.DB.prepare(`
+    SELECT 
+      bp.*,
+      u.name as company_name,
+      u.avatar_url as company_avatar,
+      u.company,
+      u.bio as company_bio
+    FROM beta_products bp
+    JOIN users u ON bp.company_user_id = u.id
+    WHERE bp.project_id = ?
+  `).bind(projectId).first();
   
   // Get market analysis
   const marketAnalysis = await c.env.DB.prepare(
@@ -57,6 +70,7 @@ projects.get('/:id', async (c) => {
   
   return c.json({
     project,
+    betaProduct,
     marketAnalysis: marketAnalysis ? {
       ...marketAnalysis,
       competitors: JSON.parse(marketAnalysis.competitors as string),
@@ -108,14 +122,10 @@ projects.patch('/:id/status', async (c) => {
   return c.json({ message: 'Status updated' });
 });
 
-// Vote for a project
+// Vote for a project (any authenticated user can vote)
 projects.post('/:id/vote', requireAuth, async (c) => {
   const projectId = c.req.param('id');
   const userId = c.var.userId;
-
-  if (c.var.userRole !== 'validator') {
-    return c.json({ error: 'Only validators can vote on projects' }, 403);
-  }
 
   // Check rate limit (1 vote per 5 seconds per user)
   const rateLimitCheck = await checkVoteRateLimit(c.env.CACHE, userId);

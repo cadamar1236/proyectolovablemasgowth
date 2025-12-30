@@ -536,6 +536,7 @@ marketplace.post('/products', requireAuth, async (c) => {
   });
   
   try {
+    // Create the beta_product directly (no project needed)
     const result = await c.env.DB.prepare(`
       INSERT INTO beta_products (
         company_user_id, title, description, category, subcategory,
@@ -547,17 +548,6 @@ marketplace.post('/products', requireAuth, async (c) => {
       stage, url, lookingForValue, compensationTypeValue, compensationAmountValue,
       pricingModelValue, durationDaysValue, validatorsNeededValue, requirementsValue, 'active'
     ).run();
-    
-    console.log('Producto insertado con éxito:', result);
-  
-    // Incrementar contadores de uso (no crítico)
-    try {
-      await incrementUsage(c.env.DB, userId, 'validators', validatorsNeededValue);
-      console.log('Contadores de uso incrementados correctamente');
-    } catch (usageError) {
-      console.error('Error al incrementar contadores de uso:', usageError);
-      // No fallar la creación del producto por esto
-    }
     
     return c.json({
       success: true,
@@ -1853,7 +1843,7 @@ marketplace.post('/products/:id/vote', requireAuth, async (c) => {
       return c.json({ error: 'Product not found' }, 404);
     }
 
-    // Insert or update vote
+    // Insert or update vote in product_votes
     await c.env.DB.prepare(`
       INSERT INTO product_votes (product_id, user_id, rating, updated_at)
       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -1879,9 +1869,6 @@ marketplace.post('/products/:id/vote', requireAuth, async (c) => {
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(productId, productId, productId).run();
-
-    // Sync to leaderboard
-    await syncProductToLeaderboard(c.env.DB, parseInt(productId));
 
     return c.json({ message: 'Vote recorded successfully' });
   } catch (error) {
@@ -2068,6 +2055,82 @@ marketplace.get('/dashboard/debug', requireAuth, async (c) => {
     user: c.get('userId'),
     timestamp: new Date().toISOString()
   });
+});
+
+// Sync existing products to projects (one-time migration endpoint)
+marketplace.post('/sync-existing-products', requireAuth, async (c) => {
+  try {
+    // Get all products without project_id
+    const { results: products } = await c.env.DB.prepare(
+      'SELECT * FROM beta_products WHERE project_id IS NULL'
+    ).all();
+
+    const synced = [];
+
+    for (const product of products) {
+      try {
+        // Create project for this product
+        const projectResult = await c.env.DB.prepare(`
+          INSERT INTO projects (
+            user_id, title, description, target_market, value_proposition,
+            category, status, rating_average, votes_count, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          product.company_user_id,
+          product.title,
+          product.description,
+          product.category,
+          product.looking_for,
+          product.category,
+          'published',
+          product.rating_average || 0,
+          product.votes_count || 0,
+          product.created_at,
+          product.updated_at
+        ).run();
+
+        const projectId = projectResult.meta.last_row_id;
+
+        // Update product with project_id
+        await c.env.DB.prepare(
+          'UPDATE beta_products SET project_id = ? WHERE id = ?'
+        ).bind(projectId, product.id).run();
+
+        // Sync votes from product_votes to project_votes
+        const { results: votes } = await c.env.DB.prepare(
+          'SELECT user_id, rating, created_at FROM product_votes WHERE product_id = ?'
+        ).bind(product.id).all();
+
+        for (const vote of votes) {
+          await c.env.DB.prepare(`
+            INSERT INTO project_votes (project_id, user_id, rating, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(project_id, user_id) DO UPDATE SET
+              rating = excluded.rating,
+              updated_at = excluded.updated_at
+          `).bind(projectId, vote.user_id, vote.rating, vote.created_at, vote.created_at).run();
+        }
+
+        synced.push({ 
+          product_id: product.id, 
+          project_id: projectId, 
+          title: product.title,
+          votes_synced: votes.length
+        });
+      } catch (error) {
+        console.error(`Error syncing product ${product.id}:`, error);
+      }
+    }
+
+    return c.json({
+      message: 'Products synced successfully',
+      synced_count: synced.length,
+      products: synced
+    });
+  } catch (error) {
+    console.error('Error syncing products:', error);
+    return c.json({ error: 'Failed to sync products' }, 500);
+  }
 });
 
 export default marketplace;

@@ -44,7 +44,7 @@ auth.post('/register', async (c) => {
     }
     
     // Validate role
-    const validRoles = ['founder', 'validator', 'admin'];
+    const validRoles = ['founder', 'investor', 'scout', 'partner', 'job_seeker', 'other', 'validator', 'admin'];
     if (!validRoles.includes(role)) {
       return c.json({ error: 'Invalid role' }, 400);
     }
@@ -244,7 +244,7 @@ auth.put('/role', async (c) => {
     }
     
     // Validate role
-    const validRoles = ['founder', 'validator', 'admin'];
+    const validRoles = ['founder', 'investor', 'scout', 'partner', 'job_seeker', 'other', 'validator', 'admin'];
     if (!validRoles.includes(newRole)) {
       return c.json({ error: 'Invalid role' }, 400);
     }
@@ -389,12 +389,26 @@ auth.get('/google', async (c) => {
 });
 
 auth.get('/google/callback', async (c) => {
+  console.log('[GOOGLE-CALLBACK] Starting OAuth callback...');
+  console.log('[GOOGLE-CALLBACK] Full URL:', c.req.url);
+  
   try {
     const code = c.req.query('code');
+    const error = c.req.query('error');
     const stateParam = c.req.query('state') || '{"role":"founder"}';
 
+    console.log('[GOOGLE-CALLBACK] Code present:', !!code);
+    console.log('[GOOGLE-CALLBACK] Error param:', error);
+    console.log('[GOOGLE-CALLBACK] State:', stateParam);
+
+    if (error) {
+      console.error('[GOOGLE-CALLBACK] OAuth error from Google:', error);
+      return c.redirect('/?error=' + error);
+    }
+
     if (!code) {
-      return c.json({ error: 'Authorization code not provided' }, 400);
+      console.error('[GOOGLE-CALLBACK] No authorization code provided');
+      return c.redirect('/?error=no_code');
     }
 
     // Parse state parameter (contains role and redirect)
@@ -402,6 +416,7 @@ auth.get('/google/callback', async (c) => {
     try {
       state = JSON.parse(stateParam);
     } catch (e) {
+      console.log('[GOOGLE-CALLBACK] Failed to parse state, using defaults');
       state = { role: 'founder', redirect: '' };
     }
     let userRole = state.role || 'founder';
@@ -411,10 +426,16 @@ auth.get('/google/callback', async (c) => {
     const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
     const redirectUri = `${new URL(c.req.url).origin}/api/auth/google/callback`;
 
+    console.log('[GOOGLE-CALLBACK] Redirect URI:', redirectUri);
+    console.log('[GOOGLE-CALLBACK] Client ID present:', !!clientId);
+
     if (!clientId || !clientSecret) {
-      return c.json({ error: 'Google OAuth not configured' }, 500);
+      console.error('[GOOGLE-CALLBACK] Google OAuth not configured');
+      return c.redirect('/?error=oauth_not_configured');
     }
 
+    console.log('[GOOGLE-CALLBACK] Exchanging code for token...');
+    
     // Exchange code for access token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -433,12 +454,18 @@ auth.get('/google/callback', async (c) => {
     const tokenData = await tokenResponse.json() as {
       access_token?: string;
       error?: string;
+      error_description?: string;
     };
 
+    console.log('[GOOGLE-CALLBACK] Token response:', tokenData.error || 'Success');
+
     if (!tokenData.access_token) {
-      return c.json({ error: 'Failed to get access token' }, 400);
+      console.error('[GOOGLE-CALLBACK] Failed to get access token:', tokenData.error, tokenData.error_description);
+      return c.redirect('/?error=token_exchange_failed');
     }
 
+    console.log('[GOOGLE-CALLBACK] Getting user info from Google...');
+    
     // Get user info from Google
     const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: {
@@ -452,8 +479,11 @@ auth.get('/google/callback', async (c) => {
       picture?: string;
     };
 
+    console.log('[GOOGLE-CALLBACK] User email:', userData.email);
+
     if (!userData.email) {
-      return c.json({ error: 'Failed to get user email' }, 400);
+      console.error('[GOOGLE-CALLBACK] Failed to get user email');
+      return c.redirect('/?error=no_email');
     }
 
     // Check if user exists
@@ -464,6 +494,7 @@ auth.get('/google/callback', async (c) => {
     let userId: number;
 
     if (existingUser) {
+      console.log('[GOOGLE-CALLBACK] Existing user found:', existingUser.id);
       // User exists, update their info if needed
       userId = existingUser.id;
       userRole = existingUser.role;
@@ -476,11 +507,12 @@ auth.get('/google/callback', async (c) => {
         WHERE id = ?
       `).bind(userData.name, userData.picture, userId).run();
     } else {
+      console.log('[GOOGLE-CALLBACK] Creating new user...');
       // Create new user
       userRole = state.role; // Use role from OAuth state
 
       // Validate role
-      const validRoles = ['founder', 'validator', 'admin'];
+      const validRoles = ['founder', 'investor', 'scout', 'partner', 'job_seeker', 'other', 'validator', 'admin'];
       if (!validRoles.includes(userRole)) {
         userRole = 'founder'; // Default to founder
       }
@@ -491,6 +523,7 @@ auth.get('/google/callback', async (c) => {
       `).bind(userData.email, userData.name, userRole, 'starter', userData.picture).run();
 
       userId = result.meta.last_row_id;
+      console.log('[GOOGLE-CALLBACK] New user created:', userId);
 
       // If validator, create validator profile
       if (userRole === 'validator') {
@@ -513,6 +546,8 @@ auth.get('/google/callback', async (c) => {
       c.env.JWT_SECRET || JWT_SECRET
     );
 
+    console.log('[GOOGLE-CALLBACK] JWT token generated');
+
     // Set cookie and redirect
     const frontendUrl = new URL(c.req.url).origin;
     const finalRedirect = redirectPath || '/dashboard';
@@ -525,11 +560,14 @@ auth.get('/google/callback', async (c) => {
       ? `${finalRedirect}&token=${token}` 
       : `${finalRedirect}?token=${token}`;
     
+    console.log('[GOOGLE-CALLBACK] Redirecting to:', redirectWithToken);
+    
     return c.redirect(redirectWithToken);
 
   } catch (error) {
-    console.error('Google OAuth callback error:', error);
-    return c.json({ error: 'OAuth authentication failed' }, 500);
+    console.error('[GOOGLE-CALLBACK] ERROR:', error);
+    console.error('[GOOGLE-CALLBACK] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    return c.redirect('/?error=callback_failed');
   }
 });
 
@@ -712,5 +750,50 @@ export function requireRole(...roles: string[]) {
     await next();
   };
 }
+
+// Get users by role (for marketplace)
+auth.get('/users-by-role', async (c) => {
+  try {
+    const role = c.req.query('role');
+    
+    if (!role) {
+      return c.json({ error: 'Role parameter is required' }, 400);
+    }
+    
+    const validRoles = ['founder', 'investor', 'scout', 'partner', 'job_seeker', 'other', 'validator'];
+    if (!validRoles.includes(role)) {
+      return c.json({ error: 'Invalid role' }, 400);
+    }
+    
+    // Get users with this role
+    const users = await c.env.DB.prepare(`
+      SELECT 
+        id,
+        name,
+        email,
+        role,
+        company,
+        avatar_url,
+        location,
+        skills,
+        interests,
+        investment_range,
+        looking_for,
+        linkedin_url,
+        twitter_url,
+        website_url,
+        created_at
+      FROM users
+      WHERE role = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(role).all();
+    
+    return c.json(users.results || []);
+  } catch (error) {
+    console.error('[AUTH] Error getting users by role:', error);
+    return c.json({ error: 'Failed to get users' }, 500);
+  }
+});
 
 export default auth;

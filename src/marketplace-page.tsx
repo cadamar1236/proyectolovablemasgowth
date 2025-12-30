@@ -197,9 +197,14 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
 
       <!-- MARKETPLACE TAB -->
       <div id="content-marketplace" class="tab-content hidden">
-        <div class="flex border-b border-gray-200 mb-6">
-          <button onclick="showMarketplaceSection('products')" id="mp-products-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-primary border-b-2 border-primary">Products</button>
-          <button onclick="showMarketplaceSection('validators')" id="mp-validators-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent">Validators</button>
+        <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+          <button onclick="showMarketplaceSection('products')" id="mp-products-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-primary border-b-2 border-primary whitespace-nowrap">Products</button>
+          <button onclick="showMarketplaceSection('founders')" id="mp-founders-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Founders</button>
+          <button onclick="showMarketplaceSection('investors')" id="mp-investors-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Investors</button>
+          <button onclick="showMarketplaceSection('validators')" id="mp-validators-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Validators</button>
+          <button onclick="showMarketplaceSection('scouts')" id="mp-scouts-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Scouts</button>
+          <button onclick="showMarketplaceSection('partners')" id="mp-partners-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Partners</button>
+          <button onclick="showMarketplaceSection('talent')" id="mp-talent-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Talent</button>
         </div>
 
         <!-- Products Section -->
@@ -232,9 +237,59 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         <!-- Validators Section -->
         <div id="mp-validators" class="mp-section hidden">
           <div class="mb-6">
-            <input type="text" id="validator-search" placeholder="Search validators..." onkeyup="searchValidators()" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+            <input type="text" id="validator-search" placeholder="Search validators..." onkeyup="searchUsers('validators')" class="w-full border border-gray-300 rounded-lg px-4 py-2">
           </div>
           <div id="validators-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
+          </div>
+        </div>
+
+        <!-- Founders Section -->
+        <div id="mp-founders" class="mp-section hidden">
+          <div class="mb-6">
+            <input type="text" placeholder="Search founders..." onkeyup="searchUsers('founders')" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+          </div>
+          <div id="founders-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
+          </div>
+        </div>
+
+        <!-- Investors Section -->
+        <div id="mp-investors" class="mp-section hidden">
+          <div class="mb-6">
+            <input type="text" placeholder="Search investors..." onkeyup="searchUsers('investors')" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+          </div>
+          <div id="investors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
+          </div>
+        </div>
+
+        <!-- Scouts Section -->
+        <div id="mp-scouts" class="mp-section hidden">
+          <div class="mb-6">
+            <input type="text" placeholder="Search scouts..." onkeyup="searchUsers('scouts')" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+          </div>
+          <div id="scouts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
+          </div>
+        </div>
+
+        <!-- Partners Section -->
+        <div id="mp-partners" class="mp-section hidden">
+          <div class="mb-6">
+            <input type="text" placeholder="Search partners..." onkeyup="searchUsers('partners')" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+          </div>
+          <div id="partners-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
+          </div>
+        </div>
+
+        <!-- Talent Section -->
+        <div id="mp-talent" class="mp-section hidden">
+          <div class="mb-6">
+            <input type="text" placeholder="Search talent..." onkeyup="searchUsers('talent')" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+          </div>
+          <div id="talent-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
           </div>
         </div>
@@ -621,7 +676,24 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       async function selectConversation(id) {
         currentConversation = id;
         const conv = conversations.find(c => c.id === id);
-        document.getElementById('chat-header').innerHTML = \`<p class="font-bold text-gray-900">\${conv?.other_user_name || 'User'}</p><p class="text-sm text-gray-500">\${conv?.project_title || conv?.product_title || ''}</p>\`;
+        
+        // If conversation not found in list (new conversation), fetch it directly
+        if (!conv) {
+          console.log('Conversation not in list, fetching directly:', id);
+          try {
+            const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+            const res = await axios.get('/api/chat/conversations/' + id, { headers: { Authorization: 'Bearer ' + token } });
+            if (res.data) {
+              document.getElementById('chat-header').innerHTML = \`<p class="font-bold text-gray-900">\${res.data.other_user_name || 'User'}</p><p class="text-sm text-gray-500">New conversation</p>\`;
+            }
+          } catch (e) {
+            console.error('Error fetching conversation:', e);
+            document.getElementById('chat-header').innerHTML = \`<p class="font-bold text-gray-900">Chat</p>\`;
+          }
+        } else {
+          document.getElementById('chat-header').innerHTML = \`<p class="font-bold text-gray-900">\${conv?.other_user_name || 'User'}</p><p class="text-sm text-gray-500">\${conv?.project_title || conv?.product_title || ''}</p>\`;
+        }
+        
         document.getElementById('chat-input-area').classList.remove('hidden');
         renderConversations();
         
@@ -647,6 +719,11 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           await axios.put('/api/chat/conversations/' + id + '/read', {}, { headers: { Authorization: 'Bearer ' + token } });
           loadConversations();
         } catch (e) { console.error('Error loading messages:', e); }
+      }
+
+      // Alias for compatibility
+      function loadConversation(id) {
+        return selectConversation(id);
       }
 
       async function sendMessage() {
@@ -681,6 +758,14 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         document.getElementById('mp-' + section + '-btn').classList.add('text-primary', 'border-primary');
         document.querySelectorAll('.mp-section').forEach(s => s.classList.add('hidden'));
         document.getElementById('mp-' + section).classList.remove('hidden');
+        
+        // Load data for the section
+        if (section === 'validators') loadValidators();
+        else if (section === 'founders') loadUsersByRole('founder', 'founders-grid');
+        else if (section === 'investors') loadUsersByRole('investor', 'investors-grid');
+        else if (section === 'scouts') loadUsersByRole('scout', 'scouts-grid');
+        else if (section === 'partners') loadUsersByRole('partner', 'partners-grid');
+        else if (section === 'talent') loadUsersByRole('job_seeker', 'talent-grid');
       }
 
       async function loadProducts() {
@@ -702,9 +787,21 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
               </div>
               <h3 class="font-bold text-gray-900 mb-2">\${p.title}</h3>
               <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${p.description}</p>
-              <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-500"><i class="fas fa-user mr-1"></i>\${p.company_name || 'Unknown'}</span>
-                <span class="text-primary font-medium">\${p.rating_average ? p.rating_average.toFixed(1) + '★' : 'New'}</span>
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-gray-500 text-sm"><i class="fas fa-user mr-1"></i>\${p.company_name || 'Unknown'}</span>
+                <div class="flex items-center gap-1">
+                  <span class="text-yellow-500 font-bold">\${p.rating_average ? p.rating_average.toFixed(1) : '0.0'}</span>
+                  <i class="fas fa-star text-yellow-500"></i>
+                  <span class="text-gray-400 text-sm">(\${p.votes_count || 0})</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="viewProductDetail(\${p.id})" class="flex-1 bg-primary text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition">
+                  <i class="fas fa-eye mr-1"></i>Ver detalle
+                </button>
+                <button onclick="voteProduct(\${p.id})" class="px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition" title="Votar">
+                  <i class="fas fa-star"></i>
+                </button>
               </div>
             </div>
           \`).join('');
@@ -713,30 +810,193 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
 
       async function loadValidators() {
         try {
-          const res = await axios.get('/api/marketplace/validators', { params: { limit: 20 } });
-          const validators = res.data.validators || [];
+          const res = await axios.get('/api/validation/validators');
+          const validators = res.data || [];
           const container = document.getElementById('validators-grid');
           if (!validators.length) {
-            container.innerHTML = '<div class="col-span-3 text-center py-12 text-gray-500"><i class="fas fa-users text-4xl mb-4 text-gray-300"></i><p>No validators found</p></div>';
+            container.innerHTML = '<div class="col-span-3 text-center py-12 text-gray-500"><i class="fas fa-users text-4xl mb-4 text-gray-300"></i><p>No validators available</p></div>';
             return;
           }
-          container.innerHTML = validators.map(v => \`
+          container.innerHTML = validators.map(v => {
+            const avatarUrl = v.avatar_url || \`https://ui-avatars.com/api/?name=\${encodeURIComponent(v.name || 'V')}&background=6366f1&color=fff\`;
+            const expertise = Array.isArray(v.expertise) ? v.expertise : JSON.parse(v.expertise || '[]');
+            const expertiseTags = expertise.slice(0, 3).map(exp => 
+              \`<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1">\${exp}</span>\`
+            ).join('');
+            
+            return \`
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition">
-              <div class="flex items-center gap-3 mb-3">
-                <div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-lg font-bold">\${(v.name || 'V')[0].toUpperCase()}</div>
-                <div>
+              <div class="flex items-start gap-3 mb-3">
+                <img src="\${avatarUrl}" class="w-14 h-14 rounded-full" alt="\${v.name}"/>
+                <div class="flex-1">
                   <h3 class="font-bold text-gray-900">\${v.name || 'Validator'}</h3>
-                  <p class="text-sm text-gray-500">\${v.title || 'Expert'}</p>
+                  <p class="text-sm text-gray-500">\${v.title || 'Expert Validator'}</p>
+                  <div class="flex items-center mt-1 text-sm">
+                    <div class="flex text-yellow-400 mr-2">
+                      \${Array(5).fill(0).map((_, i) => \`<i class="fas fa-star\${i < Math.round(v.rating || 0) ? '' : '-o'} text-xs"></i>\`).join('')}
+                    </div>
+                    <span class="text-gray-500 text-xs">(\${v.total_validations || 0})</span>
+                  </div>
                 </div>
               </div>
-              <p class="text-sm text-gray-600 mb-3 line-clamp-2">\${v.bio || 'No bio available'}</p>
-              <div class="flex justify-between items-center text-sm">
-                <span class="text-yellow-500"><i class="fas fa-star mr-1"></i>\${v.rating ? v.rating.toFixed(1) : 'New'}</span>
-                <span class="text-gray-500">\${v.total_validations || 0} validations</span>
+              <p class="text-sm text-gray-600 mb-3 line-clamp-2">\${v.bio || 'Expert validator ready to help your startup'}</p>
+              <div class="mb-3">
+                \${expertiseTags}
+              </div>
+              <div class="flex gap-2">
+                <button onclick="startChatWithValidator(\${v.user_id})" class="flex-1 bg-primary text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition">
+                  <i class="fas fa-comment mr-1"></i>Chat
+                </button>
+                <button onclick="viewValidatorProfile(\${v.user_id})" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                  <i class="fas fa-user"></i>
+                </button>
               </div>
             </div>
-          \`).join('');
-        } catch (e) { console.error('Error loading validators:', e); }
+          \`;
+          }).join('');
+        } catch (e) { 
+          console.error('Error loading validators:', e);
+          document.getElementById('validators-grid').innerHTML = '<div class="col-span-3 text-center py-12 text-red-500"><i class="fas fa-exclamation-triangle text-4xl mb-4"></i><p>Error loading validators</p></div>';
+        }
+      }
+
+      async function startChatWithValidator(validatorUserId) {
+        try {
+          console.log('Starting chat with validator:', validatorUserId);
+          const token = getAuthToken();
+          const response = await axios.post('/api/chat/conversations', {
+            other_user_id: validatorUserId
+          }, {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          const conversationId = response.data.conversation_id;
+          
+          // Switch to inbox tab
+          switchTab('inbox');
+          
+          // Wait a moment for tab to switch, then reload conversations and select the new one
+          setTimeout(async () => {
+            await loadConversations(); // Reload conversations list to include the new one
+            setTimeout(() => {
+              selectConversation(conversationId); // Now select it
+            }, 200);
+          }, 300);
+        } catch (error) {
+          console.error('Error starting chat:', error);
+          alert('Error starting conversation. Please try again.');
+        }
+      }
+
+      function viewValidatorProfile(validatorUserId) {
+        console.log('Viewing validator profile:', validatorUserId);
+        alert('Validator profile coming soon');
+      }
+
+      // Load users by role
+      async function loadUsersByRole(role, gridId) {
+        try {
+          const res = await axios.get('/api/auth/users-by-role', { params: { role } });
+          const users = res.data || [];
+          const container = document.getElementById(gridId);
+          
+          if (!users.length) {
+            container.innerHTML = '<div class="col-span-3 text-center py-12 text-gray-500"><i class="fas fa-users text-4xl mb-4 text-gray-300"></i><p>No users found</p></div>';
+            return;
+          }
+          
+          const roleIcons = {
+            founder: 'fa-rocket',
+            investor: 'fa-hand-holding-usd',
+            scout: 'fa-search',
+            partner: 'fa-handshake',
+            job_seeker: 'fa-briefcase'
+          };
+          
+          const roleLabels = {
+            founder: 'Founder',
+            investor: 'Investor',
+            scout: 'Scout',
+            partner: 'Partner',
+            job_seeker: 'Looking for opportunities'
+          };
+          
+          container.innerHTML = users.map(u => {
+            const avatarUrl = u.avatar_url || \`https://ui-avatars.com/api/?name=\${encodeURIComponent(u.name || 'U')}&background=random&color=fff\`;
+            const skills = u.skills ? (Array.isArray(u.skills) ? u.skills : JSON.parse(u.skills || '[]')) : [];
+            const skillsTags = skills.slice(0, 3).map(skill => 
+              \`<span class="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded mr-1">\${skill}</span>\`
+            ).join('');
+            
+            return \`
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition">
+              <div class="flex items-start gap-3 mb-3">
+                <img src="\${avatarUrl}" class="w-14 h-14 rounded-full" alt="\${u.name}"/>
+                <div class="flex-1">
+                  <h3 class="font-bold text-gray-900">\${u.name || 'User'}</h3>
+                  <p class="text-sm text-gray-500 flex items-center">
+                    <i class="fas \${roleIcons[role] || 'fa-user'} mr-1"></i>
+                    \${u.company || roleLabels[role] || 'User'}
+                  </p>
+                  \${u.location ? \`<p class="text-xs text-gray-400 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>\${u.location}</p>\` : ''}
+                </div>
+              </div>
+              \${u.looking_for ? \`<p class="text-sm text-gray-600 mb-3 line-clamp-2"><strong>Looking for:</strong> \${u.looking_for}</p>\` : ''}
+              \${u.investment_range && role === 'investor' ? \`<p class="text-sm text-gray-600 mb-3"><strong>Range:</strong> \${u.investment_range}</p>\` : ''}
+              <div class="mb-3">
+                \${skillsTags}
+              </div>
+              <div class="flex gap-2">
+                <button onclick="startChatWithUser(\${u.id})" class="flex-1 bg-primary text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition">
+                  <i class="fas fa-comment mr-1"></i>Chat
+                </button>
+                <button onclick="viewUserProfile(\${u.id})" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                  <i class="fas fa-user"></i>
+                </button>
+              </div>
+            </div>
+          \`;
+          }).join('');
+        } catch (e) { 
+          console.error('Error loading users:', e);
+          document.getElementById(gridId).innerHTML = '<div class="col-span-3 text-center py-12 text-red-500"><i class="fas fa-exclamation-triangle text-4xl mb-4"></i><p>Error loading users</p></div>';
+        }
+      }
+
+      async function startChatWithUser(userId) {
+        try {
+          console.log('Starting chat with user:', userId);
+          const token = getAuthToken();
+          const response = await axios.post('/api/chat/conversations', {
+            other_user_id: userId
+          }, {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          const conversationId = response.data.conversation_id;
+          
+          // Switch to inbox tab
+          switchTab('inbox');
+          
+          // Wait a moment for tab to switch, then reload conversations and select the new one
+          setTimeout(async () => {
+            await loadConversations(); // Reload conversations list to include the new one
+            setTimeout(() => {
+              selectConversation(conversationId); // Now select it
+            }, 200);
+          }, 300);
+        } catch (error) {
+          console.error('Error starting chat:', error);
+          alert('Error starting conversation. Please try again.');
+        }
+      }
+
+      function viewUserProfile(userId) {
+        console.log('Viewing user profile:', userId);
+        alert('User profile coming soon');
+      }
+
+      function searchUsers(type) {
+        // TODO: Implement search
+        console.log('Searching users:', type);
       }
 
       function searchValidators() {
@@ -746,6 +1006,146 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
 
       function openProductModal() { document.getElementById('product-modal').classList.remove('hidden'); document.getElementById('product-modal').classList.add('flex'); }
       function closeProductModal() { document.getElementById('product-modal').classList.add('hidden'); document.getElementById('product-modal').classList.remove('flex'); }
+
+      // View product detail
+      async function viewProductDetail(productId) {
+        try {
+          const res = await axios.get(\`/api/marketplace/products/\${productId}\`);
+          const product = res.data;
+          
+          // Create modal with product details
+          const modal = document.createElement('div');
+          modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+          modal.innerHTML = \`
+            <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
+              <div class="flex justify-between items-start mb-4">
+                <div>
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-700">\${product.category}</span>
+                    <span class="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600">\${product.stage}</span>
+                  </div>
+                  <h2 class="text-2xl font-bold text-gray-900">\${product.title}</h2>
+                </div>
+                <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                  <i class="fas fa-times text-xl"></i>
+                </button>
+              </div>
+              
+              <div class="mb-4">
+                <div class="flex items-center gap-3 mb-3">
+                  <img src="\${product.company_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(product.company_name || 'C')}" 
+                       class="w-12 h-12 rounded-full" alt="Company">
+                  <div>
+                    <p class="font-semibold text-gray-900">\${product.company_name || 'Unknown Company'}</p>
+                    <p class="text-sm text-gray-500">\${product.company || ''}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-2">
+                  <div class="flex items-center">
+                    <span class="text-3xl font-bold text-yellow-500">\${product.rating_average ? product.rating_average.toFixed(1) : '0.0'}</span>
+                    <i class="fas fa-star text-yellow-500 ml-1 text-xl"></i>
+                  </div>
+                  <span class="text-gray-500">(\${product.votes_count || 0} votos)</span>
+                </div>
+                <button onclick="voteProduct(\${productId}); this.closest('.fixed').remove();" 
+                        class="ml-auto bg-yellow-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-yellow-600 transition">
+                  <i class="fas fa-star mr-2"></i>Votar ahora
+                </button>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <h3 class="font-bold text-gray-900 mb-2">Descripción</h3>
+                  <p class="text-gray-600">\${product.description}</p>
+                </div>
+
+                <div>
+                  <h3 class="font-bold text-gray-900 mb-2">Información</h3>
+                  <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="bg-gray-50 p-3 rounded-lg">
+                      <p class="text-gray-500 mb-1">Categoría</p>
+                      <p class="font-semibold">\${product.category}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg">
+                      <p class="text-gray-500 mb-1">Etapa</p>
+                      <p class="font-semibold">\${product.stage}</p>
+                    </div>
+                    \${product.url ? \`
+                    <div class="bg-gray-50 p-3 rounded-lg col-span-2">
+                      <p class="text-gray-500 mb-1">URL</p>
+                      <a href="\${product.url}" target="_blank" class="text-primary hover:underline">\${product.url}</a>
+                    </div>
+                    \` : ''}
+                  </div>
+                </div>
+
+                \${product.looking_for ? \`
+                <div>
+                  <h3 class="font-bold text-gray-900 mb-2">Buscando</h3>
+                  <p class="text-gray-600">\${product.looking_for}</p>
+                </div>
+                \` : ''}
+
+                \${product.reviews && product.reviews.length > 0 ? \`
+                <div>
+                  <h3 class="font-bold text-gray-900 mb-2">Reseñas</h3>
+                  <div class="space-y-2">
+                    \${product.reviews.map(r => \`
+                      <div class="bg-gray-50 p-3 rounded-lg">
+                        <div class="flex items-center justify-between mb-1">
+                          <p class="font-semibold text-sm">\${r.reviewer_name}</p>
+                          <div class="flex text-yellow-400">
+                            \${Array(5).fill(0).map((_, i) => \`<i class="fas fa-star\${i < r.rating ? '' : '-o'} text-xs"></i>\`).join('')}
+                          </div>
+                        </div>
+                        <p class="text-sm text-gray-600">\${r.comment || ''}</p>
+                      </div>
+                    \`).join('')}
+                  </div>
+                </div>
+                \` : ''}
+              </div>
+            </div>
+          \`;
+          
+          document.body.appendChild(modal);
+        } catch (error) {
+          console.error('Error loading product details:', error);
+          alert('Error al cargar los detalles del producto');
+        }
+      }
+
+      // Vote for product
+      async function voteProduct(productId) {
+        const rating = prompt('Califica este producto (1-5 estrellas):', '5');
+        if (!rating || rating < 1 || rating > 5) {
+          alert('Por favor ingresa un valor entre 1 y 5');
+          return;
+        }
+
+        try {
+          const token = getAuthToken();
+          
+          // Vote directly on the product
+          await axios.post(\`/api/marketplace/products/\${productId}/vote\`, 
+            { rating: parseInt(rating) },
+            { headers: { Authorization: 'Bearer ' + token } }
+          );
+          
+          alert('✅ Voto registrado exitosamente');
+          loadProducts(); // Reload to show updated rating
+        } catch (error) {
+          console.error('Error voting:', error);
+          if (error.response?.status === 429) {
+            alert(error.response.data.error || 'Espera unos segundos antes de votar nuevamente');
+          } else {
+            alert('Error al votar. Por favor intenta nuevamente.');
+          }
+        }
+      }
 
       async function createProduct(e) {
         e.preventDefault();

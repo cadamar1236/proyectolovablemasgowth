@@ -8,13 +8,54 @@ const app = new Hono<{ Bindings: Bindings }>();
 // Dashboard page with integrated chat
 app.get('/', async (c) => {
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  const tokenInUrl = c.req.query('token');
 
-  if (!authToken) {
-    return c.redirect('/api/auth/google');
+  // If token is in URL (from OAuth redirect), ALWAYS let page load so client JS can save it
+  // Only redirect if there's NO token anywhere
+  if (!authToken && !tokenInUrl) {
+    console.log('[DASHBOARD] No token found, redirecting to login');
+    return c.redirect('/');
+  }
+
+  // If we have tokenInUrl, verify it on the server side too
+  // This prevents issues with placeholder values
+  let payload: any = null;
+  const tokenToVerify = authToken || tokenInUrl;
+  
+  if (tokenToVerify) {
+    try {
+      payload = await verify(tokenToVerify, c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var') as any;
+      console.log('[DASHBOARD] Token verified successfully for user:', payload.userId);
+    } catch (error) {
+      // Only redirect if BOTH tokens are invalid and there's no tokenInUrl to try
+      if (!tokenInUrl) {
+        console.error('[DASHBOARD] Invalid token, redirecting to login');
+        return c.redirect('/');
+      }
+      // If we have tokenInUrl but it failed to verify, use placeholder (client will retry)
+      console.warn('[DASHBOARD] Token in URL failed verification, using placeholder');
+      payload = { 
+        userId: 0, 
+        userName: 'Loading...', 
+        email: '', 
+        name: 'Loading...', 
+        role: 'founder' 
+      };
+    }
+  }
+
+  // If still no payload, use placeholder values (shouldn't happen due to earlier check)
+  if (!payload) {
+    payload = { 
+      userId: 0, 
+      userName: 'Loading...', 
+      email: '', 
+      name: 'Loading...', 
+      role: 'founder' 
+    };
   }
 
   try {
-    const payload = await verify(authToken, c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var') as any;
 
     return c.html(`
 <!DOCTYPE html>
@@ -22,7 +63,7 @@ app.get('/', async (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - ValidAI Studio</title>
+    <title>Dashboard - ASTAR* Labs</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -72,13 +113,17 @@ app.get('/', async (c) => {
       const urlParams = new URLSearchParams(window.location.search);
       const urlToken = urlParams.get('token');
       if (urlToken) {
-        // Save token as cookie - use more permissive settings for cross-origin
-        document.cookie = \`authToken=\${urlToken}; path=/; max-age=\${60 * 60 * 24 * 7}; SameSite=Lax; Secure\`;
+        console.log('[DASHBOARD] Token found in URL, saving...');
+        // Save token as cookie
+        document.cookie = \`authToken=\${urlToken}; path=/; max-age=\${60 * 60 * 24 * 7}; SameSite=Lax\`;
         // Also save in localStorage as backup
         localStorage.setItem('authToken', urlToken);
+        console.log('[DASHBOARD] Token saved successfully');
         // Clean up URL
         const cleanUrl = window.location.pathname + window.location.hash;
         window.history.replaceState({}, document.title, cleanUrl);
+      } else {
+        console.log('[DASHBOARD] No token in URL');
       }
       
       // Get token from cookie or localStorage
@@ -87,8 +132,10 @@ app.get('/', async (c) => {
         return cookieMatch ? cookieMatch[1] : localStorage.getItem('authToken');
       }
 
-      const userId = ${payload.userId};
-      const userName = "${payload.userName || 'Usuario'}";
+      const userId = ${payload.userId || 0};
+      const userName = "${(payload.userName || payload.name || payload.email || 'Usuario').replace(/"/g, '\\"')}";
+      const userEmail = "${(payload.email || '').replace(/"/g, '\\"')}";
+      const userRole = "${payload.role || 'founder'}";
       
       // Configure axios to send cookies automatically
       axios.defaults.withCredentials = true;
@@ -455,348 +502,155 @@ app.get('/', async (c) => {
 
         document.getElementById('app').innerHTML = \`
           <div class="flex h-screen bg-gray-50">
-            <!-- Sidebar Navigation -->
-            <div class="w-64 bg-white shadow-lg flex flex-col">
-              <div class="p-6">
-                <h1 class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  ValidAI Studio
-                </h1>
-                <p class="text-sm text-gray-600 mt-1">${userName}</p>
+            <!-- Main Content Area with Top Nav -->
+            <div class="flex-1 overflow-y-auto">
+              <!-- Header -->
+              <div class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="max-w-7xl mx-auto flex items-center justify-between">
+                  <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold flex items-center">
+                      <span class="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">ASTAR</span>
+                      <span class="text-blue-500 ml-1">✦</span>
+                    </h1>
+                    <div class="text-sm">
+                      <p class="font-semibold text-gray-900">\${userName}</p>
+                      <p class="text-xs text-gray-500">\${userRole}</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center space-x-4">
+                    <button onclick="toggleChat()" class="text-gray-600 hover:text-primary transition">
+                      <i class="fas fa-robot text-xl"></i>
+                    </button>
+                    <button class="text-gray-600 hover:text-primary transition">
+                      <i class="fas fa-bell text-xl"></i>
+                    </button>
+                    <a href="#settings" class="text-gray-600 hover:text-primary transition">
+                      <i class="fas fa-cog text-xl"></i>
+                    </a>
+                  </div>
+                </div>
               </div>
-              
-              <nav class="flex-1 px-3 overflow-y-auto">
-                <a href="#" onclick="switchView('dashboard'); return false;" class="flex items-center px-4 py-3 \${state.currentView === 'dashboard' ? 'text-gray-700 bg-primary/10' : 'text-gray-600 hover:bg-gray-100'} rounded-lg mb-2">
-                  <i class="fas fa-home mr-3"></i>
-                  Home (HQ)
-                </a>
-                <a href="#" onclick="switchView('traction'); return false;" class="flex items-center px-4 py-3 \${state.currentView === 'traction' ? 'text-gray-700 bg-primary/10' : 'text-gray-600 hover:bg-gray-100'} rounded-lg mb-2">
-                  <i class="fas fa-chart-line mr-3"></i>
-                  Traction
-                </a>
-                <a href="#" onclick="switchView('inbox'); return false;" class="flex items-center px-4 py-3 \${state.currentView === 'inbox' ? 'text-gray-700 bg-primary/10' : 'text-gray-600 hover:bg-gray-100'} rounded-lg mb-2">
-                  <i class="fas fa-inbox mr-3"></i>
-                  Inbox
-                </a>
-                <a href="/leaderboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg mb-2">
-                  <i class="fas fa-trophy mr-3"></i>
-                  Leaderboard
-                </a>
-                <a href="/marketplace" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg mb-2">
-                  <i class="fas fa-star mr-3"></i>
-                  Marketplace
-                </a>
-                <a href="#planner" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg mb-2">
-                  <i class="fas fa-calendar mr-3"></i>
-                  Planner
-                </a>
-                <a href="#insights" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg mb-2">
-                  <i class="fas fa-chart-bar mr-3"></i>
-                  Insights
-                </a>
-              </nav>
 
-              <div class="p-3 border-t">
-                <a href="#settings" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg mb-2">
-                  <i class="fas fa-cog mr-3"></i>
-                  Settings
-                </a>
-                <a href="#help" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
-                  <i class="fas fa-question-circle mr-3"></i>
-                  Help
-                </a>
+              <!-- Tab Navigation -->
+              <div class="bg-white border-b border-gray-200">
+                <div class="max-w-7xl mx-auto px-6">
+                  <div class="flex space-x-8">
+                    <button onclick="switchView(\\'dashboard\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'dashboard' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
+                      <i class="fas fa-home mr-2"></i>Home
+                    </button>
+                    <button onclick="switchView(\\'traction\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'traction' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
+                      <i class="fas fa-chart-line mr-2"></i>Traction
+                    </button>
+                    <button onclick="switchView(\\'inbox\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'inbox' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
+                      <i class="fas fa-inbox mr-2"></i>Inbox
+                    </button>
+                    <button onclick="switchView(\\'marketplace\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'marketplace' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
+                      <i class="fas fa-users mr-2"></i>Validators
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <!-- Main Content Area -->
-            <div class="flex-1 overflow-y-auto transition-all duration-300 \${chatExpanded ? 'mr-96' : 'mr-20'}">
-              <div class="p-8" id="main-content">
+              <!-- Content Area -->
+              <div class="max-w-7xl mx-auto p-6" id="main-content">
                 <!-- Content will be rendered here based on state.currentView -->
               </div>
             </div>
 
-            <!-- Temporary hidden div to avoid breaking the rest -->
-            <div style="display:none;">
-              <div class="flex justify-between items-center mb-8">
+            <!-- AI Chat Modal (Floating) -->
+            <div class="fixed bottom-6 right-6 z-50 \${chatExpanded ? '' : 'hidden'}">
+              <div class="bg-gray-900 text-white rounded-2xl shadow-2xl w-96 h-[600px] flex flex-col">
+                <!-- Chat Header -->
+                <div class="p-4 border-b border-gray-700 flex items-center justify-between">
                   <div>
-                    <h2 class="text-3xl font-bold text-gray-900">Dashboard</h2>
-                    <p class="text-gray-600 mt-1">Monitorea tu progreso y objetivos</p>
+                    <h3 class="text-lg font-bold">AI Assistant</h3>
+                    <p class="text-xs text-gray-400">Gestiona tus objetivos</p>
                   </div>
-                  <div class="bg-white rounded-2xl shadow-lg p-6 text-center min-w-[200px]">
-                    <div class="flex items-center justify-center mb-2">
-                      <i class="fas fa-trophy text-red-500 text-2xl mr-2"></i>
-                      <span class="text-gray-600 font-semibold">Score</span>
-                    </div>
-                    <div class="text-5xl font-bold text-red-500 mb-2">\${metrics.overallCompletion}.0</div>
-                    <div class="flex items-center justify-center space-x-4 text-sm">
-                      <span class="flex items-center text-yellow-500">
-                        <i class="fas fa-star mr-1"></i> \${metrics.completedGoals}
-                      </span>
-                      <span class="flex items-center text-red-500">
-                        <i class="fas fa-heart mr-1"></i> \${metrics.overdueGoals}
-                      </span>
-                      <span class="flex items-center text-blue-500">
-                        <i class="fas fa-check-circle mr-1"></i> \${metrics.totalGoals}
-                      </span>
-                    </div>
-                  </div>
+                  <button onclick="toggleChat()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                  </button>
                 </div>
 
-                <!-- Dashboard Grid -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  <!-- Goals Status -->
-                  <div class="bg-white rounded-2xl shadow-lg p-6">
-                    <div class="flex items-center mb-4">
-                      <i class="fas fa-bullseye text-blue-500 text-xl mr-3"></i>
-                      <h3 class="text-xl font-bold text-gray-900">Goals Status</h3>
-                    </div>
-                    <div class="flex items-center justify-center">
-                      <div class="relative w-48 h-48">
-                        <svg class="w-full h-full transform -rotate-90">
-                          <circle cx="96" cy="96" r="80" stroke="#e5e7eb" stroke-width="16" fill="none"/>
-                          <circle 
-                            cx="96" cy="96" r="80" 
-                            stroke="#10b981" 
-                            stroke-width="16" 
-                            fill="none"
-                            stroke-dasharray="\${(metrics.overallCompletion / 100) * 502.4} 502.4"
-                            stroke-linecap="round"
-                          />
-                        </svg>
-                        <div class="absolute inset-0 flex items-center justify-center">
-                          <div class="text-center">
-                            <div class="text-4xl font-bold text-gray-900">\${metrics.overallCompletion}%</div>
-                            <div class="text-sm text-gray-600">Overall</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="mt-6 grid grid-cols-3 gap-4">
-                      <div class="text-center">
-                        <div class="text-2xl font-bold text-green-600">\${metrics.completedGoals}</div>
-                        <div class="text-xs text-gray-600">Completed</div>
-                      </div>
-                      <div class="text-center">
-                        <div class="text-2xl font-bold text-blue-600">\${goals.filter(g => g.status === 'in_progress').length}</div>
-                        <div class="text-xs text-gray-600">In Progress</div>
-                      </div>
-                      <div class="text-center">
-                        <div class="text-2xl font-bold text-red-600">\${metrics.overdueGoals}</div>
-                        <div class="text-xs text-gray-600">Overdue</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Goals Progress Chart -->
-                  <div class="bg-white rounded-2xl shadow-lg p-6">
-                    <div class="flex items-center mb-4">
-                      <i class="fas fa-chart-line text-purple-500 text-xl mr-3"></i>
-                      <h3 class="text-xl font-bold text-gray-900">Progress Over Time</h3>
-                    </div>
-                    <div class="h-64 flex items-end justify-around space-x-2">
-                      \${goals.slice(0, 7).map((goal, index) => {
-                        const progress = (goal.current_value / goal.target_value) * 100;
-                        return \`
-                          <div class="flex-1 flex flex-col items-center">
-                            <div class="w-full bg-gray-200 rounded-t-lg overflow-hidden" style="height: 200px">
-                              <div 
-                                class="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all"
-                                style="height: \${Math.min(progress, 100)}%; margin-top: \${100 - Math.min(progress, 100)}%"
-                              ></div>
-                            </div>
-                            <div class="text-xs text-gray-600 mt-2">Day \${index + 1}</div>
-                          </div>
-                        \`;
-                      }).join('')}
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Active Goals List -->
-                <div class="bg-white rounded-2xl shadow-lg p-6">
-                  <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center">
-                      <i class="fas fa-list text-orange-500 text-xl mr-3"></i>
-                      <h3 class="text-xl font-bold text-gray-900">Active Goals</h3>
-                    </div>
-                    <button onclick="createGoal()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
-                      <i class="fas fa-plus mr-2"></i>New Goal
+                <!-- Quick Actions -->
+                <div class="p-3 border-b border-gray-700">
+                  <div class="grid grid-cols-2 gap-2">
+                    <button onclick="analyzeGoals()" class="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-xs font-medium transition">
+                      <i class="fas fa-chart-line mr-1"></i>Analizar
+                    </button>
+                    <button onclick="generateMarketingPlan()" class="px-2 py-1.5 bg-purple-600 hover:bg-purple-700 rounded text-xs font-medium transition">
+                      <i class="fas fa-clipboard-list mr-1"></i>Plan
+                    </button>
+                    <button onclick="generateContentIdeas()" class="px-2 py-1.5 bg-green-600 hover:bg-green-700 rounded text-xs font-medium transition">
+                      <i class="fas fa-lightbulb mr-1"></i>Ideas
+                    </button>
+                    <button onclick="analyzeCompetition()" class="px-2 py-1.5 bg-orange-600 hover:bg-orange-700 rounded text-xs font-medium transition">
+                      <i class="fas fa-users mr-1"></i>Competencia
                     </button>
                   </div>
-                  <div class="space-y-3">
-                    \${goals.length === 0 ? \`
-                      <div class="text-center py-12 text-gray-400">
-                        <i class="fas fa-inbox text-4xl mb-4"></i>
-                        <p>No hay objetivos activos</p>
-                        <p class="text-sm mt-2">Crea tu primer objetivo o pregunta al asistente</p>
+                </div>
+
+                <!-- Chat Messages -->
+                <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                  \${messages.length === 0 ? \`
+                    <div class="text-center text-gray-400 mt-8">
+                      <i class="fas fa-robot text-4xl mb-4"></i>
+                      <p class="text-sm">¡Hola! Soy tu asistente de IA.</p>
+                      <p class="text-xs mt-2">Puedo ayudarte a:</p>
+                      <ul class="text-xs mt-2 space-y-1 text-left mx-4">
+                        <li>• Crear y actualizar objetivos</li>
+                        <li>• Registrar progreso</li>
+                        <li>• Ver estadísticas</li>
+                        <li>• Analizar tu rendimiento</li>
+                      </ul>
+                    </div>
+                  \` : messages.map(message => \`
+                    <div class="flex \${message.role === 'user' ? 'justify-end' : 'justify-start'}">
+                      <div class="max-w-[80%] rounded-lg p-3 \${
+                        message.role === 'user'
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-800 text-gray-100'
+                      }">
+                        <p class="text-sm whitespace-pre-wrap">\${message.content}</p>
+                        <p class="text-xs opacity-60 mt-1">\${formatTime(message.timestamp)}</p>
                       </div>
-                    \` : goals.slice(0, 5).map(goal => \`
-                      <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                        <div class="flex-1">
-                          <div class="flex items-center mb-2">
-                            <span class="w-3 h-3 rounded-full mr-3 \${
-                              goal.status === 'completed' ? 'bg-green-500' :
-                              goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400'
-                            }"></span>
-                            <h4 class="font-semibold text-gray-900">\${goal.description}</h4>
-                          </div>
-                          <div class="ml-6">
-                            <div class="flex items-center text-sm text-gray-600 mb-2">
-                              <span class="mr-4">Target: \${goal.target_value}</span>
-                              <span>Current: \${goal.current_value}</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                class="h-2 rounded-full \${
-                                  goal.status === 'completed' ? 'bg-green-500' :
-                                  goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400'
-                                }"
-                                style="width: \${Math.min((goal.current_value / goal.target_value) * 100, 100)}%"
-                              ></div>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="text-right ml-4">
-                          <div class="text-sm text-gray-600">\${formatDate(goal.deadline)}</div>
+                    </div>
+                  \`).join('')}
+                  \${isLoading ? \`
+                    <div class="flex justify-start">
+                      <div class="bg-gray-800 rounded-lg p-3">
+                        <div class="flex space-x-2">
+                          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
                         </div>
                       </div>
-                    \`).join('')}
+                    </div>
+                  \` : ''}
+                </div>
+
+                <!-- Chat Input -->
+                <div class="p-4 border-t border-gray-700">
+                  <div class="flex items-end space-x-2">
+                    <textarea
+                      id="chat-input"
+                      value="\${inputMessage}"
+                      oninput="updateInput(this.value)"
+                      onkeypress="handleKeyPress(event)"
+                      placeholder="Escribe un mensaje..."
+                      class="flex-1 bg-gray-800 text-white rounded-lg px-4 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                      rows="1"
+                      \${isLoading ? 'disabled' : ''}
+                    ></textarea>
+                    <button
+                      onclick="sendMessage()"
+                      \${isLoading || !inputMessage.trim() ? 'disabled' : ''}
+                      class="bg-primary hover:bg-primary/90 disabled:bg-gray-600 text-white p-2 rounded-lg transition"
+                    >
+                      <i class="fas fa-paper-plane"></i>
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-
-            <!-- Chat Sidebar -->
-            <div class="fixed right-0 top-0 h-full bg-gray-900 text-white transition-all duration-300 \${chatExpanded ? 'w-96' : 'w-20'} shadow-2xl z-50">
-              <!-- Chat Toggle -->
-              <button
-                onclick="toggleChat()"
-                class="absolute -left-12 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white p-3 rounded-l-lg hover:bg-gray-800 transition"
-              >
-                <i class="fas \${chatExpanded ? 'fa-chevron-right' : 'fa-chevron-left'}"></i>
-              </button>
-
-              \${chatExpanded ? \`
-                <div class="flex flex-col h-full">
-                  <!-- Chat Header -->
-                  <div class="p-4 border-b border-gray-700">
-                    <div class="flex items-center justify-between mb-2">
-                      <h3 class="text-lg font-bold">AI Assistant</h3>
-                      <button onclick="clearChat()" class="text-gray-400 hover:text-white" title="Nuevo chat">
-                        <i class="fas fa-plus"></i>
-                      </button>
-                    </div>
-                    <p class="text-xs text-gray-400">Gestiona tus objetivos y progreso</p>
-                    
-                    <!-- Marketing Agent Quick Actions -->
-                    <div class="mt-4 space-y-2">
-                      <p class="text-xs text-gray-400 uppercase tracking-wider mb-2">Acciones Rápidas</p>
-                      <button 
-                        onclick="analyzeGoals()" 
-                        class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-xs font-medium transition flex items-center justify-center"
-                      >
-                        <i class="fas fa-chart-line mr-2"></i>
-                        Analizar Objetivos
-                      </button>
-                      <button 
-                        onclick="generateMarketingPlan()" 
-                        class="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-xs font-medium transition flex items-center justify-center"
-                      >
-                        <i class="fas fa-clipboard-list mr-2"></i>
-                        Plan de Marketing
-                      </button>
-                      <button 
-                        onclick="generateContentIdeas()" 
-                        class="w-full px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-xs font-medium transition flex items-center justify-center"
-                      >
-                        <i class="fas fa-lightbulb mr-2"></i>
-                        Ideas de Contenido
-                      </button>
-                      <button 
-                        onclick="analyzeCompetition()" 
-                        class="w-full px-3 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg text-xs font-medium transition flex items-center justify-center"
-                      >
-                        <i class="fas fa-users mr-2"></i>
-                        Análisis de Competencia
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- Chat Messages -->
-                  <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
-                    \${messages.length === 0 ? \`
-                      <div class="text-center text-gray-400 mt-8">
-                        <i class="fas fa-robot text-4xl mb-4"></i>
-                        <p class="text-sm">¡Hola! Soy tu asistente de IA.</p>
-                        <p class="text-xs mt-2">Puedo ayudarte a:</p>
-                        <ul class="text-xs mt-2 space-y-1 text-left mx-4">
-                          <li>• Crear y actualizar objetivos</li>
-                          <li>• Registrar progreso</li>
-                          <li>• Ver estadísticas</li>
-                          <li>• Analizar tu rendimiento</li>
-                        </ul>
-                      </div>
-                    \` : messages.map(message => \`
-                      <div class="flex \${message.role === 'user' ? 'justify-end' : 'justify-start'}">
-                        <div class="max-w-[80%] rounded-lg p-3 \${
-                          message.role === 'user'
-                            ? 'bg-primary text-white'
-                            : 'bg-gray-800 text-gray-100'
-                        }">
-                          <p class="text-sm whitespace-pre-wrap">\${message.content}</p>
-                          <p class="text-xs opacity-60 mt-1">\${formatTime(message.timestamp)}</p>
-                        </div>
-                      </div>
-                    \`).join('')}
-                    \${isLoading ? \`
-                      <div class="flex justify-start">
-                        <div class="bg-gray-800 rounded-lg p-3">
-                          <div class="flex space-x-2">
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
-                          </div>
-                        </div>
-                      </div>
-                    \` : ''}
-                  </div>
-
-                  <!-- Chat Input -->
-                  <div class="p-4 border-t border-gray-700">
-                    <div class="flex items-end space-x-2">
-                      <textarea
-                        id="chat-input"
-                        value="\${inputMessage}"
-                        oninput="updateInput(this.value)"
-                        onkeypress="handleKeyPress(event)"
-                        placeholder="Escribe un mensaje..."
-                        class="flex-1 bg-gray-800 text-white rounded-lg px-4 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                        rows="1"
-                        \${isLoading ? 'disabled' : ''}
-                      ></textarea>
-                      <button
-                        onclick="sendMessage()"
-                        \${isLoading || !inputMessage.trim() ? 'disabled' : ''}
-                        class="bg-primary hover:bg-primary/90 disabled:bg-gray-600 text-white p-2 rounded-lg transition"
-                      >
-                        <i class="fas fa-paper-plane"></i>
-                      </button>
-                    </div>
-                    <div class="flex items-center justify-between mt-2 text-xs text-gray-400">
-                      <span>Enter para enviar</span>
-                      <span class="flex items-center">
-                        <i class="fas fa-circle text-green-500 mr-1 text-[8px]"></i>
-                        Online
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              \` : \`
-                <div class="flex flex-col items-center py-6 space-y-6">
-                  <button onclick="toggleChat()" class="text-white hover:text-primary transition" title="Abrir chat">
-                    <i class="fas fa-comments text-xl"></i>
-                  </button>
-                </div>
-              \`}
             </div>
           </div>
         \`;
@@ -808,7 +662,7 @@ app.get('/', async (c) => {
       }
 
       // Update main content based on view
-      function updateMainContent() {
+      async function updateMainContent() {
         const contentDiv = document.getElementById('main-content');
         console.log('updateMainContent called', { contentDiv, currentView: state.currentView });
         if (!contentDiv) {
@@ -824,80 +678,130 @@ app.get('/', async (c) => {
         } else if (state.currentView === 'traction') {
           contentDiv.innerHTML = getTractionHTML(goals, metrics);
         } else if (state.currentView === 'inbox') {
-          contentDiv.innerHTML = getInboxHTML();
+          contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-primary"></i><p class="text-gray-600 mt-4">Cargando conversaciones...</p></div>';
+          contentDiv.innerHTML = await getInboxHTML();
+        } else if (state.currentView === 'marketplace') {
+          contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-primary"></i><p class="text-gray-600 mt-4">Cargando validators...</p></div>';
+          contentDiv.innerHTML = await getMarketplaceHTML();
         }
         console.log('Content updated');
       }
       
-      function formatDate(dateStr) {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-      }
-      
       function getDashboardHTML(goals, metrics) {
-        return '<div class="flex justify-between items-center mb-8">' +
-          '<div>' +
-            '<h2 class="text-3xl font-bold text-gray-900">Dashboard</h2>' +
-            '<p class="text-gray-600 mt-1">Monitorea tu progreso y objetivos</p>' +
-          '</div>' +
-          '<div class="bg-white rounded-2xl shadow-lg p-6 text-center min-w-[200px]">' +
-            '<div class="flex items-center justify-center mb-2">' +
-              '<i class="fas fa-trophy text-red-500 text-2xl mr-2"></i>' +
-              '<span class="text-gray-600 font-semibold">Score</span>' +
+        return '<div class="mb-6">' +
+          '<h2 class="text-2xl font-bold text-gray-900">Welcome back! 👋</h2>' +
+          '<p class="text-gray-500">Manage your startup growth and connect with validators</p>' +
+        '</div>' +
+        '<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">' +
+          '<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">' +
+            '<div class="flex items-center justify-between">' +
+              '<div><p class="text-xs font-medium text-gray-500 uppercase">Goals</p><p class="text-2xl font-bold text-gray-900">' + metrics.totalGoals + '</p></div>' +
+              '<div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center"><i class="fas fa-bullseye text-blue-600 text-xl"></i></div>' +
             '</div>' +
-            '<div class="text-5xl font-bold text-red-500 mb-2">' + metrics.overallCompletion + '.0</div>' +
-            '<div class="flex items-center justify-center space-x-4 text-sm">' +
-              '<span class="flex items-center text-yellow-500"><i class="fas fa-star mr-1"></i> ' + metrics.completedGoals + '</span>' +
-              '<span class="flex items-center text-red-500"><i class="fas fa-heart mr-1"></i> ' + metrics.overdueGoals + '</span>' +
-              '<span class="flex items-center text-blue-500"><i class="fas fa-check-circle mr-1"></i> ' + metrics.totalGoals + '</span>' +
+            '<p class="text-xs text-gray-500 mt-2">' + goals.filter(g => g.status === 'in_progress').length + ' active</p>' +
+          '</div>' +
+          '<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">' +
+            '<div class="flex items-center justify-between">' +
+              '<div><p class="text-xs font-medium text-gray-500 uppercase">Completion</p><p class="text-2xl font-bold text-gray-900">' + metrics.overallCompletion + '%</p></div>' +
+              '<div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center"><i class="fas fa-check-circle text-green-600 text-xl"></i></div>' +
+            '</div>' +
+            '<p class="text-xs text-gray-500 mt-2">' + metrics.completedGoals + ' completed</p>' +
+          '</div>' +
+          '<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">' +
+            '<div class="flex items-center justify-between">' +
+              '<div><p class="text-xs font-medium text-gray-500 uppercase">Users</p><p class="text-2xl font-bold text-gray-900">-</p></div>' +
+              '<div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center"><i class="fas fa-users text-purple-600 text-xl"></i></div>' +
+            '</div>' +
+            '<p class="text-xs text-gray-500 mt-2">-</p>' +
+          '</div>' +
+          '<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">' +
+            '<div class="flex items-center justify-between">' +
+              '<div><p class="text-xs font-medium text-gray-500 uppercase">Revenue</p><p class="text-2xl font-bold text-gray-900">-</p></div>' +
+              '<div class="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center"><i class="fas fa-dollar-sign text-yellow-600 text-xl"></i></div>' +
+            '</div>' +
+            '<p class="text-xs text-gray-500 mt-2">-</p>' +
+          '</div>' +
+        '</div>' +
+        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">' +
+          '<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">' +
+            '<div class="flex items-center justify-between mb-4">' +
+              '<h3 class="font-bold text-gray-900">Active Goals</h3>' +
+              '<button onclick="switchView(\\'traction\\')" class="text-primary text-sm font-medium hover:underline">View all →</button>' +
+            '</div>' +
+            '<div class="space-y-3">' +
+              (goals.length === 0 ? 
+                '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">No active goals</p></div>' :
+                goals.slice(0, 3).map(goal => 
+                  '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
+                    '<div class="flex-1"><div class="flex items-center mb-1">' +
+                      '<span class="w-2 h-2 rounded-full mr-2 ' + (goal.status === 'completed' ? 'bg-green-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400') + '"></span>' +
+                      '<h4 class="font-semibold text-gray-900 text-sm">' + goal.description + '</h4>' +
+                    '</div><div class="ml-4">' +
+                      '<div class="w-full bg-gray-200 rounded-full h-1.5"><div class="h-1.5 rounded-full ' + (goal.status === 'completed' ? 'bg-green-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400') + '" style="width: ' + Math.min((goal.current_value / goal.target_value) * 100, 100) + '%"></div></div>' +
+                    '</div></div>' +
+                    '<div class="text-right ml-3"><div class="text-xs text-gray-600">' + Math.round((goal.current_value / goal.target_value) * 100) + '%</div></div>' +
+                  '</div>'
+                ).join('')
+              ) +
+            '</div>' +
+          '</div>' +
+          '<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">' +
+            '<div class="flex items-center justify-between mb-4">' +
+              '<h3 class="font-bold text-gray-900">Recent Messages</h3>' +
+              '<button onclick="switchView(\\'inbox\\')" class="text-primary text-sm font-medium hover:underline">View all →</button>' +
+            '</div>' +
+            '<div class="space-y-3">' +
+              '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">No messages</p></div>' +
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">' +
-          '<div class="bg-white rounded-2xl shadow-lg p-6">' +
-            '<div class="flex items-center mb-4"><i class="fas fa-bullseye text-blue-500 text-xl mr-3"></i><h3 class="text-xl font-bold text-gray-900">Goals Status</h3></div>' +
-            '<div class="flex items-center justify-center"><div class="relative w-48 h-48">' +
-              '<svg class="w-full h-full transform -rotate-90"><circle cx="96" cy="96" r="80" stroke="#e5e7eb" stroke-width="16" fill="none"/>' +
-              '<circle cx="96" cy="96" r="80" stroke="#10b981" stroke-width="16" fill="none" stroke-dasharray="' + ((metrics.overallCompletion / 100) * 502.4) + ' 502.4" stroke-linecap="round"/></svg>' +
-              '<div class="absolute inset-0 flex items-center justify-center"><div class="text-center"><div class="text-4xl font-bold text-gray-900">' + metrics.overallCompletion + '%</div><div class="text-sm text-gray-600">Overall</div></div></div>' +
-            '</div></div>' +
-            '<div class="mt-6 grid grid-cols-3 gap-4">' +
-              '<div class="text-center"><div class="text-2xl font-bold text-green-600">' + metrics.completedGoals + '</div><div class="text-xs text-gray-600">Completed</div></div>' +
-              '<div class="text-center"><div class="text-2xl font-bold text-blue-600">' + goals.filter(g => g.status === 'in_progress').length + '</div><div class="text-xs text-gray-600">In Progress</div></div>' +
-              '<div class="text-center"><div class="text-2xl font-bold text-red-600">' + metrics.overdueGoals + '</div><div class="text-xs text-gray-600">Overdue</div></div>' +
+        // LinkedIn Connector Terminal
+        '<div class="mt-8">' +
+          '<h2 class="text-2xl font-bold text-gray-900 mb-6">🔗 LinkedIn Connector</h2>' +
+          '<div class="bg-gray-900 rounded-lg shadow-lg overflow-hidden">' +
+            '<div class="bg-gray-800 px-4 py-2 flex items-center space-x-2">' +
+              '<div class="flex space-x-2"><div class="w-3 h-3 rounded-full bg-red-500"></div><div class="w-3 h-3 rounded-full bg-yellow-500"></div><div class="w-3 h-3 rounded-full bg-green-500"></div></div>' +
+              '<span class="text-gray-400 text-sm ml-4">linkedin-connector-terminal</span>' +
             '</div>' +
-          '</div>' +
-          '<div class="bg-white rounded-2xl shadow-lg p-6"><div class="flex items-center mb-4"><i class="fas fa-chart-line text-purple-500 text-xl mr-3"></i><h3 class="text-xl font-bold text-gray-900">Progress Over Time</h3></div>' +
-          '<div class="h-64 flex items-end justify-around space-x-2">' +
-            goals.slice(0, 7).map((goal, index) => {
-              const progress = (goal.current_value / goal.target_value) * 100;
-              return '<div class="flex-1 flex flex-col items-center"><div class="w-full bg-gray-200 rounded-t-lg overflow-hidden" style="height: 200px">' +
-                '<div class="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all" style="height: ' + Math.min(progress, 100) + '%; margin-top: ' + (100 - Math.min(progress, 100)) + '%"></div>' +
-                '</div><div class="text-xs text-gray-600 mt-2">Day ' + (index + 1) + '</div></div>';
-            }).join('') +
-          '</div></div>' +
-        '</div>' +
-        '<div class="bg-white rounded-2xl shadow-lg p-6">' +
-          '<div class="flex items-center justify-between mb-4">' +
-            '<div class="flex items-center"><i class="fas fa-list text-orange-500 text-xl mr-3"></i><h3 class="text-xl font-bold text-gray-900">Active Goals</h3></div>' +
-            '<button onclick="createGoal()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"><i class="fas fa-plus mr-2"></i>New Goal</button>' +
-          '</div>' +
-          '<div class="space-y-3">' +
-            (goals.length === 0 ? 
-              '<div class="text-center py-12 text-gray-400"><i class="fas fa-inbox text-4xl mb-4"></i><p>No hay objetivos activos</p><p class="text-sm mt-2">Crea tu primer objetivo o pregunta al asistente</p></div>' :
-              goals.slice(0, 5).map(goal => 
-                '<div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
-                  '<div class="flex-1"><div class="flex items-center mb-2">' +
-                    '<span class="w-3 h-3 rounded-full mr-3 ' + (goal.status === 'completed' ? 'bg-green-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400') + '"></span>' +
-                    '<h4 class="font-semibold text-gray-900">' + goal.description + '</h4>' +
-                  '</div><div class="ml-6">' +
-                    '<div class="flex items-center text-sm text-gray-600 mb-2"><span class="mr-4">Target: ' + goal.target_value + '</span><span>Current: ' + goal.current_value + '</span></div>' +
-                    '<div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full ' + (goal.status === 'completed' ? 'bg-green-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400') + '" style="width: ' + Math.min((goal.current_value / goal.target_value) * 100, 100) + '%"></div></div>' +
-                  '</div></div>' +
-                  '<div class="text-right ml-4"><div class="text-sm text-gray-600">' + formatDate(goal.deadline) + '</div></div>' +
-                '</div>'
-              ).join('')
-            ) +
+            '<div class="p-6 text-gray-100 font-mono text-sm">' +
+              '<div class="mb-6">' +
+                '<div class="flex items-center mb-4">' +
+                  '<span class="text-green-400 mr-2">$</span>' +
+                  '<span class="text-gray-400 mr-2">search --type</span>' +
+                  '<select id="linkedinSearchType" class="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700 mr-2">' +
+                    '<option value="investor">investor</option>' +
+                    '<option value="talent">talent</option>' +
+                    '<option value="customer">customer</option>' +
+                    '<option value="partner">partner</option>' +
+                  '</select>' +
+                  '<span class="text-gray-400 mr-2">--query</span>' +
+                  '<input type="text" id="linkedinQuery" placeholder=\'"venture capital" OR "AI startup"\' class="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700 flex-1" onkeypress="if(event.key===\'Enter\')searchLinkedInProfiles()"/>' +
+                  '<button onclick="searchLinkedInProfiles()" class="ml-2 bg-blue-600 hover:bg-blue-700 px-4 py-1 rounded">🔍 Search</button>' +
+                '</div>' +
+                '<div class="text-xs text-gray-500 mb-4"><span class="text-yellow-400">💡 Tips:</span> Use keywords like "seed investor", "full stack engineer", "CTO SaaS", etc.</div>' +
+              '</div>' +
+              '<div id="linkedinResults" class="hidden">' +
+                '<div class="flex items-center justify-between mb-4">' +
+                  '<div class="text-gray-400"><span class="text-green-400">✓</span> Found <span id="totalProfiles">0</span> profiles | <span class="text-blue-400"><span id="selectedCount">0</span> selected</span></div>' +
+                  '<div class="space-x-2" id="linkedinActions" style="display:none">' +
+                    '<button onclick="generateConnectionMessages()" class="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-xs">📧 Generate Messages</button>' +
+                    '<button onclick="saveSelectedConnections()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs">💾 Save to Campaign</button>' +
+                  '</div>' +
+                '</div>' +
+                '<div id="profilesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto"></div>' +
+              '</div>' +
+              '<div id="linkedinEmpty" class="text-center py-8 text-gray-500">' +
+                '<div class="text-4xl mb-4">🔍</div>' +
+                '<p>No searches yet. Start by typing a query and clicking Search.</p>' +
+                '<div class="mt-4 text-xs"><p class="mb-2">Example queries:</p>' +
+                  '<div class="space-y-1 text-left max-w-md mx-auto">' +
+                    '<div class="bg-gray-800 px-3 py-2 rounded">investor: "seed stage venture capital AI"</div>' +
+                    '<div class="bg-gray-800 px-3 py-2 rounded">talent: "senior react developer"</div>' +
+                    '<div class="bg-gray-800 px-3 py-2 rounded">customer: "CTO fintech company"</div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
           '</div>' +
         '</div>';
       }
@@ -961,45 +865,162 @@ app.get('/', async (c) => {
         '</div></div>';
       }
       
-      function getInboxHTML() {
-        return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Inbox</h2><p class="text-gray-600 mt-1">Mensajes entre validadores y startups</p></div>' +
-        '<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">' +
-          '<div class="lg:col-span-1 bg-white rounded-2xl shadow-lg p-4">' +
-            '<div class="mb-4"><input type="text" placeholder="Buscar conversaciones..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"/></div>' +
-            '<div class="space-y-2">' +
-              '<div class="p-4 bg-primary/10 rounded-lg cursor-pointer hover:bg-primary/20 transition"><div class="flex items-center mb-2">' +
-                '<img src="https://ui-avatars.com/api/?name=Beta+Validator&background=6366f1&color=fff" class="w-10 h-10 rounded-full mr-3"/>' +
-                '<div class="flex-1"><div class="font-semibold text-gray-900">Beta Validator Team</div><div class="text-xs text-gray-600">hace 5 min</div></div>' +
-                '<span class="bg-primary text-white text-xs px-2 py-1 rounded-full">2</span>' +
-              '</div><p class="text-sm text-gray-700">¿Cuándo podemos agendar la sesión de validación?</p></div>' +
-              '<div class="p-4 hover:bg-gray-50 rounded-lg cursor-pointer transition"><div class="flex items-center mb-2">' +
-                '<img src="https://ui-avatars.com/api/?name=Startup+Tech&background=8b5cf6&color=fff" class="w-10 h-10 rounded-full mr-3"/>' +
-                '<div class="flex-1"><div class="font-semibold text-gray-900">Startup Tech Co.</div><div class="text-xs text-gray-600">hace 2 horas</div></div>' +
-              '</div><p class="text-sm text-gray-600">Gracias por tu feedback detallado...</p></div>' +
-              '<div class="p-4 hover:bg-gray-50 rounded-lg cursor-pointer transition"><div class="flex items-center mb-2">' +
-                '<img src="https://ui-avatars.com/api/?name=AI+Product&background=10b981&color=fff" class="w-10 h-10 rounded-full mr-3"/>' +
-                '<div class="flex-1"><div class="font-semibold text-gray-900">AI Product Labs</div><div class="text-xs text-gray-600">ayer</div></div>' +
-              '</div><p class="text-sm text-gray-600">Hemos implementado las sugerencias...</p></div>' +
+      async function getInboxHTML() {
+        try {
+          // Load real conversations from API
+          const response = await axios.get('/api/chat/conversations');
+          const conversations = response.data.conversations || [];
+          
+          let conversationsHTML = '';
+          if (conversations.length === 0) {
+            conversationsHTML = '<div class="p-4 text-center text-gray-500"><p>No tienes conversaciones aún</p></div>';
+          } else {
+            conversationsHTML = conversations.map(conv => {
+              const unreadBadge = conv.unread_count > 0 
+                ? \`<span class="bg-primary text-white text-xs px-2 py-1 rounded-full">\${conv.unread_count}</span>\`
+                : '';
+              const timeAgo = formatTimeAgo(conv.last_message_at);
+              const avatarUrl = conv.other_user_avatar || \`https://ui-avatars.com/api/?name=\${encodeURIComponent(conv.other_user_name)}&background=6366f1&color=fff\`;
+              
+              return \`<div class="p-4 hover:bg-gray-50 rounded-lg cursor-pointer transition" onclick="loadConversation(\${conv.id})">
+                <div class="flex items-center mb-2">
+                  <img src="\${avatarUrl}" class="w-10 h-10 rounded-full mr-3"/>
+                  <div class="flex-1">
+                    <div class="font-semibold text-gray-900">\${conv.other_user_name}</div>
+                    <div class="text-xs text-gray-600">\${timeAgo}</div>
+                  </div>
+                  \${unreadBadge}
+                </div>
+                <p class="text-sm text-gray-600 truncate">\${conv.last_message || 'Sin mensajes'}</p>
+              </div>\`;
+            }).join('');
+          }
+          
+          return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Inbox</h2><p class="text-gray-600 mt-1">Mensajes entre validadores y startups</p></div>' +
+          '<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">' +
+            '<div class="lg:col-span-1 bg-white rounded-2xl shadow-lg p-4">' +
+              '<div class="mb-4"><input type="text" placeholder="Buscar conversaciones..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"/></div>' +
+              '<div class="space-y-2">' +
+                conversationsHTML +
+              '</div>' +
             '</div>' +
-          '</div>' +
-          '<div class="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6">' +
-            '<div class="border-b pb-4 mb-4"><div class="flex items-center">' +
-              '<img src="https://ui-avatars.com/api/?name=Beta+Validator&background=6366f1&color=fff" class="w-12 h-12 rounded-full mr-4"/>' +
-              '<div><div class="font-bold text-gray-900 text-lg">Beta Validator Team</div><div class="text-sm text-green-600"><i class="fas fa-circle text-xs mr-1"></i>En línea</div></div>' +
-            '</div></div>' +
-            '<div class="h-96 overflow-y-auto mb-4 space-y-4">' +
-              '<div class="flex"><div class="bg-gray-100 rounded-lg p-3 max-w-[70%]"><p class="text-sm text-gray-900">Hola! Vi tu producto en el marketplace y me interesa validarlo.</p><span class="text-xs text-gray-500 mt-1 block">10:30 AM</span></div></div>' +
-              '<div class="flex justify-end"><div class="bg-primary text-white rounded-lg p-3 max-w-[70%]"><p class="text-sm">¡Excelente! ¿Qué aspectos te gustaría validar específicamente?</p><span class="text-xs text-white/80 mt-1 block">10:32 AM</span></div></div>' +
-              '<div class="flex"><div class="bg-gray-100 rounded-lg p-3 max-w-[70%]"><p class="text-sm text-gray-900">Me gustaría enfocarme en UX/UI y el flujo de onboarding.</p><span class="text-xs text-gray-500 mt-1 block">10:35 AM</span></div></div>' +
-              '<div class="flex justify-end"><div class="bg-primary text-white rounded-lg p-3 max-w-[70%]"><p class="text-sm">Perfecto. ¿Cuándo podemos agendar la sesión?</p><span class="text-xs text-white/80 mt-1 block">10:36 AM</span></div></div>' +
+            '<div class="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6">' +
+              '<div class="flex items-center justify-center h-96 text-gray-400">' +
+                '<div class="text-center">' +
+                  '<i class="fas fa-comments text-5xl mb-4"></i>' +
+                  '<p>Selecciona una conversación para ver los mensajes</p>' +
+                '</div>' +
+              '</div>' +
             '</div>' +
-            '<div class="flex items-center gap-2 border-t pt-4">' +
-              '<input type="text" placeholder="Escribe tu mensaje..." class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"/>' +
-              '<button class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition font-semibold"><i class="fas fa-paper-plane mr-2"></i>Enviar</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
+          '</div>';
+        } catch (error) {
+          console.error('Error loading conversations:', error);
+          return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Inbox</h2><p class="text-red-600 mt-1">Error cargando conversaciones</p></div>';
+        }
       }
+      
+      function formatTimeAgo(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        
+        if (seconds < 60) return 'hace un momento';
+        if (seconds < 3600) return \`hace \${Math.floor(seconds / 60)} min\`;
+        if (seconds < 86400) return \`hace \${Math.floor(seconds / 3600)} horas\`;
+        if (seconds < 604800) return \`hace \${Math.floor(seconds / 86400)} días\`;
+        return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+      }
+      
+      window.loadConversation = async function(conversationId) {
+        console.log('Loading conversation:', conversationId);
+        // TODO: Implement conversation loading
+        alert('Funcionalidad de conversación en desarrollo');
+      };
+      
+      async function getMarketplaceHTML() {
+        try {
+          // Load validators from API
+          const response = await axios.get('/api/validation/validators');
+          const validators = response.data || [];
+          
+          let validatorsHTML = '';
+          if (validators.length === 0) {
+            validatorsHTML = '<div class="col-span-full text-center p-12 text-gray-500"><i class="fas fa-users text-5xl mb-4"></i><p>No hay validadores disponibles</p></div>';
+          } else {
+            validatorsHTML = validators.map(validator => {
+              const avatarUrl = validator.avatar_url || \`https://ui-avatars.com/api/?name=\${encodeURIComponent(validator.name)}&background=6366f1&color=fff\`;
+              const expertise = Array.isArray(validator.expertise) ? validator.expertise : JSON.parse(validator.expertise || '[]');
+              const expertiseHTML = expertise.slice(0, 3).map(exp => 
+                \`<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1">\${exp}</span>\`
+              ).join('');
+              
+              return \`<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
+                <div class="flex items-start mb-4">
+                  <img src="\${avatarUrl}" class="w-16 h-16 rounded-full mr-4"/>
+                  <div class="flex-1">
+                    <h3 class="font-bold text-gray-900 text-lg">\${validator.name}</h3>
+                    <p class="text-sm text-gray-600">\${validator.title || 'Validator'}</p>
+                    <div class="flex items-center mt-2">
+                      <div class="flex text-yellow-400">
+                        \${Array(5).fill(0).map((_, i) => \`<i class="fas fa-star\${i < Math.round(validator.rating || 0) ? '' : '-o'}"></i>\`).join('')}
+                      </div>
+                      <span class="text-sm text-gray-500 ml-2">(\${validator.total_validations || 0} validaciones)</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="mb-4">
+                  <p class="text-sm text-gray-600 line-clamp-2">\${validator.bio || 'Validator experto en startups'}</p>
+                </div>
+                <div class="mb-4">
+                  \${expertiseHTML}
+                </div>
+                <div class="flex gap-2">
+                  <button onclick="startChatWithValidator(\${validator.user_id})" class="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
+                    <i class="fas fa-comment mr-2"></i>Chatear
+                  </button>
+                  <button onclick="viewValidatorProfile(\${validator.user_id})" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    <i class="fas fa-user"></i>
+                  </button>
+                </div>
+              </div>\`;
+            }).join('');
+          }
+          
+          return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Validators</h2><p class="text-gray-600 mt-1">Conecta con expertos que pueden validar tu startup</p></div>' +
+          '<div class="mb-6"><input type="text" placeholder="Buscar validators por nombre o expertise..." class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"/></div>' +
+          '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">' +
+            validatorsHTML +
+          '</div>';
+        } catch (error) {
+          console.error('Error loading validators:', error);
+          return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Validators</h2><p class="text-red-600 mt-1">Error cargando validators</p></div>';
+        }
+      }
+      
+      window.startChatWithValidator = async function(validatorUserId) {
+        try {
+          console.log('Starting chat with validator:', validatorUserId);
+          // Create or get conversation
+          const response = await axios.post('/api/chat/conversations', {
+            other_user_id: validatorUserId
+          });
+          const conversationId = response.data.conversation_id;
+          // Switch to inbox and load conversation
+          state.currentView = 'inbox';
+          render();
+          setTimeout(() => {
+            window.loadConversation(conversationId);
+          }, 500);
+        } catch (error) {
+          console.error('Error starting chat:', error);
+          alert('Error al iniciar conversación');
+        }
+      };
+      
+      window.viewValidatorProfile = function(validatorUserId) {
+        console.log('Viewing validator profile:', validatorUserId);
+        alert('Perfil de validator en desarrollo');
+      };
 
       // Event handlers
       window.toggleChat = () => {
@@ -1054,6 +1075,162 @@ app.get('/', async (c) => {
         // Content will be updated by render() -> requestAnimationFrame -> updateMainContent()
       };
 
+      // LinkedIn Connector functions
+      let linkedinProfiles = [];
+      let selectedProfiles = new Set();
+
+      window.searchLinkedInProfiles = async function() {
+        const query = document.getElementById('linkedinQuery').value;
+        const type = document.getElementById('linkedinSearchType').value;
+        
+        if (!query.trim()) {
+          alert('Por favor ingresa términos de búsqueda');
+          return;
+        }
+
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.post('/api/linkedin-connector/search', {
+            type: type,
+            query: query,
+            maxResults: 20
+          }, {
+            headers: { 'Authorization': \`Bearer \${token}\` }
+          });
+
+          if (response.data.success) {
+            linkedinProfiles = response.data.profiles;
+            selectedProfiles = new Set();
+            renderLinkedInProfiles();
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al buscar perfiles');
+        }
+      };
+
+      function renderLinkedInProfiles() {
+        const resultsDiv = document.getElementById('linkedinResults');
+        const emptyDiv = document.getElementById('linkedinEmpty');
+        const profilesGrid = document.getElementById('profilesGrid');
+        const totalSpan = document.getElementById('totalProfiles');
+        const selectedSpan = document.getElementById('selectedCount');
+        const actionsDiv = document.getElementById('linkedinActions');
+
+        if (linkedinProfiles.length === 0) {
+          resultsDiv.classList.add('hidden');
+          emptyDiv.classList.remove('hidden');
+          return;
+        }
+
+        resultsDiv.classList.remove('hidden');
+        emptyDiv.classList.add('hidden');
+        totalSpan.textContent = linkedinProfiles.length;
+        selectedSpan.textContent = selectedProfiles.size;
+        actionsDiv.style.display = selectedProfiles.size > 0 ? 'block' : 'none';
+
+        profilesGrid.innerHTML = linkedinProfiles.map(profile => \`
+          <div class="bg-gray-800 border rounded p-4 cursor-pointer transition-all \${selectedProfiles.has(profile.id) ? 'border-blue-500 bg-gray-750' : 'border-gray-700 hover:border-gray-600'}" 
+               onclick="toggleProfileSelection('\${profile.id}')">
+            <div class="flex items-start space-x-3">
+              <input type="checkbox" \${selectedProfiles.has(profile.id) ? 'checked' : ''} 
+                     onclick="event.stopPropagation(); toggleProfileSelection('\${profile.id}')" class="mt-1"/>
+              <div class="flex-1">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-white font-semibold">\${profile.name}</h3>
+                  <span class="text-xs px-2 py-1 rounded \${profile.compatibilityScore >= 90 ? 'bg-green-600' : profile.compatibilityScore >= 75 ? 'bg-blue-600' : 'bg-yellow-600'}">
+                    \${profile.compatibilityScore}% match
+                  </span>
+                </div>
+                <p class="text-gray-400 text-xs mb-2">\${profile.headline}</p>
+                <div class="flex items-center text-xs text-gray-500 space-x-3">
+                  <span>📍 \${profile.location}</span>
+                  <span>🏢 \${profile.industry}</span>
+                  \${profile.connections ? \`<span>🤝 \${profile.connections}+</span>\` : ''}
+                </div>
+                <div class="mt-2 text-xs">
+                  \${profile.matchReasons.slice(0, 2).map(reason => \`<div class="text-green-400">✓ \${reason}</div>\`).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        \`).join('');
+      }
+
+      window.toggleProfileSelection = function(profileId) {
+        if (selectedProfiles.has(profileId)) {
+          selectedProfiles.delete(profileId);
+        } else {
+          selectedProfiles.add(profileId);
+        }
+        renderLinkedInProfiles();
+      };
+
+      window.generateConnectionMessages = async function() {
+        if (selectedProfiles.size === 0) {
+          alert('Selecciona al menos un perfil');
+          return;
+        }
+
+        try {
+          const token = localStorage.getItem('token');
+          const type = document.getElementById('linkedinSearchType').value;
+          const purpose = type === 'investor' ? 'investment' : 
+                         type === 'talent' ? 'hiring' : 
+                         type === 'customer' ? 'partnership' : 'partnership';
+
+          const response = await axios.post('/api/linkedin-connector/generate-message', {
+            profileIds: Array.from(selectedProfiles),
+            purpose: purpose,
+            senderInfo: {
+              name: 'Your Name',
+              company: 'Your Company',
+              title: 'Your Title'
+            }
+          }, {
+            headers: { 'Authorization': \`Bearer \${token}\` }
+          });
+
+          if (response.data.success) {
+            alert(\`✅ \${response.data.totalMessages} mensajes generados exitosamente\`);
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al generar mensajes');
+        }
+      };
+
+      window.saveSelectedConnections = async function() {
+        if (selectedProfiles.size === 0) {
+          alert('Selecciona al menos un perfil');
+          return;
+        }
+
+        const campaignName = prompt('Nombre de la campaña:');
+        if (!campaignName) return;
+
+        try {
+          const token = localStorage.getItem('token');
+          const profilesArray = linkedinProfiles.filter(p => selectedProfiles.has(p.id));
+          
+          const response = await axios.post('/api/linkedin-connector/save-connections', {
+            profiles: profilesArray,
+            campaign: campaignName
+          }, {
+            headers: { 'Authorization': \`Bearer \${token}\` }
+          });
+
+          if (response.data.success) {
+            alert(\`✅ \${response.data.saved} conexiones guardadas en campaña: \${campaignName}\`);
+            selectedProfiles = new Set();
+            renderLinkedInProfiles();
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al guardar conexiones');
+        }
+      };
+
       // Initialize
       loadGoals();
       loadChatHistory();
@@ -1061,7 +1238,7 @@ app.get('/', async (c) => {
       // Handle hash changes
       window.addEventListener('hashchange', () => {
         const view = window.location.hash ? window.location.hash.substring(1) : 'dashboard';
-        if (['dashboard', 'traction', 'inbox'].includes(view)) {
+        if (['dashboard', 'traction', 'inbox', 'marketplace'].includes(view)) {
           window.switchView(view);
         }
       });
@@ -1070,7 +1247,20 @@ app.get('/', async (c) => {
 </html>
     `);
   } catch (error) {
-    return c.redirect('/api/auth/google');
+    console.error('[DASHBOARD] Error rendering page:', error);
+    console.error('[DASHBOARD] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    // Don't redirect, show error instead
+    return c.html(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Error</title></head>
+      <body>
+        <h1>Dashboard Error</h1>
+        <pre>${error instanceof Error ? error.message : String(error)}</pre>
+        <a href="/">Go back to home</a>
+      </body>
+      </html>
+    `);
   }
 });
 

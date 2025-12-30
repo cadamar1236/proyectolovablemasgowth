@@ -28,6 +28,20 @@ interface WhatsAppCode {
   expires_in: string;
 }
 
+interface LinkedInProfile {
+  id: string;
+  name: string;
+  headline: string;
+  location: string;
+  industry: string;
+  profileUrl: string;
+  photoUrl?: string;
+  connections?: number;
+  compatibilityScore: number;
+  matchReasons: string[];
+  selected?: boolean;
+}
+
 interface DBGoal {
   id: number;
   user_id: number;
@@ -69,6 +83,14 @@ const Dashboard = () => {
   const [whatsappCode, setWhatsappCode] = useState<WhatsAppCode | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+  
+  // LinkedIn Connector state
+  const [linkedinProfiles, setLinkedinProfiles] = useState<LinkedInProfile[]>([]);
+  const [linkedinSearchType, setLinkedinSearchType] = useState<'investor' | 'talent' | 'customer' | 'partner'>('investor');
+  const [linkedinQuery, setLinkedinQuery] = useState('');
+  const [linkedinSearching, setLinkedinSearching] = useState(false);
+  const [selectedProfiles, setSelectedProfiles] = useState<Set<string>>(new Set());
+  const [showMessageGenerator, setShowMessageGenerator] = useState(false);
 
   // API functions
   const fetchGoals = async () => {
@@ -633,6 +655,157 @@ const Dashboard = () => {
       <section>
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Logged-In Users</h2>
         <p className="text-lg">Number of users currently logged in: {loggedInUsers}</p>
+      </section>
+
+      {/* LinkedIn Connector Terminal */}
+      <section className="mt-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">🔗 LinkedIn Connector</h2>
+        <div className="bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+          {/* Terminal Header */}
+          <div className="bg-gray-800 px-4 py-2 flex items-center space-x-2">
+            <div className="flex space-x-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <span className="text-gray-400 text-sm ml-4">linkedin-connector-terminal</span>
+          </div>
+
+          {/* Terminal Content */}
+          <div className="p-6 text-gray-100 font-mono text-sm">
+            {/* Search Controls */}
+            <div className="mb-6">
+              <div className="flex items-center mb-4">
+                <span className="text-green-400 mr-2">$</span>
+                <span className="text-gray-400 mr-2">search --type</span>
+                <select
+                  value={linkedinSearchType}
+                  onChange={(e) => setLinkedinSearchType(e.target.value as any)}
+                  className="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700 mr-2"
+                >
+                  <option value="investor">investor</option>
+                  <option value="talent">talent</option>
+                  <option value="customer">customer</option>
+                  <option value="partner">partner</option>
+                </select>
+                <span className="text-gray-400 mr-2">--query</span>
+                <input
+                  type="text"
+                  value={linkedinQuery}
+                  onChange={(e) => setLinkedinQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchLinkedInProfiles()}
+                  placeholder='"venture capital" OR "AI startup"'
+                  className="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700 flex-1"
+                />
+                <button
+                  onClick={searchLinkedInProfiles}
+                  disabled={linkedinSearching}
+                  className="ml-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-1 rounded"
+                >
+                  {linkedinSearching ? '⏳' : '🔍 Search'}
+                </button>
+              </div>
+
+              <div className="text-xs text-gray-500 mb-4">
+                <span className="text-yellow-400">💡 Tips:</span> Use keywords like "seed investor", "full stack engineer", "CTO SaaS", etc.
+              </div>
+            </div>
+
+            {/* Results */}
+            {linkedinProfiles.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-gray-400">
+                    <span className="text-green-400">✓</span> Found {linkedinProfiles.length} profiles | 
+                    <span className="text-blue-400"> {selectedProfiles.size} selected</span>
+                  </div>
+                  {selectedProfiles.size > 0 && (
+                    <div className="space-x-2">
+                      <button
+                        onClick={generateConnectionMessages}
+                        className="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-xs"
+                      >
+                        📧 Generate Messages
+                      </button>
+                      <button
+                        onClick={saveSelectedConnections}
+                        className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs"
+                      >
+                        💾 Save to Campaign
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Profiles Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                  {linkedinProfiles.map((profile) => (
+                    <div
+                      key={profile.id}
+                      className={`bg-gray-800 border rounded p-4 cursor-pointer transition-all ${
+                        selectedProfiles.has(profile.id)
+                          ? 'border-blue-500 bg-gray-750'
+                          : 'border-gray-700 hover:border-gray-600'
+                      }`}
+                      onClick={() => toggleProfileSelection(profile.id)}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedProfiles.has(profile.id)}
+                          onChange={() => toggleProfileSelection(profile.id)}
+                          className="mt-1"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-white font-semibold">{profile.name}</h3>
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              profile.compatibilityScore >= 90 ? 'bg-green-600' :
+                              profile.compatibilityScore >= 75 ? 'bg-blue-600' :
+                              'bg-yellow-600'
+                            }`}>
+                              {profile.compatibilityScore}% match
+                            </span>
+                          </div>
+                          <p className="text-gray-400 text-xs mb-2">{profile.headline}</p>
+                          <div className="flex items-center text-xs text-gray-500 space-x-3">
+                            <span>📍 {profile.location}</span>
+                            <span>🏢 {profile.industry}</span>
+                            {profile.connections && <span>🤝 {profile.connections}+</span>}
+                          </div>
+                          <div className="mt-2 text-xs">
+                            {profile.matchReasons.slice(0, 2).map((reason, idx) => (
+                              <div key={idx} className="text-green-400">
+                                ✓ {reason}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {linkedinProfiles.length === 0 && !linkedinSearching && (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-4">🔍</div>
+                <p>No searches yet. Start by typing a query and clicking Search.</p>
+                <div className="mt-4 text-xs">
+                  <p className="mb-2">Example queries:</p>
+                  <div className="space-y-1 text-left max-w-md mx-auto">
+                    <div className="bg-gray-800 px-3 py-2 rounded">investor: "seed stage venture capital AI"</div>
+                    <div className="bg-gray-800 px-3 py-2 rounded">talent: "senior react developer"</div>
+                    <div className="bg-gray-800 px-3 py-2 rounded">customer: "CTO fintech company"</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );

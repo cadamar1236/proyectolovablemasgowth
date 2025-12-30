@@ -28,6 +28,8 @@ import quickPitch from './api/quick-pitch';
 import whatsapp from './api/whatsapp';
 import chatAgent from './api/chat-agent';
 import dashboardPage from './dashboard-page';
+import marketingAI from './api/marketing-ai';
+import linkedinConnector from './api/linkedin-connector';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -54,29 +56,50 @@ app.route('/api/notifications', notifications);
 app.route('/api/quick-pitch', quickPitch);
 app.route('/api/whatsapp', whatsapp);
 app.route('/api/chat-agent', chatAgent);
+app.route('/api/marketing-ai', marketingAI);
+app.route('/api/linkedin-connector', linkedinConnector);
 
-// Page Routes (mount sub-apps for authenticated pages)
-app.route('/dashboard', dashboardPage);
-
-// Marketplace page - ASTAR Hub Dashboard
-app.get('/marketplace', async (c) => {
+// Page Routes - Use marketplace page as main dashboard
+app.get('/dashboard', async (c) => {
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
-  
-  if (!authToken) {
-    return c.redirect('/api/auth/google');
+  const tokenInUrl = c.req.query('token');
+
+  if (!authToken && !tokenInUrl) {
+    return c.redirect('/');
   }
 
-  try {
-    const payload = await verify(authToken, c.env.JWT_SECRET || JWT_SECRET) as any;
-    const userName = payload.userName || payload.email || 'Usuario';
-    const userAvatar = payload.avatar_url;
-    const userRole = payload.role || 'founder';
-    
-    const html = getMarketplacePage({ userName, userAvatar, userRole });
-    return c.html(html);
-  } catch (error) {
-    return c.redirect('/api/auth/google');
+  let payload: any = null;
+  const tokenToVerify = authToken || tokenInUrl;
+  
+  if (tokenToVerify) {
+    try {
+      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+    } catch (error) {
+      if (!tokenInUrl) {
+        return c.redirect('/');
+      }
+    }
   }
+
+  if (!payload) {
+    payload = { userName: 'User', email: '', userId: 0, role: 'founder' };
+  }
+
+  const html = getMarketplacePage({
+    userName: payload.userName || payload.name || payload.email || 'User',
+    userAvatar: payload.avatar_url,
+    userRole: payload.role || 'founder'
+  });
+
+  return c.html(html);
+});
+
+// Old dashboard route removed - now using marketplace
+// app.route('/dashboard', dashboardPage);
+
+// Marketplace page - Redirect to unified dashboard
+app.get('/marketplace', async (c) => {
+  return c.redirect('/dashboard');
 });
 
 // Vote page for QR codes
@@ -120,15 +143,32 @@ app.get('/vote/:projectId', async (c) => {
   }
 });
 
-// Frontend Routes - ASTAR* Labs Landing Page
-app.get('/', (c) => {
+// Frontend Routes - Redirect to Dashboard (Unified Marketplace)
+app.get('/', async (c) => {
+  // Check if user is authenticated
+  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  
+  if (authToken) {
+    try {
+      // Verify token
+      const payload = await verify(authToken, JWT_SECRET) as any;
+      if (payload && payload.userId) {
+        // Authenticated user - redirect to dashboard
+        return c.redirect('/dashboard');
+      }
+    } catch (error) {
+      // Invalid token, show landing page
+    }
+  }
+  
+  // Not authenticated - show landing page
   return c.html(`
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ASTAR* Labs - Launch Your Startup to the Stars</title>
+    <title>ASTAR* - Connecting the brightest minds in the universe</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -137,9 +177,10 @@ app.get('/', (c) => {
         theme: {
           extend: {
             colors: {
-              primary: '#8B5CF6',
-              secondary: '#06B6D4',
-              accent: '#F59E0B',
+              primary: '#4F9BFF',
+              secondary: '#FF6B9D',
+              accent: '#FFB84F',
+              purple: '#9D7BFF',
               cosmic: {
                 dark: '#0a0a1a',
                 darker: '#050510',
@@ -544,68 +585,30 @@ app.get('/', (c) => {
         }
     </script>
 
-    <!-- Hero Section -->
-    <section class="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-        <div class="max-w-7xl mx-auto px-4 py-20 sm:py-32 sm:px-6 lg:px-8 relative z-10">
-            <div class="text-center">
-                <!-- Badge -->
-                <div class="inline-flex items-center mb-8">
-                    <span class="px-5 py-2.5 rounded-full text-sm font-semibold border border-primary/30 bg-primary/10 backdrop-blur-sm text-primary flex items-center space-x-2">
-                        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                        <span>Where Startups Become Stars</span>
-                        <span>✦</span>
-                    </span>
-                </div>
-                
-                <!-- Main Headline -->
-                <h1 class="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight tracking-tight">
-                    <span class="text-white">Launch Your</span><br/>
-                    <span class="text-gradient-cosmic text-glow">Startup to the Stars</span>
-                </h1>
-                
-                <!-- Subheadline -->
-                <p class="text-xl sm:text-2xl mb-6 text-gray-300 font-medium max-w-3xl mx-auto leading-relaxed">
-                    The <span class="text-primary font-semibold">Venture Studio</span> that transforms ideas into 
-                    <span class="text-secondary font-semibold">validated startups</span> using AI & Expert Networks
-                </p>
-                
-                <p class="text-base sm:text-lg mb-12 max-w-2xl mx-auto text-gray-400">
-                    From concept to market validation in 48 hours. Connect with 500+ expert validators 
-                    and accelerate your journey through the startup universe.
-                </p>
-                
-                <!-- CTA Buttons -->
-                <div class="flex flex-col sm:flex-row justify-center gap-5 mb-16">
-                    <button onclick="showValidationForm()" class="btn-cosmic text-white px-10 py-5 rounded-2xl font-bold text-lg inline-flex items-center justify-center group">
-                        <i class="fas fa-rocket mr-3 group-hover:animate-bounce"></i>
-                        Launch Your Idea
-                    </button>
-                    <a href="/marketplace" class="btn-outline-cosmic text-white px-10 py-5 rounded-2xl font-bold text-lg inline-flex items-center justify-center">
-                        <i class="fas fa-compass mr-3"></i>
-                        Explore Hub
-                    </a>
-                </div>
-                
-                <!-- Trust Indicators -->
-                <div class="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-400 font-medium">
-                    <div class="flex items-center space-x-2">
-                        <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                            <i class="fas fa-check text-green-400 text-sm"></i>
-                        </div>
-                        <span>48h Validation</span>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                            <i class="fas fa-users text-primary text-sm"></i>
-                        </div>
-                        <span>500+ Validators</span>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <div class="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
-                            <i class="fas fa-shield-alt text-secondary text-sm"></i>
-                        </div>
-                        <span>AI-Powered</span>
-                    </div>
+    <!-- Hero Section - ASTAR* Simple Design -->
+    <section class="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 py-20 sm:py-32 sm:px-6 lg:px-8 relative z-10 text-center">
+            <!-- Large ASTAR* Logo -->
+            <h1 class="font-display text-8xl sm:text-9xl md:text-[12rem] font-bold mb-12 leading-none tracking-tight">
+                <span class="text-white">ASTAR</span><span class="text-primary text-glow">*</span>
+            </h1>
+            
+            <!-- Tagline -->
+            <p class="text-2xl sm:text-3xl md:text-4xl mb-16 text-gray-300 font-medium">
+                Connecting the brightest minds in the universe
+            </p>
+            
+            <!-- CTA Button -->
+            <button onclick="showAuthModal('register')" class="btn-cosmic text-white px-12 py-6 rounded-full font-bold text-xl inline-flex items-center justify-center group mb-8 pulse-glow">
+                <span class="mr-2">Sign Up</span>
+                <span class="text-2xl">⭐</span>
+            </button>
+            
+            <!-- Scroll indicator -->
+            <div class="mt-20">
+                <div class="inline-flex flex-col items-center text-gray-400">
+                    <i class="fas fa-chevron-down text-2xl mb-2 animate-bounce"></i>
+                    <span class="text-sm">Or scroll to explore</span>
                 </div>
             </div>
         </div>
@@ -617,30 +620,105 @@ app.get('/', (c) => {
         <div class="absolute bottom-1/3 right-1/4 w-2 h-2 rounded-full bg-white float-animation opacity-60" style="animation-delay: 3s;"></div>
     </section>
 
-    <!-- Stats Section -->
-    <section class="relative py-24 border-t border-b border-white/5">
+    <!-- User Type Selection Section -->
+    <section class="relative py-32 border-t border-white/5">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
-                <div class="text-center p-8 card-cosmic rounded-2xl">
-                    <div class="text-5xl sm:text-6xl font-display font-bold text-gradient-cosmic mb-3 stat-number">48h</div>
-                    <div class="text-white font-semibold text-lg mb-1">Full Validation</div>
-                    <div class="text-gray-400 text-sm">From idea to insights</div>
-                </div>
-                <div class="text-center p-8 card-cosmic rounded-2xl">
-                    <div class="text-5xl sm:text-6xl font-display font-bold text-gradient-cosmic mb-3 stat-number">90%</div>
-                    <div class="text-white font-semibold text-lg mb-1">Faster</div>
-                    <div class="text-gray-400 text-sm">Than traditional methods</div>
-                </div>
-                <div class="text-center p-8 card-cosmic rounded-2xl">
-                    <div class="text-5xl sm:text-6xl font-display font-bold text-gradient-cosmic mb-3 stat-number">500+</div>
-                    <div class="text-white font-semibold text-lg mb-1">Validators</div>
-                    <div class="text-gray-400 text-sm">Expert network</div>
-                </div>
-                <div class="text-center p-8 card-cosmic rounded-2xl">
-                    <div class="text-5xl sm:text-6xl font-display font-bold text-gradient-cosmic mb-3 stat-number">10K+</div>
-                    <div class="text-white font-semibold text-lg mb-1">Startups</div>
-                    <div class="text-gray-400 text-sm">Successfully launched</div>
-                </div>
+            <div class="text-center mb-16">
+                <h2 class="font-display text-4xl sm:text-5xl font-bold text-white mb-4">
+                    Welcome to the ASTAR* ecosystem!
+                </h2>
+                <h3 class="font-display text-3xl font-bold text-white mb-6">
+                    Choose your trajectory 🚀
+                </h3>
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto">
+                    We make thoughtful introductions between startup founders, customers, investors, partners and talent. Which role defines your mission in the ASTAR* ecosystem?
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+                <!-- FOUNDER -->
+                <button onclick="loginWithGoogle('founder')" class="group relative overflow-hidden rounded-3xl p-8 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #B8C6DB 0%, #A8B8D0 100%);">
+                    <div class="relative z-10 flex flex-col items-center text-center">
+                        <div class="w-24 h-24 rounded-full bg-white/30 flex items-center justify-center mb-6 transition-transform group-hover:scale-110">
+                            <span class="text-5xl">⚪</span>
+                        </div>
+                        <div class="px-6 py-2 bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-sm font-bold uppercase tracking-wide">Founder</span>
+                        </div>
+                        <h3 class="font-display font-bold text-gray-900 text-xl mb-2">FOUNDER</h3>
+                        <p class="text-gray-700 text-sm">Building the next big thing in the universe</p>
+                    </div>
+                </button>
+                
+                <!-- INVESTOR -->
+                <button onclick="loginWithGoogle('investor')" class="group relative overflow-hidden rounded-3xl p-8 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #5DE0E6 0%, #4DD4DA 100%);">
+                    <div class="relative z-10 flex flex-col items-center text-center">
+                        <div class="w-24 h-24 rounded-full bg-white/30 flex items-center justify-center mb-6 transition-transform group-hover:scale-110">
+                            <span class="text-5xl">🌐</span>
+                        </div>
+                        <div class="px-6 py-2 bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-sm font-bold uppercase tracking-wide">Investor</span>
+                        </div>
+                        <h3 class="font-display font-bold text-gray-900 text-xl mb-2">INVESTOR</h3>
+                        <p class="text-gray-700 text-sm">Fueling stellar growth with capital</p>
+                    </div>
+                </button>
+                
+                <!-- SCOUT -->
+                <button onclick="loginWithGoogle('scout')" class="group relative overflow-hidden rounded-3xl p-8 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #A78BFA 0%, #9B7DF5 100%);">
+                    <div class="relative z-10 flex flex-col items-center text-center">
+                        <div class="w-24 h-24 rounded-full bg-white/30 flex items-center justify-center mb-6 transition-transform group-hover:scale-110">
+                            <span class="text-5xl">🟣</span>
+                        </div>
+                        <div class="px-6 py-2 bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-sm font-bold uppercase tracking-wide">Scout</span>
+                        </div>
+                        <h3 class="font-display font-bold text-gray-900 text-xl mb-2">SCOUT</h3>
+                        <p class="text-gray-700 text-sm">Finding hidden gems and opportunities</p>
+                    </div>
+                </button>
+                
+                <!-- PARTNER -->
+                <button onclick="loginWithGoogle('partner')" class="group relative overflow-hidden rounded-3xl p-8 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #FF6B9D 0%, #FF5A8F 100%);">
+                    <div class="relative z-10 flex flex-col items-center text-center">
+                        <div class="w-24 h-24 rounded-full bg-white/30 flex items-center justify-center mb-6 transition-transform group-hover:scale-110">
+                            <span class="text-5xl">🔴</span>
+                        </div>
+                        <div class="px-6 py-2 bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-sm font-bold uppercase tracking-wide">Partner</span>
+                        </div>
+                        <h3 class="font-display font-bold text-gray-900 text-xl mb-2">PARTNER</h3>
+                        <p class="text-gray-700 text-sm">I want to partner/sponsor/collab with ASTAR*</p>
+                    </div>
+                </button>
+                
+                <!-- JOB SEEKER -->
+                <button onclick="loginWithGoogle('job_seeker')" class="group relative overflow-hidden rounded-3xl p-8 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #FFB84F 0%, #FFA940 100%);">
+                    <div class="relative z-10 flex flex-col items-center text-center">
+                        <div class="w-24 h-24 rounded-full bg-white/30 flex items-center justify-center mb-6 transition-transform group-hover:scale-110">
+                            <span class="text-5xl">🟠</span>
+                        </div>
+                        <div class="px-6 py-2 bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-sm font-bold uppercase tracking-wide">Job Seeker</span>
+                        </div>
+                        <h3 class="font-display font-bold text-gray-900 text-xl mb-2">JOB SEEKER</h3>
+                        <p class="text-gray-700 text-sm">Looking for a job at a promising startup</p>
+                    </div>
+                </button>
+                
+                <!-- OTHER -->
+                <button onclick="loginWithGoogle('other')" class="group relative overflow-hidden rounded-3xl p-8 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #4A5568 0%, #3A4558 100%);">
+                    <div class="relative z-10 flex flex-col items-center text-center">
+                        <div class="w-24 h-24 rounded-full bg-white/30 flex items-center justify-center mb-6 transition-transform group-hover:scale-110">
+                            <span class="text-5xl">🔵</span>
+                        </div>
+                        <div class="px-6 py-2 bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-sm font-bold uppercase tracking-wide">Other</span>
+                        </div>
+                        <h3 class="font-display font-bold text-gray-100 text-xl mb-2">OTHER</h3>
+                        <p class="text-gray-300 text-sm">I am curious about the ASTAR* ecosystem</p>
+                    </div>
+                </button>
             </div>
         </div>
     </section>
@@ -974,7 +1052,7 @@ app.get('/', (c) => {
 
     <!-- Auth Modal - Cosmic Theme -->
     <div id="auth-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(5, 5, 16, 0.95); backdrop-filter: blur(10px);">
-        <div class="card-cosmic rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
+        <div class="card-cosmic rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto relative">
             <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white z-10 transition">
                 <i class="fas fa-times text-xl"></i>
             </button>
@@ -1192,7 +1270,7 @@ app.get('/', (c) => {
           '</div>';
       }
 
-      // Show auth modal - Cosmic Theme
+      // Show auth modal - Cosmic Theme with User Type Selection
       function showAuthModal(mode) {
         const modal = document.getElementById('auth-modal');
         const modalContent = document.getElementById('auth-modal-content');
@@ -1200,45 +1278,101 @@ app.get('/', (c) => {
         if (!modal || !modalContent) return;
 
         modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
 
         if (mode === 'login') {
-          const loginHtml = '<div class="text-center">' +
-            '<div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">' +
-              '<i class="fas fa-rocket text-white text-2xl"></i>' +
+          const loginHtml = '<div class="text-center max-w-2xl mx-auto">' +
+            '<div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center pulse-glow">' +
+              '<span class="text-white text-3xl">✦</span>' +
             '</div>' +
-            '<h2 class="font-display text-3xl font-bold text-white mb-2">Welcome Back</h2>' +
-            '<p class="text-gray-400 mb-8">Continue your journey through the stars</p>' +
-            '<button onclick="showRoleSelection(\\\'login\\\')" class="w-full btn-cosmic text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-3 mb-6">' +
-              '<i class="fab fa-google text-xl"></i>' +
-              '<span class="text-lg">Continue with Google</span>' +
-            '</button>' +
-            '<p class="text-sm text-gray-400">' +
-              'New to ASTAR*? <a href="#" onclick="showAuthModal(\\\'register\\\')" class="text-primary hover:text-primary/80 font-semibold">Create Account</a>' +
-            '</p>' +
+            '<h2 class="font-display text-3xl font-bold text-white mb-2">Welcome to the ASTAR* ecosystem!</h2>' +
+            '<h3 class="font-display text-2xl font-bold text-white mb-4">Choose your trajectory 🚀</h3>' +
+            '<p class="text-gray-400 mb-8 text-sm">We make thoughtful introductions between startup founders, customers, investors, partners and talent. Which role defines your mission in the ASTAR* ecosystem?</p>' +
+            '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">' +
+              '<!-- FOUNDER -->' +
+              '<button onclick="loginWithGoogle(\\\'founder\\\')" class="group relative overflow-hidden rounded-2xl p-6 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #B8C6DB 0%, #A8B8D0 100%);">' +
+                '<div class="relative z-10 flex flex-col items-center">' +
+                  '<div class="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center mb-4 transition-transform group-hover:scale-110">' +
+                    '<span class="text-4xl">⚪</span>' +
+                  '</div>' +
+                  '<div class="w-16 h-6 bg-gray-700 rounded-full flex items-center justify-center mb-3">' +
+                    '<span class="text-white text-xs font-bold uppercase tracking-wide">Founder</span>' +
+                  '</div>' +
+                  '<h3 class="font-bold text-gray-900 text-sm mb-1">FOUNDER</h3>' +
+                  '<p class="text-gray-700 text-xs">Building the next big thing in the universe</p>' +
+                '</div>' +
+              '</button>' +
+              '<!-- INVESTOR -->' +
+              '<button onclick="loginWithGoogle(\\\'investor\\\')" class="group relative overflow-hidden rounded-2xl p-6 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #5DE0E6 0%, #4DD4DA 100%);">' +
+                '<div class="relative z-10 flex flex-col items-center">' +
+                  '<div class="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center mb-4 transition-transform group-hover:scale-110">' +
+                    '<span class="text-4xl">🌐</span>' +
+                  '</div>' +
+                  '<div class="w-16 h-6 bg-gray-700 rounded-full flex items-center justify-center mb-3">' +
+                    '<span class="text-white text-xs font-bold uppercase tracking-wide">Investor</span>' +
+                  '</div>' +
+                  '<h3 class="font-bold text-gray-900 text-sm mb-1">INVESTOR</h3>' +
+                  '<p class="text-gray-700 text-xs">Fueling stellar growth with capital</p>' +
+                '</div>' +
+              '</button>' +
+              '<!-- SCOUT -->' +
+              '<button onclick="loginWithGoogle(\\\'scout\\\')" class="group relative overflow-hidden rounded-2xl p-6 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #A78BFA 0%, #9B7DF5 100%);">' +
+                '<div class="relative z-10 flex flex-col items-center">' +
+                  '<div class="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center mb-4 transition-transform group-hover:scale-110">' +
+                    '<span class="text-4xl">🟣</span>' +
+                  '</div>' +
+                  '<div class="w-16 h-6 bg-gray-700 rounded-full flex items-center justify-center mb-3">' +
+                    '<span class="text-white text-xs font-bold uppercase tracking-wide">Scout</span>' +
+                  '</div>' +
+                  '<h3 class="font-bold text-gray-900 text-sm mb-1">SCOUT</h3>' +
+                  '<p class="text-gray-700 text-xs">Finding hidden gems and opportunities</p>' +
+                '</div>' +
+              '</button>' +
+              '<!-- PARTNER -->' +
+              '<button onclick="loginWithGoogle(\\\'partner\\\')" class="group relative overflow-hidden rounded-2xl p-6 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #FF6B9D 0%, #FF5A8F 100%);">' +
+                '<div class="relative z-10 flex flex-col items-center">' +
+                  '<div class="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center mb-4 transition-transform group-hover:scale-110">' +
+                    '<span class="text-4xl">🔴</span>' +
+                  '</div>' +
+                  '<div class="w-16 h-6 bg-gray-700 rounded-full flex items-center justify-center mb-3">' +
+                    '<span class="text-white text-xs font-bold uppercase tracking-wide">Partner</span>' +
+                  '</div>' +
+                  '<h3 class="font-bold text-gray-900 text-sm mb-1">PARTNER</h3>' +
+                  '<p class="text-gray-700 text-xs">I want to partner/sponsor/collab with ASTAR*</p>' +
+                '</div>' +
+              '</button>' +
+              '<!-- JOB SEEKER -->' +
+              '<button onclick="loginWithGoogle(\\\'job_seeker\\\')" class="group relative overflow-hidden rounded-2xl p-6 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #FFB84F 0%, #FFA940 100%);">' +
+                '<div class="relative z-10 flex flex-col items-center">' +
+                  '<div class="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center mb-4 transition-transform group-hover:scale-110">' +
+                    '<span class="text-4xl">🟠</span>' +
+                  '</div>' +
+                  '<div class="w-16 h-6 bg-gray-700 rounded-full flex items-center justify-center mb-3">' +
+                    '<span class="text-white text-xs font-bold uppercase tracking-wide">Job Seeker</span>' +
+                  '</div>' +
+                  '<h3 class="font-bold text-gray-900 text-sm mb-1">JOB SEEKER</h3>' +
+                  '<p class="text-gray-700 text-xs">Looking for a job at a promising startup</p>' +
+                '</div>' +
+              '</button>' +
+              '<!-- OTHER -->' +
+              '<button onclick="loginWithGoogle(\\\'other\\\')" class="group relative overflow-hidden rounded-2xl p-6 transition-all hover:scale-105 cursor-pointer" style="background: linear-gradient(135deg, #4A5568 0%, #3A4558 100%);">' +
+                '<div class="relative z-10 flex flex-col items-center">' +
+                  '<div class="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center mb-4 transition-transform group-hover:scale-110">' +
+                    '<span class="text-4xl">🔵</span>' +
+                  '</div>' +
+                  '<div class="w-16 h-6 bg-gray-700 rounded-full flex items-center justify-center mb-3">' +
+                    '<span class="text-white text-xs font-bold uppercase tracking-wide">Other</span>' +
+                  '</div>' +
+                  '<h3 class="font-bold text-gray-100 text-sm mb-1">OTHER</h3>' +
+                  '<p class="text-gray-300 text-xs">I am curious about the ASTAR* ecosystem</p>' +
+                '</div>' +
+              '</button>' +
+            '</div>' +
           '</div>';
           modalContent.innerHTML = loginHtml;
         } else if (mode === 'register') {
-          const registerHtml = '<div class="text-center">' +
-            '<div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">' +
-              '<span class="text-white text-2xl">✦</span>' +
-            '</div>' +
-            '<h2 class="font-display text-3xl font-bold text-white mb-2">Join ASTAR*</h2>' +
-            '<p class="text-gray-400 mb-8">Choose your mission</p>' +
-            '<div class="space-y-4">' +
-              '<button onclick="loginAsFounder()" class="w-full btn-cosmic text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-3">' +
-                '<i class="fas fa-rocket text-xl"></i>' +
-                '<span class="text-lg">Founder - Launch Ideas</span>' +
-              '</button>' +
-              '<button onclick="loginAsValidator()" class="w-full btn-outline-cosmic text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-3">' +
-                '<i class="fas fa-star text-xl"></i>' +
-                '<span class="text-lg">Validator - Guide Startups</span>' +
-              '</button>' +
-            '</div>' +
-            '<p class="text-sm text-gray-400 mt-6">' +
-              'Already aboard? <a href="#" onclick="showAuthModal(\\\'login\\\')" class="text-primary hover:text-primary/80 font-semibold">Sign In</a>' +
-            '</p>' +
-          '</div>';
-          modalContent.innerHTML = registerHtml;
+          // Same as login for now
+          showAuthModal('login');
         }
       }
 
@@ -1247,6 +1381,7 @@ app.get('/', (c) => {
         const modal = document.getElementById('auth-modal');
         if (modal) {
           modal.classList.add('hidden');
+          document.body.style.overflow = '';
         }
       }
 
@@ -1278,6 +1413,10 @@ app.get('/', (c) => {
             closeAuthModal();
             updateAuthUI();
             alert('¡Inicio de sesión exitoso!');
+            // Redirect to dashboard
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 500);
           } else {
             alert('Error: ' + (data.error || 'No se pudo iniciar sesión'));
           }
@@ -1312,6 +1451,10 @@ app.get('/', (c) => {
             closeAuthModal();
             updateAuthUI();
             alert('¡Cuenta creada exitosamente!');
+            // Redirect to dashboard
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 500);
           } else {
             alert('Error: ' + (data.error || 'No se pudo crear la cuenta'));
           }
