@@ -9,4 +9,4 @@ PORT=${PORT:-8000}
 echo "Starting server on port $PORT"
 
 # Ejecutar uvicorn con el puerto correcto
-exec uvicorn main:app --host 0.0.0.0 --port $PORT
+exec uvicorn app:app --host 0.0.0.0 --port $PORT

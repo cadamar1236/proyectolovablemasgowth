@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import os
+import json
 from linkedin_connector_agent import (
     LinkedInConnectorTeam,
     get_linkedin_connector_team
@@ -29,6 +30,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize LinkedIn Connector Team
+linkedin_team = None
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize LinkedIn Connector on startup"""
+    global linkedin_team
+    try:
+        linkedin_team = get_linkedin_connector_team()
+        print("✅ LinkedIn Connector Team initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Warning: Could not initialize LinkedIn Team: {e}")
+        print("API will continue with limited functionality")
+
 # Request Models
 class SearchRequest(BaseModel):
     type: str  # investor, talent, customer, partner
@@ -47,19 +62,6 @@ class GenerateMessageRequest(BaseModel):
     purpose: str  # investment, partnership, hiring, mentorship
     tone: Optional[str] = "professional"
 
-# Initialize LinkedIn Connector Team
-linkedin_team = None
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize LinkedIn Connector on startup"""
-    global linkedin_team
-    try:
-        linkedin_team = get_linkedin_connector_team()
-        print("✅ LinkedIn Connector Team initialized successfully")
-    except Exception as e:
-        print(f"⚠️ Warning: Could not initialize LinkedIn Team: {e}")
-        print("API will continue with limited functionality")
 
 @app.get("/")
 async def root():
@@ -108,7 +110,7 @@ async def search_profiles(request: SearchRequest):
                 funding_stage=request.filters.get("stage", "seed"),
                 industry=request.filters.get("industry", "Technology"),
                 location=request.filters.get("location", ""),
-                max_results=request.maxResults
+                max_results=request.maxResults or 20
             )
         elif request.type == "talent":
             result = linkedin_team.find_talent(
@@ -116,7 +118,7 @@ async def search_profiles(request: SearchRequest):
                 required_skills=request.filters.get("skills", []),
                 company_description=request.filters.get("company", ""),
                 location=request.filters.get("location", ""),
-                max_results=request.maxResults
+                max_results=request.maxResults or 20
             )
         elif request.type == "customer":
             result = linkedin_team.find_customers(
@@ -124,14 +126,14 @@ async def search_profiles(request: SearchRequest):
                 target_persona=request.filters.get("persona", "Decision Maker"),
                 industry=request.filters.get("industry", "Technology"),
                 company_size=request.filters.get("size", ""),
-                max_results=request.maxResults
+                max_results=request.maxResults or 20
             )
         elif request.type == "partner":
             result = linkedin_team.find_partners(
                 company_description=request.query,
                 partnership_type=request.filters.get("partnership_type", "integration"),
                 target_industry=request.filters.get("industry", "Technology"),
-                max_results=request.maxResults
+                max_results=request.maxResults or 20
             )
         else:
             raise HTTPException(status_code=400, detail=f"Invalid type: {request.type}")
