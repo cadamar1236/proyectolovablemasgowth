@@ -1,6 +1,6 @@
 /**
  * LinkedIn Connector API
- * Endpoints para conectar startups con inversores, talento, clientes y partners
+ * Endpoints para chat conversacional con el agente de LinkedIn
  */
 
 import { Hono } from 'hono';
@@ -8,6 +8,7 @@ import { verify } from 'hono/jwt';
 import type { Bindings } from '../types';
 
 const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
+const RAILWAY_API_URL = 'https://proyectolovablemasgowth-production.up.railway.app';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -27,6 +28,46 @@ app.use('/*', async (c, next) => {
     await next();
   } catch (error) {
     return c.json({ error: 'Invalid token' }, 401);
+  }
+});
+
+// POST /api/linkedin-connector/chat - Chat conversacional
+app.post('/chat', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const { message, sessionId } = await c.req.json();
+    
+    if (!message) {
+      return c.json({ error: 'Message is required' }, 400);
+    }
+    
+    // Llamar al backend de Railway
+    const response = await fetch(`${RAILWAY_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        session_id: sessionId || `user_${userId}`,
+        user_id: String(userId)
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      return c.json({ error: `Railway API error: ${error}` }, response.status);
+    }
+    
+    const data = await response.json();
+    return c.json(data);
+    
+  } catch (error) {
+    console.error('Error in chat endpoint:', error);
+    return c.json({ 
+      error: 'Failed to process chat message',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
   }
 });
 

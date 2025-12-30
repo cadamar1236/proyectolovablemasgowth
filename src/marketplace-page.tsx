@@ -117,56 +117,67 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           </div>
         </div>
 
-        <!-- LinkedIn Connector Terminal -->
+        <!-- LinkedIn Connector Chat -->
         <div class="mt-8">
-          <h2 class="text-2xl font-bold text-gray-900 mb-6">🔗 LinkedIn Connector</h2>
-          <div class="bg-gray-900 rounded-lg shadow-lg overflow-hidden">
-            <div class="bg-gray-800 px-4 py-2 flex items-center space-x-2">
-              <div class="flex space-x-2">
-                <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+          <h2 class="text-2xl font-bold text-gray-900 mb-6">🔗 LinkedIn Connector AI Assistant</h2>
+          <div class="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center">
+                  <span class="text-2xl">🤖</span>
+                </div>
+                <div>
+                  <h3 class="text-white font-semibold">LinkedIn Assistant</h3>
+                  <p class="text-blue-100 text-xs">Powered by AI - Ask me to find investors, talent, customers, or partners</p>
+                </div>
               </div>
-              <span class="text-gray-400 text-sm ml-4">linkedin-connector-terminal</span>
             </div>
-            <div class="p-6 text-gray-100 font-mono text-sm">
-              <div class="mb-6">
-                <div class="flex items-center mb-4 flex-wrap gap-2">
-                  <span class="text-green-400">$</span>
-                  <span class="text-gray-400">search --type</span>
-                  <select id="linkedinSearchType" class="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700">
-                    <option value="investor">investor</option>
-                    <option value="talent">talent</option>
-                    <option value="customer">customer</option>
-                    <option value="partner">partner</option>
-                  </select>
-                  <span class="text-gray-400">--query</span>
-                  <input type="text" id="linkedinQuery" placeholder='"venture capital" OR "AI startup"' class="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700 flex-1 min-w-[200px]" onkeypress="if(event.key==='Enter')searchLinkedInProfiles()"/>
-                  <button onclick="searchLinkedInProfiles()" class="bg-blue-600 hover:bg-blue-700 px-4 py-1 rounded">🔍 Search</button>
+            
+            <!-- Chat Messages -->
+            <div id="linkedinChatMessages" class="h-96 overflow-y-auto p-6 space-y-4 bg-gray-50">
+              <!-- Welcome Message -->
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                  <span class="text-white text-sm">🤖</span>
                 </div>
-                <div class="text-xs text-gray-500 mb-4"><span class="text-yellow-400">💡 Tips:</span> Use keywords like "seed investor", "full stack engineer", "CTO SaaS", etc.</div>
-              </div>
-              <div id="linkedinResults" class="hidden">
-                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                  <div class="text-gray-400"><span class="text-green-400">✓</span> Found <span id="totalProfiles">0</span> profiles | <span class="text-blue-400"><span id="selectedCount">0</span> selected</span></div>
-                  <div class="space-x-2" id="linkedinActions" style="display:none">
-                    <button onclick="generateConnectionMessages()" class="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-xs">📧 Generate Messages</button>
-                    <button onclick="saveSelectedConnections()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs">💾 Save to Campaign</button>
+                <div class="flex-1">
+                  <div class="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                    <p class="text-gray-800">👋 Hi! I'm your LinkedIn Connector Assistant. I can help you:</p>
+                    <ul class="mt-3 space-y-2 text-sm">
+                      <li class="flex items-center space-x-2"><span class="text-blue-500">💰</span><span>Find investors for your startup</span></li>
+                      <li class="flex items-center space-x-2"><span class="text-green-500">👨‍💻</span><span>Discover talented professionals</span></li>
+                      <li class="flex items-center space-x-2"><span class="text-purple-500">🎯</span><span>Identify potential customers</span></li>
+                      <li class="flex items-center space-x-2"><span class="text-orange-500">🤝</span><span>Connect with strategic partners</span></li>
+                    </ul>
+                    <p class="mt-3 text-sm text-gray-600">Just tell me what you're looking for!</p>
                   </div>
+                  <div class="text-xs text-gray-400 mt-1">Just now</div>
                 </div>
-                <div id="profilesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto"></div>
               </div>
-              <div id="linkedinEmpty" class="text-center py-8 text-gray-500">
-                <div class="text-4xl mb-4">🔍</div>
-                <p>No searches yet. Start by typing a query and clicking Search.</p>
-                <div class="mt-4 text-xs">
-                  <p class="mb-2">Example queries:</p>
-                  <div class="space-y-1 text-left max-w-md mx-auto">
-                    <div class="bg-gray-800 px-3 py-2 rounded">investor: "seed stage venture capital AI"</div>
-                    <div class="bg-gray-800 px-3 py-2 rounded">talent: "senior react developer"</div>
-                    <div class="bg-gray-800 px-3 py-2 rounded">customer: "CTO fintech company"</div>
-                  </div>
-                </div>
+            </div>
+            
+            <!-- Chat Input -->
+            <div class="border-t border-gray-200 p-4 bg-white">
+              <div class="flex items-center space-x-3">
+                <input 
+                  type="text" 
+                  id="linkedinChatInput" 
+                  placeholder="Ask me anything... (e.g., 'Find seed investors in AI' or 'I need a React developer')"
+                  class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onkeypress="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendLinkedInMessage(); }"
+                />
+                <button 
+                  onclick="sendLinkedInMessage()" 
+                  class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+                >
+                  <span class="flex items-center space-x-2">
+                    <span>Send</span>
+                    <span>📤</span>
+                  </span>
+                </button>
+              </div>
+              <div class="text-xs text-gray-500 mt-2">
+                <span class="text-blue-600">💡 Tip:</span> Be specific! Tell me about your industry, stage, location, or any other preferences.
               </div>
             </div>
           </div>
@@ -1220,178 +1231,155 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       }
 
       // LinkedIn Connector functions
-      let linkedinProfiles = [];
-      let selectedProfiles = new Set();
+      // LinkedIn Chat Session Management
+      let linkedinSessionId = null;
+      let isLinkedInTyping = false;
 
-      window.searchLinkedInProfiles = async function() {
-        const query = document.getElementById('linkedinQuery').value;
-        const type = document.getElementById('linkedinSearchType').value;
+      window.sendLinkedInMessage = async function() {
+        const input = document.getElementById('linkedinChatInput');
+        const message = input.value.trim();
         
-        if (!query.trim()) {
-          alert('Por favor ingresa términos de búsqueda');
-          return;
-        }
-
+        if (!message || isLinkedInTyping) return;
+        
+        // Add user message to chat
+        addLinkedInMessage('user', message);
+        input.value = '';
+        
+        // Show typing indicator
+        isLinkedInTyping = true;
+        addLinkedInTypingIndicator();
+        
         try {
-          const token = localStorage.getItem('token');
-          const response = await fetch('/api/linkedin-connector/search', {
+          // Get token from cookie or localStorage
+          const cookieMatch = document.cookie.match(/authToken=([^;]+)/);
+          const token = cookieMatch ? cookieMatch[1] : localStorage.getItem('authToken');
+          
+          if (!token) {
+            removeLinkedInTypingIndicator();
+            isLinkedInTyping = false;
+            addLinkedInMessage('error', '⚠️ Sesión expirada. Por favor recarga la página.');
+            return;
+          }
+          
+          const response = await fetch('/api/linkedin-connector/chat', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': \`Bearer \${token}\`
             },
             body: JSON.stringify({
-              type: type,
-              query: query,
-              maxResults: 20
+              message: message,
+              session_id: linkedinSessionId
             })
           });
 
           const data = await response.json();
+          
+          // Remove typing indicator
+          removeLinkedInTypingIndicator();
+          isLinkedInTyping = false;
+          
           if (data.success) {
-            linkedinProfiles = data.profiles;
-            selectedProfiles = new Set();
-            renderLinkedInProfiles();
+            // Update session ID
+            linkedinSessionId = data.session_id;
+            
+            // Add AI response
+            addLinkedInMessage('assistant', data.response);
+          } else {
+            addLinkedInMessage('error', 'Lo siento, hubo un error. Por favor intenta de nuevo.');
           }
         } catch (error) {
           console.error('Error:', error);
-          alert('Error al buscar perfiles');
+          removeLinkedInTypingIndicator();
+          isLinkedInTyping = false;
+          addLinkedInMessage('error', 'Error de conexión. Verifica tu conexión a internet.');
         }
       };
 
-      function renderLinkedInProfiles() {
-        const resultsDiv = document.getElementById('linkedinResults');
-        const emptyDiv = document.getElementById('linkedinEmpty');
-        const profilesGrid = document.getElementById('profilesGrid');
-        const totalSpan = document.getElementById('totalProfiles');
-        const selectedSpan = document.getElementById('selectedCount');
-        const actionsDiv = document.getElementById('linkedinActions');
-
-        if (linkedinProfiles.length === 0) {
-          resultsDiv.classList.add('hidden');
-          emptyDiv.classList.remove('hidden');
-          return;
-        }
-
-        resultsDiv.classList.remove('hidden');
-        emptyDiv.classList.add('hidden');
-        totalSpan.textContent = linkedinProfiles.length;
-        selectedSpan.textContent = selectedProfiles.size;
-        actionsDiv.style.display = selectedProfiles.size > 0 ? 'block' : 'none';
-
-        profilesGrid.innerHTML = linkedinProfiles.map(profile => \`
-          <div class="bg-gray-800 border rounded p-4 cursor-pointer transition-all \${selectedProfiles.has(profile.id) ? 'border-blue-500 bg-gray-750' : 'border-gray-700 hover:border-gray-600'}" 
-               onclick="toggleProfileSelection('\${profile.id}')">
-            <div class="flex items-start space-x-3">
-              <input type="checkbox" \${selectedProfiles.has(profile.id) ? 'checked' : ''} 
-                     onclick="event.stopPropagation(); toggleProfileSelection('\${profile.id}')" class="mt-1"/>
-              <div class="flex-1">
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-white font-semibold">\${profile.name}</h3>
-                  <span class="text-xs px-2 py-1 rounded \${profile.compatibilityScore >= 90 ? 'bg-green-600' : profile.compatibilityScore >= 75 ? 'bg-blue-600' : 'bg-yellow-600'}">
-                    \${profile.compatibilityScore}% match
-                  </span>
+      function addLinkedInMessage(type, content) {
+        const messagesDiv = document.getElementById('linkedinChatMessages');
+        const timestamp = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        
+        if (type === 'user') {
+          const messageHtml = \`
+            <div class="flex items-start space-x-3 justify-end">
+              <div class="flex-1 max-w-lg">
+                <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm p-4">
+                  <p class="whitespace-pre-wrap">\${content}</p>
                 </div>
-                <p class="text-gray-400 text-xs mb-2">\${profile.headline}</p>
-                <div class="flex items-center text-xs text-gray-500 space-x-3 flex-wrap">
-                  <span>📍 \${profile.location}</span>
-                  <span>🏢 \${profile.industry}</span>
-                  \${profile.connections ? \`<span>🤝 \${profile.connections}+</span>\` : ''}
-                </div>
-                <div class="mt-2 text-xs">
-                  \${profile.matchReasons.slice(0, 2).map(reason => \`<div class="text-green-400">✓ \${reason}</div>\`).join('')}
-                </div>
+                <div class="text-xs text-gray-400 mt-1 text-right">\${timestamp}</div>
+              </div>
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center flex-shrink-0">
+                <span class="text-white text-sm">👤</span>
               </div>
             </div>
-          </div>
-        \`).join('');
+          \`;
+          messagesDiv.insertAdjacentHTML('beforeend', messageHtml);
+        } else if (type === 'assistant') {
+          const messageHtml = \`
+            <div class="flex items-start space-x-3">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                <span class="text-white text-sm">🤖</span>
+              </div>
+              <div class="flex-1">
+                <div class="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                  <p class="text-gray-800 whitespace-pre-wrap">\${content}</p>
+                </div>
+                <div class="text-xs text-gray-400 mt-1">\${timestamp}</div>
+              </div>
+            </div>
+          \`;
+          messagesDiv.insertAdjacentHTML('beforeend', messageHtml);
+        } else if (type === 'error') {
+          const messageHtml = \`
+            <div class="flex items-start space-x-3">
+              <div class="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                <span class="text-white text-sm">⚠️</span>
+              </div>
+              <div class="flex-1">
+                <div class="bg-red-50 rounded-lg shadow-sm p-4 border border-red-200">
+                  <p class="text-red-800">\${content}</p>
+                </div>
+                <div class="text-xs text-gray-400 mt-1">\${timestamp}</div>
+              </div>
+            </div>
+          \`;
+          messagesDiv.insertAdjacentHTML('beforeend', messageHtml);
+        }
+        
+        // Auto-scroll to bottom
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
       }
 
-      window.toggleProfileSelection = function(profileId) {
-        if (selectedProfiles.has(profileId)) {
-          selectedProfiles.delete(profileId);
-        } else {
-          selectedProfiles.add(profileId);
+      function addLinkedInTypingIndicator() {
+        const messagesDiv = document.getElementById('linkedinChatMessages');
+        const typingHtml = \`
+          <div id="linkedinTypingIndicator" class="flex items-start space-x-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+              <span class="text-white text-sm">🤖</span>
+            </div>
+            <div class="flex-1">
+              <div class="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                <div class="flex space-x-2">
+                  <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                  <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                  <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                </div>
+              </div>
+              <div class="text-xs text-gray-400 mt-1">Thinking...</div>
+            </div>
+          </div>
+        \`;
+        messagesDiv.insertAdjacentHTML('beforeend', typingHtml);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      function removeLinkedInTypingIndicator() {
+        const indicator = document.getElementById('linkedinTypingIndicator');
+        if (indicator) {
+          indicator.remove();
         }
-        renderLinkedInProfiles();
-      };
-
-      window.generateConnectionMessages = async function() {
-        if (selectedProfiles.size === 0) {
-          alert('Selecciona al menos un perfil');
-          return;
-        }
-
-        try {
-          const token = localStorage.getItem('token');
-          const type = document.getElementById('linkedinSearchType').value;
-          const purpose = type === 'investor' ? 'investment' : 
-                         type === 'talent' ? 'hiring' : 
-                         type === 'customer' ? 'partnership' : 'partnership';
-
-          const response = await fetch('/api/linkedin-connector/generate-message', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': \`Bearer \${token}\`
-            },
-            body: JSON.stringify({
-              profileIds: Array.from(selectedProfiles),
-              purpose: purpose,
-              senderInfo: {
-                name: 'Your Name',
-                company: 'Your Company',
-                title: 'Your Title'
-              }
-            })
-          });
-
-          const data = await response.json();
-          if (data.success) {
-            alert(\`✅ \${data.totalMessages} mensajes generados exitosamente\`);
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          alert('Error al generar mensajes');
-        }
-      };
-
-      window.saveSelectedConnections = async function() {
-        if (selectedProfiles.size === 0) {
-          alert('Selecciona al menos un perfil');
-          return;
-        }
-
-        const campaignName = prompt('Nombre de la campaña:');
-        if (!campaignName) return;
-
-        try {
-          const token = localStorage.getItem('token');
-          const profilesArray = linkedinProfiles.filter(p => selectedProfiles.has(p.id));
-          
-          const response = await fetch('/api/linkedin-connector/save-connections', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': \`Bearer \${token}\`
-            },
-            body: JSON.stringify({
-              profiles: profilesArray,
-              campaign: campaignName
-            })
-          });
-
-          const data = await response.json();
-          if (data.success) {
-            alert(\`✅ \${data.saved} conexiones guardadas en campaña: \${campaignName}\`);
-            selectedProfiles = new Set();
-            renderLinkedInProfiles();
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          alert('Error al guardar conexiones');
-        }
-      };
+      }
 
       // Initialize
       window.addEventListener('load', () => {

@@ -45,6 +45,11 @@ async def startup_event():
         print("API will continue with limited functionality")
 
 # Request Models
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = "default"
+    user_id: Optional[str] = "user"
+
 class SearchRequest(BaseModel):
     type: str  # investor, talent, customer, partner
     query: str
@@ -88,6 +93,30 @@ async def health_check():
             "apify_configured": bool(os.getenv("APIFY_API_TOKEN"))
         }
     }
+
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
+    """
+    Chat conversacional con el LinkedIn Connector Agent
+    
+    - **message**: Mensaje del usuario
+    - **session_id**: ID de sesión para mantener contexto
+    - **user_id**: ID del usuario
+    """
+    try:
+        if not linkedin_team:
+            raise HTTPException(status_code=503, detail="LinkedIn Connector not initialized")
+        
+        response = linkedin_team.chat(
+            message=request.message,
+            session_id=request.session_id,
+            user_id=request.user_id
+        )
+        
+        return response
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/search")
 async def search_profiles(request: SearchRequest):

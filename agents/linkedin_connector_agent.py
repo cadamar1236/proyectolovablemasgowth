@@ -38,7 +38,7 @@ class LinkedInConnectorConfig:
 
 class LinkedInConnectorTeam:
     """
-    Sistema multiagente para LinkedIn Connector
+    Sistema multiagente conversacional para LinkedIn Connector
     """
     
     def __init__(self):
@@ -48,7 +48,29 @@ class LinkedInConnectorTeam:
         openai.api_key = self.config.openai_api_key
         self.apify_client = ApifyClient(self.config.apify_api_token)
         
-        # Initialize agents with modern agno API
+        # Initialize main conversational agent
+        self.main_agent = Agent(
+            name="LinkedIn Connector Assistant",
+            model="openai:gpt-4o-mini",
+            description="AI assistant that helps connect startups with investors, talent, customers, and partners via LinkedIn",
+            instructions=[
+                "You are a helpful AI assistant specialized in LinkedIn networking and business connections",
+                "Help users find investors, talent, customers, or strategic partners",
+                "Ask clarifying questions to understand their needs",
+                "Provide personalized recommendations and connection strategies",
+                "Be conversational, friendly, and professional",
+                "When users ask to search for connections, gather these details:",
+                "  - Type: investor, talent, customer, or partner",
+                "  - Industry or sector",
+                "  - Location (optional)",
+                "  - Specific requirements or preferences",
+                "Always explain your reasoning and provide actionable insights"
+            ],
+            markdown=True,
+            add_history_to_context=True
+        )
+        
+        # Specialized agents for specific tasks
         self.investor_agent = Agent(
             name="Investor Matching Agent",
             model="openai:gpt-4o-mini",
@@ -90,6 +112,45 @@ class LinkedInConnectorTeam:
         )
         
         print(f"✅ LinkedIn Connector Team initialized with {self.config.openai_model}")
+    
+    def chat(
+        self,
+        message: str,
+        session_id: str = "default",
+        user_id: str = "user"
+    ) -> Dict[str, Any]:
+        """
+        Chat conversacional con el agente de LinkedIn
+        
+        Args:
+            message: Mensaje del usuario
+            session_id: ID de sesión para mantener contexto
+            user_id: ID del usuario
+            
+        Returns:
+            Respuesta del agente con contenido y metadata
+        """
+        try:
+            response = self.main_agent.run(
+                message,
+                session_id=session_id,
+                user_id=user_id,
+                stream=False
+            )
+            
+            return {
+                "success": True,
+                "response": response.content if hasattr(response, 'content') else str(response),
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat()
+            }
     
     def find_investors(
         self,
