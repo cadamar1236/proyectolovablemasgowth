@@ -1,6 +1,9 @@
 # Agno Framework - Sistema Multiagente
 agno>=0.1.0
 
+# Twilio WhatsApp Integration
+twilio>=9.0.0
+
 # FastAPI para el servidor
 fastapi>=0.109.0
 uvicorn>=0.27.0
