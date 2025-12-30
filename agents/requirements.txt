@@ -26,3 +26,6 @@ pydantic>=2.5.0
 
 # Async support
 asyncio-throttle>=1.0.2
+
+# Apify client for LinkedIn scraping
+apify-client>=1.0.0

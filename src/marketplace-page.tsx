@@ -116,6 +116,61 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
             </div>
           </div>
         </div>
+
+        <!-- LinkedIn Connector Terminal -->
+        <div class="mt-8">
+          <h2 class="text-2xl font-bold text-gray-900 mb-6">🔗 LinkedIn Connector</h2>
+          <div class="bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+            <div class="bg-gray-800 px-4 py-2 flex items-center space-x-2">
+              <div class="flex space-x-2">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              </div>
+              <span class="text-gray-400 text-sm ml-4">linkedin-connector-terminal</span>
+            </div>
+            <div class="p-6 text-gray-100 font-mono text-sm">
+              <div class="mb-6">
+                <div class="flex items-center mb-4 flex-wrap gap-2">
+                  <span class="text-green-400">$</span>
+                  <span class="text-gray-400">search --type</span>
+                  <select id="linkedinSearchType" class="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700">
+                    <option value="investor">investor</option>
+                    <option value="talent">talent</option>
+                    <option value="customer">customer</option>
+                    <option value="partner">partner</option>
+                  </select>
+                  <span class="text-gray-400">--query</span>
+                  <input type="text" id="linkedinQuery" placeholder='"venture capital" OR "AI startup"' class="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700 flex-1 min-w-[200px]" onkeypress="if(event.key==='Enter')searchLinkedInProfiles()"/>
+                  <button onclick="searchLinkedInProfiles()" class="bg-blue-600 hover:bg-blue-700 px-4 py-1 rounded">🔍 Search</button>
+                </div>
+                <div class="text-xs text-gray-500 mb-4"><span class="text-yellow-400">💡 Tips:</span> Use keywords like "seed investor", "full stack engineer", "CTO SaaS", etc.</div>
+              </div>
+              <div id="linkedinResults" class="hidden">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div class="text-gray-400"><span class="text-green-400">✓</span> Found <span id="totalProfiles">0</span> profiles | <span class="text-blue-400"><span id="selectedCount">0</span> selected</span></div>
+                  <div class="space-x-2" id="linkedinActions" style="display:none">
+                    <button onclick="generateConnectionMessages()" class="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-xs">📧 Generate Messages</button>
+                    <button onclick="saveSelectedConnections()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs">💾 Save to Campaign</button>
+                  </div>
+                </div>
+                <div id="profilesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto"></div>
+              </div>
+              <div id="linkedinEmpty" class="text-center py-8 text-gray-500">
+                <div class="text-4xl mb-4">🔍</div>
+                <p>No searches yet. Start by typing a query and clicking Search.</p>
+                <div class="mt-4 text-xs">
+                  <p class="mb-2">Example queries:</p>
+                  <div class="space-y-1 text-left max-w-md mx-auto">
+                    <div class="bg-gray-800 px-3 py-2 rounded">investor: "seed stage venture capital AI"</div>
+                    <div class="bg-gray-800 px-3 py-2 rounded">talent: "senior react developer"</div>
+                    <div class="bg-gray-800 px-3 py-2 rounded">customer: "CTO fintech company"</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- TRACTION TAB -->
@@ -1163,6 +1218,180 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           loadProducts();
         } catch (e) { alert('Error creating product'); }
       }
+
+      // LinkedIn Connector functions
+      let linkedinProfiles = [];
+      let selectedProfiles = new Set();
+
+      window.searchLinkedInProfiles = async function() {
+        const query = document.getElementById('linkedinQuery').value;
+        const type = document.getElementById('linkedinSearchType').value;
+        
+        if (!query.trim()) {
+          alert('Por favor ingresa términos de búsqueda');
+          return;
+        }
+
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch('/api/linkedin-connector/search', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': \`Bearer \${token}\`
+            },
+            body: JSON.stringify({
+              type: type,
+              query: query,
+              maxResults: 20
+            })
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            linkedinProfiles = data.profiles;
+            selectedProfiles = new Set();
+            renderLinkedInProfiles();
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al buscar perfiles');
+        }
+      };
+
+      function renderLinkedInProfiles() {
+        const resultsDiv = document.getElementById('linkedinResults');
+        const emptyDiv = document.getElementById('linkedinEmpty');
+        const profilesGrid = document.getElementById('profilesGrid');
+        const totalSpan = document.getElementById('totalProfiles');
+        const selectedSpan = document.getElementById('selectedCount');
+        const actionsDiv = document.getElementById('linkedinActions');
+
+        if (linkedinProfiles.length === 0) {
+          resultsDiv.classList.add('hidden');
+          emptyDiv.classList.remove('hidden');
+          return;
+        }
+
+        resultsDiv.classList.remove('hidden');
+        emptyDiv.classList.add('hidden');
+        totalSpan.textContent = linkedinProfiles.length;
+        selectedSpan.textContent = selectedProfiles.size;
+        actionsDiv.style.display = selectedProfiles.size > 0 ? 'block' : 'none';
+
+        profilesGrid.innerHTML = linkedinProfiles.map(profile => \`
+          <div class="bg-gray-800 border rounded p-4 cursor-pointer transition-all \${selectedProfiles.has(profile.id) ? 'border-blue-500 bg-gray-750' : 'border-gray-700 hover:border-gray-600'}" 
+               onclick="toggleProfileSelection('\${profile.id}')">
+            <div class="flex items-start space-x-3">
+              <input type="checkbox" \${selectedProfiles.has(profile.id) ? 'checked' : ''} 
+                     onclick="event.stopPropagation(); toggleProfileSelection('\${profile.id}')" class="mt-1"/>
+              <div class="flex-1">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-white font-semibold">\${profile.name}</h3>
+                  <span class="text-xs px-2 py-1 rounded \${profile.compatibilityScore >= 90 ? 'bg-green-600' : profile.compatibilityScore >= 75 ? 'bg-blue-600' : 'bg-yellow-600'}">
+                    \${profile.compatibilityScore}% match
+                  </span>
+                </div>
+                <p class="text-gray-400 text-xs mb-2">\${profile.headline}</p>
+                <div class="flex items-center text-xs text-gray-500 space-x-3 flex-wrap">
+                  <span>📍 \${profile.location}</span>
+                  <span>🏢 \${profile.industry}</span>
+                  \${profile.connections ? \`<span>🤝 \${profile.connections}+</span>\` : ''}
+                </div>
+                <div class="mt-2 text-xs">
+                  \${profile.matchReasons.slice(0, 2).map(reason => \`<div class="text-green-400">✓ \${reason}</div>\`).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        \`).join('');
+      }
+
+      window.toggleProfileSelection = function(profileId) {
+        if (selectedProfiles.has(profileId)) {
+          selectedProfiles.delete(profileId);
+        } else {
+          selectedProfiles.add(profileId);
+        }
+        renderLinkedInProfiles();
+      };
+
+      window.generateConnectionMessages = async function() {
+        if (selectedProfiles.size === 0) {
+          alert('Selecciona al menos un perfil');
+          return;
+        }
+
+        try {
+          const token = localStorage.getItem('token');
+          const type = document.getElementById('linkedinSearchType').value;
+          const purpose = type === 'investor' ? 'investment' : 
+                         type === 'talent' ? 'hiring' : 
+                         type === 'customer' ? 'partnership' : 'partnership';
+
+          const response = await fetch('/api/linkedin-connector/generate-message', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': \`Bearer \${token}\`
+            },
+            body: JSON.stringify({
+              profileIds: Array.from(selectedProfiles),
+              purpose: purpose,
+              senderInfo: {
+                name: 'Your Name',
+                company: 'Your Company',
+                title: 'Your Title'
+              }
+            })
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            alert(\`✅ \${data.totalMessages} mensajes generados exitosamente\`);
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al generar mensajes');
+        }
+      };
+
+      window.saveSelectedConnections = async function() {
+        if (selectedProfiles.size === 0) {
+          alert('Selecciona al menos un perfil');
+          return;
+        }
+
+        const campaignName = prompt('Nombre de la campaña:');
+        if (!campaignName) return;
+
+        try {
+          const token = localStorage.getItem('token');
+          const profilesArray = linkedinProfiles.filter(p => selectedProfiles.has(p.id));
+          
+          const response = await fetch('/api/linkedin-connector/save-connections', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': \`Bearer \${token}\`
+            },
+            body: JSON.stringify({
+              profiles: profilesArray,
+              campaign: campaignName
+            })
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            alert(\`✅ \${data.saved} conexiones guardadas en campaña: \${campaignName}\`);
+            selectedProfiles = new Set();
+            renderLinkedInProfiles();
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al guardar conexiones');
+        }
+      };
 
       // Initialize
       window.addEventListener('load', () => {
