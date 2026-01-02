@@ -30,7 +30,6 @@ import whatsapp from './api/whatsapp';
 import chatAgent from './api/chat-agent';
 import dashboardPage from './dashboard-page';
 import marketingAI from './api/marketing-ai';
-import linkedinConnector from './api/linkedin-connector';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -58,7 +57,6 @@ app.route('/api/quick-pitch', quickPitch);
 app.route('/api/whatsapp', whatsapp);
 app.route('/api/chat-agent', chatAgent);
 app.route('/api/marketing-ai', marketingAI);
-app.route('/api/linkedin-connector', linkedinConnector);
 
 // Page Routes - Onboarding for new users
 app.get('/onboarding', async (c) => {
@@ -208,15 +206,27 @@ app.get('/', async (c) => {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      html {
+        scroll-behavior: smooth;
+      }
+      
       body {
         font-family: 'Space Grotesk', system-ui, sans-serif;
+        overflow-x: hidden;
+        overflow-y: auto;
       }
       
       /* Cosmic Background */
       .cosmic-bg {
         background: linear-gradient(180deg, #050510 0%, #0a0a1a 50%, #1a1a3e 100%);
         position: relative;
-        overflow: hidden;
+        min-height: 100vh;
       }
       
       /* Stars Animation */
@@ -389,7 +399,7 @@ app.get('/', async (c) => {
     </nav>
 
     <!-- Hero Section with Planets -->
-    <main class="relative z-10 min-h-screen flex items-center justify-center px-6 pt-20">
+    <main class="relative z-10 min-h-screen flex items-center justify-center px-6 pt-32 pb-20">
         <div class="max-w-6xl w-full text-center" id="roles">
             <!-- Hero Title -->
             <h1 class="text-5xl md:text-6xl font-bold mb-6 leading-tight">

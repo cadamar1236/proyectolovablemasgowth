@@ -30,8 +30,8 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         theme: {
           extend: {
             colors: {
-              primary: '#FF6154',
-              secondary: '#FB651E',
+              primary: '#8B5CF6',
+              secondary: '#A78BFA',
             }
           }
         }
@@ -81,13 +81,13 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
       }
 
       .nav-item:hover {
-        background-color: rgba(255, 97, 84, 0.1);
+        background-color: rgba(139, 92, 246, 0.1);
         transform: translateX(4px);
       }
 
       .nav-item.active {
-        background-color: rgba(255, 97, 84, 0.15);
-        border-left: 4px solid #FF6154;
+        background-color: rgba(139, 92, 246, 0.15);
+        border-left: 4px solid #8B5CF6;
         font-weight: 700;
       }
 
@@ -105,32 +105,66 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- Top Navigation Bar -->
+    <nav class="fixed top-0 w-full z-50 bg-black bg-opacity-90 backdrop-blur-sm border-b border-gray-800">
+        <div class="max-w-full mx-auto px-6 py-3">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <span class="text-xl font-bold text-white">ASTAR*</span>
+                    <span class="text-gray-400 text-xs hidden sm:inline">Hub</span>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-gray-300 hover:text-white text-sm flex items-center space-x-1 transition">
+                        <span>🏠</span>
+                        <span class="hidden sm:inline">Home</span>
+                    </a>
+                    <a href="/dashboard" class="text-purple-400 hover:text-purple-300 text-sm flex items-center space-x-1 transition font-semibold">
+                        <span>🚀</span>
+                        <span class="hidden sm:inline">Hub</span>
+                    </a>
+                    <a href="/leaderboard" class="text-gray-300 hover:text-white text-sm flex items-center space-x-1 transition">
+                        <span>🏆</span>
+                        <span class="hidden sm:inline">Leaderboard</span>
+                    </a>
+                    <a href="/marketplace" class="text-gray-300 hover:text-white text-sm flex items-center space-x-1 transition">
+                        <span>🔥</span>
+                        <span class="hidden sm:inline">Trending</span>
+                    </a>
+                    <button onclick="logout()" class="text-gray-400 hover:text-white text-sm transition">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
     <!-- Layout Container -->
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen overflow-hidden pt-12">
         
         <!-- Left Sidebar - Navigation Menu -->
-        <aside id="left-sidebar" class="left-sidebar w-64 bg-white border-r border-gray-200 flex-shrink-0 hidden md:flex flex-col fixed md:static inset-y-0 left-0 z-40">
+        <aside id="left-sidebar" class="left-sidebar w-64 bg-gray-900 border-r border-gray-800 flex-shrink-0 hidden md:flex flex-col fixed md:static inset-y-0 left-0 z-40">
             <!-- Logo/Brand -->
-            <div class="p-6 border-b border-gray-200">
+            <div class="p-6 border-b border-gray-800">
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-400 rounded-xl flex items-center justify-center">
                         <i class="fas fa-rocket text-white text-lg"></i>
                     </div>
                     <div>
-                        <h2 class="text-xl font-black text-gray-900">ASTAR<span class="text-primary">*</span> Hub</h2>
+                        <h2 class="text-xl font-black text-white">ASTAR<span class="text-purple-400">*</span> Hub</h2>
                     </div>
                 </div>
             </div>
 
             <!-- User Profile Section -->
-            <div class="p-4 border-b border-gray-200">
+            <div class="p-4 border-b border-gray-800">
                 <div class="flex items-center space-x-3">
-                    <div class="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold">
+                    <div class="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-purple-400 flex items-center justify-center text-white font-bold">
                         ${userAvatar ? `<img src="${userAvatar}" alt="${userName}" class="w-full h-full object-cover" />` : userName.charAt(0).toUpperCase()}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-gray-900 truncate">${userName}</p>
-                        <button class="text-xs text-gray-500 hover:text-primary flex items-center mt-0.5">
+                        <p class="text-sm font-bold text-white truncate">${userName}</p>
+                        <button class="text-xs text-gray-400 hover:text-purple-400 flex items-center mt-0.5">
                             <span>Profile</span>
                             <i class="fas fa-chevron-down ml-1 text-[10px]"></i>
                         </button>
@@ -140,28 +174,28 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
             <!-- Navigation Links -->
             <nav class="flex-1 p-4 overflow-y-auto">
-                <a href="#" onclick="switchTab('home'); return false;" class="nav-item sidebar-nav-home flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('home'); return false;" class="nav-item sidebar-nav-home flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
                     <i class="fas fa-home mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Home (HQ)</span>
                 </a>
 
-                <a href="#" onclick="switchTab('home'); return false;" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('home'); return false;" class="nav-item flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
                     <i class="fas fa-bell mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Notifications</span>
                     <span class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
                 </a>
 
-                <a href="#" onclick="switchTab('traction'); return false;" class="nav-item sidebar-nav-traction flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('traction'); return false;" class="nav-item sidebar-nav-traction flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
                     <i class="fas fa-chart-line mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Traction</span>
                 </a>
 
-                <a href="#" onclick="switchTab('inbox'); return false;" class="nav-item sidebar-nav-inbox flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="#" onclick="switchTab('inbox'); return false;" class="nav-item sidebar-nav-inbox flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
                     <i class="fas fa-inbox mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Inbox</span>
                 </a>
 
-                <a href="/leaderboard" class="nav-item ${currentPage === 'leaderboard' ? 'active' : ''} flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                <a href="/leaderboard" class="nav-item ${currentPage === 'leaderboard' ? 'active' : ''} flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
                     <i class="fas fa-trophy mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Leaderboard</span>
                 </a>
