@@ -532,6 +532,9 @@ auth.get('/google/callback', async (c) => {
           VALUES (?, ?, ?)
         `).bind(userId, 'New Validator', '[]').run();
       }
+      
+      // Mark that this is a new user who needs onboarding
+      existingUser = { id: userId, role: userRole, needsOnboarding: true };
     }
 
     // Generate JWT token
@@ -550,7 +553,8 @@ auth.get('/google/callback', async (c) => {
 
     // Set cookie and redirect
     const frontendUrl = new URL(c.req.url).origin;
-    const finalRedirect = redirectPath || '/dashboard';
+    // Redirect new users to onboarding, existing users to dashboard
+    const finalRedirect = existingUser.needsOnboarding ? '/onboarding' : (redirectPath || '/dashboard');
     
     // Set the cookie (NOT HttpOnly so JavaScript can read it for API calls)
     c.header('Set-Cookie', `authToken=${token}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`);
@@ -568,6 +572,62 @@ auth.get('/google/callback', async (c) => {
     console.error('[GOOGLE-CALLBACK] ERROR:', error);
     console.error('[GOOGLE-CALLBACK] Error stack:', error instanceof Error ? error.stack : 'No stack');
     return c.redirect('/?error=callback_failed');
+  }
+});
+
+// POST /api/auth/complete-onboarding - Save onboarding data
+auth.post('/complete-onboarding', async (c) => {
+  try {  
+    const authHeader = c.req.header('Authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: 'No token provided' }, 401);
+    }
+
+    const token = authHeader.substring(7);
+    const payload = await verify(token, c.env.JWT_SECRET || JWT_SECRET) as any;
+    const userId = payload.userId;
+
+    const data = await c.req.json();
+
+    // Build dynamic UPDATE query based on provided fields
+    const allowedFields = [
+      'startup_name', 'startup_stage', 'industry', 'funding_status', 'funding_goal', 'team_size', 'target_market', 'pitch_deck_url',
+      'investor_type', 'investment_stage', 'check_size', 'investment_focus', 'geographic_focus', 'portfolio_size', 'notable_investments',
+      'scout_for', 'scout_focus', 'scout_commission', 'deals_closed',
+      'partner_type', 'services_offered', 'target_clients', 'case_studies',
+      'job_title', 'experience_years', 'skills', 'looking_for', 'salary_expectation', 'resume_url', 'github_url', 'portfolio_url',
+      'bio', 'company', 'location', 'phone', 'linkedin_url', 'twitter_url', 'website_url'
+    ];
+
+    const updates = [];
+    const values = [];
+
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        // Convert arrays to JSON strings
+        if (Array.isArray(data[field])) {
+          values.push(JSON.stringify(data[field]));
+        } else {
+          values.push(data[field]);
+        }
+      }
+    }
+
+    // Always mark onboarding as completed
+    updates.push('onboarding_completed = 1');
+    values.push(userId);
+
+    if (updates.length > 1) { // More than just onboarding_completed
+      const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+      await c.env.DB.prepare(query).bind(...values).run();
+    }
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('[COMPLETE-ONBOARDING] Error:', error);
+    return c.json({ error: 'Failed to save onboarding data' }, 500);
   }
 });
 

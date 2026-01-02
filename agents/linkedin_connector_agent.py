@@ -48,6 +48,9 @@ class LinkedInConnectorTeam:
         openai.api_key = self.config.openai_api_key
         self.apify_client = ApifyClient(self.config.apify_api_token)
         
+        # Session storage for conversation memory
+        self.session_storage = {}
+        
         # Initialize main conversational agent
         self.main_agent = Agent(
             name="LinkedIn Connector Assistant",
@@ -58,16 +61,19 @@ class LinkedInConnectorTeam:
                 "Help users find investors, talent, customers, or strategic partners",
                 "Ask clarifying questions to understand their needs",
                 "Provide personalized recommendations and connection strategies",
-                "Be conversational, friendly, and professional",
+                "Be conversational, friendly, and professional in Spanish",
+                "Remember previous context in the conversation",
                 "When users ask to search for connections, gather these details:",
                 "  - Type: investor, talent, customer, or partner",
                 "  - Industry or sector",
                 "  - Location (optional)",
                 "  - Specific requirements or preferences",
-                "Always explain your reasoning and provide actionable insights"
+                "Always explain your reasoning and provide actionable insights",
+                "When you have enough details, confirm with the user before searching"
             ],
             markdown=True,
-            add_history_to_context=True
+            add_history_to_messages=True,
+            add_datetime_to_instructions=True
         )
         
         # Specialized agents for specific tasks
@@ -131,26 +137,133 @@ class LinkedInConnectorTeam:
             Respuesta del agente con contenido y metadata
         """
         try:
+            # Get or create session storage
+            if session_id not in self.session_storage:
+                self.session_storage[session_id] = {
+                    "messages": [],
+                    "context": {}
+                }
+            
+            session = self.session_storage[session_id]
+            
+            # Add user message to history
+            session["messages"].append({
+                "role": "user",
+                "content": message,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            # Build conversation context
+            conversation_history = "\n".join([
+                f"{msg['role']}: {msg['content']}" 
+                for msg in session["messages"][-10:]  # Last 10 messages
+            ])
+            
+            # Run agent with context
             response = self.main_agent.run(
-                message,
-                session_id=session_id,
-                user_id=user_id,
+                f"Conversation history:\n{conversation_history}\n\nUser: {message}",
                 stream=False
             )
             
+            response_text = response.content if hasattr(response, 'content') else str(response)
+            
+            # Add assistant response to history
+            session["messages"].append({
+                "role": "assistant",
+                "content": response_text,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            # Check if user wants to search - trigger Apify search
+            if any(keyword in message.lower() for keyword in ["busca", "encuentra", "search", "find", "quiero", "necesito"]):
+                if any(keyword in message.lower() for keyword in ["inversor", "investor", "inversionista", "capital", "funding"]):
+                    # Extract search intent and trigger Apify search
+                    search_results = self._search_linkedin_with_apify(message, "investor")
+                    if search_results:
+                        response_text += f"\n\n🔍 **Perfiles encontrados en LinkedIn:**\n{search_results}"
+            
             return {
                 "success": True,
-                "response": response.content if hasattr(response, 'content') else str(response),
+                "response": response_text,
                 "session_id": session_id,
+                "message_count": len(session["messages"]),
                 "timestamp": datetime.now().isoformat()
             }
         except Exception as e:
+            print(f"❌ Error in chat: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
                 "session_id": session_id,
                 "timestamp": datetime.now().isoformat()
             }
+    
+    def _search_linkedin_with_apify(self, query: str, search_type: str = "investor") -> str:
+        """
+        Busca perfiles en LinkedIn usando Apify
+        
+        Args:
+            query: Query de búsqueda
+            search_type: Tipo de búsqueda (investor, talent, customer, partner)
+            
+        Returns:
+            String con resultados formateados
+        """
+        try:
+            print(f"🔍 Searching LinkedIn with Apify: {query} (type: {search_type})")
+            
+            # Configure search based on type
+            search_queries = {
+                "investor": ["venture capital", "seed investor", "angel investor", "VC partner"],
+                "talent": ["software engineer", "developer", "CTO", "tech lead"],
+                "customer": ["founder", "CEO", "decision maker"],
+                "partner": ["business development", "partnerships", "strategic alliances"]
+            }
+            
+            keywords = search_queries.get(search_type, ["professional"])
+            search_query = f"{query} {' OR '.join(keywords[:2])}"
+            
+            # Run Apify LinkedIn scraper
+            run_input = {
+                "searchUrls": [
+                    f"https://www.linkedin.com/search/results/people/?keywords={search_query.replace(' ', '%20')}"
+                ],
+                "maxResults": 10,
+                "minDelay": 2,
+                "maxDelay": 4
+            }
+            
+            # Start actor run
+            run = self.apify_client.actor("apify/linkedin-profile-scraper").call(run_input=run_input)
+            
+            # Get results
+            results = []
+            for item in self.apify_client.dataset(run["defaultDatasetId"]).iterate_items():
+                results.append({
+                    "name": item.get("fullName", "Unknown"),
+                    "headline": item.get("headline", ""),
+                    "location": item.get("location", ""),
+                    "profile_url": item.get("url", ""),
+                    "connections": item.get("connectionsCount", 0)
+                })
+            
+            # Format results
+            if results:
+                formatted = "\n\n".join([
+                    f"**{r['name']}**\n"
+                    f"📋 {r['headline']}\n"
+                    f"📍 {r['location']}\n"
+                    f"🤝 {r['connections']}+ conexiones\n"
+                    f"🔗 [Ver perfil]({r['profile_url']})"
+                    for r in results[:5]  # Top 5
+                ])
+                return formatted
+            else:
+                return "No se encontraron perfiles con esos criterios."
+                
+        except Exception as e:
+            print(f"❌ Error searching with Apify: {str(e)}")
+            return f"⚠️ Error al buscar en LinkedIn: {str(e)}"
     
     def find_investors(
         self,
@@ -160,20 +273,66 @@ class LinkedInConnectorTeam:
         location: str = "",
         max_results: int = 20
     ) -> Dict[str, Any]:
-        """Encuentra inversores relevantes"""
+        """Encuentra inversores relevantes usando Apify"""
         print(f"\n🔍 Buscando inversores para: {industry} | {funding_stage}")
         
-        response = self.investor_agent.run(
-            f"Find {max_results} relevant investors for a {industry} startup at {funding_stage} stage. "
-            f"Startup: {startup_description}. Location: {location or 'Global'}. "
-            f"Return a ranked list with compatibility scores."
-        )
-        
-        return {
-            "task": "investor_search",
-            "results": response.content if hasattr(response, 'content') else str(response),
-            "timestamp": datetime.now().isoformat()
-        }
+        try:
+            # Build LinkedIn search query
+            search_keywords = f"{industry} {funding_stage} venture capital investor"
+            if location:
+                search_keywords += f" {location}"
+            
+            # Run Apify LinkedIn scraper
+            run_input = {
+                "searchUrls": [
+                    f"https://www.linkedin.com/search/results/people/?keywords={search_keywords.replace(' ', '%20')}"
+                ],
+                "maxResults": max_results,
+                "minDelay": 2,
+                "maxDelay": 5
+            }
+            
+            print(f"🚀 Launching Apify actor with query: {search_keywords}")
+            run = self.apify_client.actor("apify/linkedin-profile-scraper").call(run_input=run_input)
+            
+            # Collect results
+            profiles = []
+            for item in self.apify_client.dataset(run["defaultDatasetId"]).iterate_items():
+                profiles.append({
+                    "name": item.get("fullName", "Unknown"),
+                    "headline": item.get("headline", ""),
+                    "location": item.get("location", ""),
+                    "industry": item.get("industry", ""),
+                    "profile_url": item.get("url", ""),
+                    "connections": item.get("connectionsCount", 0),
+                    "description": item.get("summary", "")
+                })
+            
+            # Use AI agent to analyze and rank profiles
+            analysis_prompt = (
+                f"Analyze these {len(profiles)} investor profiles for a {industry} startup at {funding_stage} stage.\n"
+                f"Startup: {startup_description}\n\n"
+                f"Profiles:\n{json.dumps(profiles, indent=2)}\n\n"
+                f"Rank them by relevance and provide compatibility scores (0-100)."
+            )
+            
+            analysis = self.investor_agent.run(analysis_prompt)
+            
+            return {
+                "task": "investor_search",
+                "profiles": profiles,
+                "analysis": analysis.content if hasattr(analysis, 'content') else str(analysis),
+                "total_found": len(profiles),
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            print(f"❌ Error finding investors: {str(e)}")
+            return {
+                "task": "investor_search",
+                "error": str(e),
+                "profiles": [],
+                "timestamp": datetime.now().isoformat()
+            }
     
     def find_talent(
         self,

@@ -6,6 +6,7 @@ import { jsx } from 'hono/jsx';
 import type { Bindings } from './types';
 import { getNotFoundPage, getVotePage } from './html-templates';
 import { getMarketplacePage } from './marketplace-page';
+import { getOnboardingPage } from './onboarding-page';
 
 // JWT Secret for token verification
 const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
@@ -58,6 +59,41 @@ app.route('/api/whatsapp', whatsapp);
 app.route('/api/chat-agent', chatAgent);
 app.route('/api/marketing-ai', marketingAI);
 app.route('/api/linkedin-connector', linkedinConnector);
+
+// Page Routes - Onboarding for new users
+app.get('/onboarding', async (c) => {
+  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  const tokenInUrl = c.req.query('token');
+
+  if (!authToken && !tokenInUrl) {
+    return c.redirect('/');
+  }
+
+  let payload: any = null;
+  const tokenToVerify = authToken || tokenInUrl;
+  
+  if (tokenToVerify) {
+    try {
+      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+    } catch (error) {
+      return c.redirect('/');
+    }
+  }
+
+  if (!payload) {
+    return c.redirect('/');
+  }
+
+  const html = getOnboardingPage({
+    userName: payload.userName || payload.name || payload.email || 'User',
+    userEmail: payload.email,
+    userRole: payload.role || 'founder',
+    userId: payload.userId,
+    token: tokenToVerify
+  });
+
+  return c.html(html);
+});
 
 // Page Routes - Use marketplace page as main dashboard
 app.get('/dashboard', async (c) => {
