@@ -197,7 +197,7 @@ app.get('/', async (c) => {
     }
   }
   
-  // Not authenticated - show landing page
+  // Not authenticated - show simple landing page
   return c.html(`
 <!DOCTYPE html>
 <html lang="en">
@@ -206,6 +206,343 @@ app.get('/', async (c) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ASTAR* - Connecting the brightest minds in the universe</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Space Grotesk', system-ui, sans-serif;
+      }
+      
+      /* Cosmic Background */
+      .cosmic-bg {
+        background: linear-gradient(180deg, #050510 0%, #0a0a1a 50%, #1a1a3e 100%);
+        position: relative;
+        overflow: hidden;
+      }
+      
+      /* Stars Animation */
+      .stars {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      
+      .stars::before,
+      .stars::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-image: 
+          radial-gradient(2px 2px at 20% 30%, #fff, transparent),
+          radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.8), transparent),
+          radial-gradient(1px 1px at 50% 50%, #fff, transparent),
+          radial-gradient(2px 2px at 80% 10%, rgba(255,255,255,0.9), transparent),
+          radial-gradient(1px 1px at 90% 60%, #fff, transparent),
+          radial-gradient(2px 2px at 30% 80%, rgba(255,255,255,0.7), transparent);
+        background-repeat: repeat;
+        background-size: 200% 200%;
+        animation: twinkle 8s ease-in-out infinite;
+      }
+      
+      @keyframes twinkle {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
+      }
+      
+      /* Planet Styles */
+      .planet {
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        position: relative;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid rgba(255,255,255,0.1);
+      }
+      
+      .planet:hover {
+        transform: scale(1.1);
+        border-color: rgba(255,255,255,0.3);
+      }
+      
+      .planet-founder {
+        background: linear-gradient(135deg, #78909C 0%, #90A4AE 50%, #B0BEC5 100%);
+        box-shadow: 0 0 60px rgba(120, 144, 156, 0.4), inset 0 0 40px rgba(255,255,255,0.1);
+      }
+      
+      .planet-investor {
+        background: linear-gradient(135deg, #26C6DA 0%, #00ACC1 50%, #0097A7 100%);
+        box-shadow: 0 0 60px rgba(0, 172, 193, 0.5), inset 0 0 40px rgba(255,255,255,0.1);
+      }
+      
+      .planet-scout {
+        background: linear-gradient(135deg, #AB47BC 0%, #8E24AA 50%, #7B1FA2 100%);
+        box-shadow: 0 0 60px rgba(142, 36, 170, 0.5), inset 0 0 40px rgba(255,255,255,0.1);
+      }
+      
+      .planet-partner {
+        background: linear-gradient(135deg, #EF5350 0%, #E53935 50%, #D32F2F 100%);
+        box-shadow: 0 0 60px rgba(239, 83, 80, 0.5), inset 0 0 40px rgba(255,255,255,0.1);
+      }
+      
+      .planet-jobseeker {
+        background: linear-gradient(135deg, #FFCA28 0%, #FFB300 50%, #FFA000 100%);
+        box-shadow: 0 0 60px rgba(255, 179, 0, 0.5), inset 0 0 40px rgba(255,255,255,0.1);
+      }
+      
+      .planet-other {
+        background: linear-gradient(135deg, #42A5F5 0%, #1E88E5 50%, #1565C0 100%);
+        box-shadow: 0 0 60px rgba(66, 165, 245, 0.5), inset 0 0 40px rgba(255,255,255,0.1);
+      }
+      
+      /* Orbit Ring */
+      .orbit-ring {
+        position: absolute;
+        border: 1px solid rgba(255, 184, 0, 0.3);
+        border-radius: 50%;
+        animation: rotate 20s linear infinite;
+      }
+      
+      .planet-jobseeker .orbit-ring {
+        width: 280px;
+        height: 160px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotateX(75deg);
+      }
+      
+      @keyframes rotate {
+        from { transform: translate(-50%, -50%) rotateX(75deg) rotateZ(0deg); }
+        to { transform: translate(-50%, -50%) rotateX(75deg) rotateZ(360deg); }
+      }
+      
+      .planet-badge {
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+        padding: 8px 20px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        border: 1px solid rgba(255,255,255,0.2);
+      }
+      
+      .nav-link {
+        transition: all 0.3s ease;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+      }
+      
+      .nav-link:hover {
+        background: rgba(255,255,255,0.1);
+      }
+    </style>
+</head>
+<body class="cosmic-bg min-h-screen text-white">
+    <!-- Stars Background -->
+    <div class="stars"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 bg-black bg-opacity-50 backdrop-blur-sm border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <span class="text-2xl font-bold">ASTAR*</span>
+                    <span class="text-gray-400 text-sm hidden sm:inline">Connecting the brightest minds in the universe</span>
+                </div>
+                
+                <div class="flex items-center space-x-6">
+                    <a href="#roles" class="nav-link text-white flex items-center space-x-2">
+                        <span>🏠</span>
+                        <span class="hidden sm:inline">Home</span>
+                    </a>
+                    <a href="/dashboard" class="nav-link text-white flex items-center space-x-2">
+                        <span>🚀</span>
+                        <span class="hidden sm:inline">Hub</span>
+                    </a>
+                    <a href="/leaderboard" class="nav-link text-white flex items-center space-x-2">
+                        <span>🏆</span>
+                        <span class="hidden sm:inline">Leaderboard</span>
+                    </a>
+                    <a href="/marketplace" class="nav-link text-white flex items-center space-x-2">
+                        <span>🔥</span>
+                        <span class="hidden sm:inline">Trending Startups</span>
+                    </a>
+                    <button onclick="showAuthModal('login')" class="bg-white text-black px-6 py-2 rounded-full font-semibold hover:bg-gray-200 transition">
+                        Sign In
+                    </button>
+                    <button onclick="showAuthModal('register')" class="bg-blue-600 text-white px-6 py-2 rounded-full font-semibold hover:bg-blue-700 transition">
+                        Launch Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section with Planets -->
+    <main class="relative z-10 min-h-screen flex items-center justify-center px-6 pt-20">
+        <div class="max-w-6xl w-full text-center" id="roles">
+            <!-- Hero Title -->
+            <h1 class="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+                Welcome to the <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">ASTAR* ecosystem!</span><br/>
+                Choose your trajectory 🚀
+            </h1>
+            
+            <p class="text-xl text-gray-300 mb-16 max-w-3xl mx-auto">
+                We make thoughtful introductions between startup founders, customers, investors,<br/>
+                partners and talent. Which role defines your mission in the ASTAR* ecosystem?
+            </p>
+
+            <!-- Planets Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto mb-12">
+                <!-- Founder Planet -->
+                <div class="flex flex-col items-center" onclick="selectRole('founder')">
+                    <div class="planet planet-founder">
+                        <span class="planet-badge">FOUNDER</span>
+                    </div>
+                    <h3 class="text-xl font-bold mt-6 mb-2">FOUNDER</h3>
+                    <p class="text-gray-400 text-sm">Building the next big thing in the universe</p>
+                </div>
+
+                <!-- Investor Planet -->
+                <div class="flex flex-col items-center" onclick="selectRole('investor')">
+                    <div class="planet planet-investor">
+                        <span class="planet-badge">INVESTOR</span>
+                    </div>
+                    <h3 class="text-xl font-bold mt-6 mb-2">INVESTOR</h3>
+                    <p class="text-gray-400 text-sm">Fueling stellar growth with capital</p>
+                </div>
+
+                <!-- Scout Planet -->
+                <div class="flex flex-col items-center" onclick="selectRole('scout')">
+                    <div class="planet planet-scout">
+                        <span class="planet-badge">SCOUT</span>
+                    </div>
+                    <h3 class="text-xl font-bold mt-6 mb-2">SCOUT</h3>
+                    <p class="text-gray-400 text-sm">Finding hidden gems and opportunities</p>
+                </div>
+            </div>
+
+            <!-- Second Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto">
+                <!-- Partner Planet -->
+                <div class="flex flex-col items-center" onclick="selectRole('partner')">
+                    <div class="planet planet-partner">
+                        <span class="planet-badge">PARTNER</span>
+                    </div>
+                    <h3 class="text-xl font-bold mt-6 mb-2">PARTNER</h3>
+                    <p class="text-gray-400 text-sm">I want to partner/sponsor/collab with ASTAR*</p>
+                </div>
+
+                <!-- Job Seeker Planet -->
+                <div class="flex flex-col items-center" onclick="selectRole('job_seeker')">
+                    <div class="planet planet-jobseeker">
+                        <div class="orbit-ring"></div>
+                        <span class="planet-badge">JOB SEEKER</span>
+                    </div>
+                    <h3 class="text-xl font-bold mt-6 mb-2">JOB SEEKER</h3>
+                    <p class="text-gray-400 text-sm">Looking for a job at a promising startup</p>
+                </div>
+
+                <!-- Other Planet -->
+                <div class="flex flex-col items-center" onclick="selectRole('other')">
+                    <div class="planet planet-other">
+                        <span class="planet-badge">OTHER</span>
+                    </div>
+                    <h3 class="text-xl font-bold mt-6 mb-2">OTHER</h3>
+                    <p class="text-gray-400 text-sm">I am curious about the ASTAR* ecosystem</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Auth Modal (same as before) -->
+    <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm z-50 hidden flex items-center justify-center px-4">
+      <div class="bg-gray-900 rounded-2xl p-8 max-w-md w-full border border-white/10" id="modal-content">
+        <!-- Modal content will be inserted here -->
+      </div>
+    </div>
+
+    <script>
+      function selectRole(role) {
+        window.location.href = '/api/auth/google?role=' + role;
+      }
+
+      function showAuthModal(mode) {
+        const modal = document.getElementById('auth-modal');
+        const modalContent = document.getElementById('modal-content');
+        
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        
+        if (mode === 'login') {
+          const loginHtml = 
+            '<div class="text-center">' +
+              '<h2 class="text-2xl font-bold mb-4">Choose your role to Sign In</h2>' +
+              '<p class="text-gray-400 mb-6">Sign in with Google to access your ASTAR* account</p>' +
+              '<div class="space-y-3">' +
+                '<button onclick="loginWithGoogle(\\\'founder\\\')" class="w-full bg-gradient-to-r from-gray-500 to-gray-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
+                  '<span class="mr-2">👨‍💻</span> Founder' +
+                '</button>' +
+                '<button onclick="loginWithGoogle(\\\'investor\\\')" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
+                  '<span class="mr-2">💰</span> Investor' +
+                '</button>' +
+                '<button onclick="loginWithGoogle(\\\'scout\\\')" class="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
+                  '<span class="mr-2">🔍</span> Scout' +
+                '</button>' +
+                '<button onclick="loginWithGoogle(\\\'partner\\\')" class="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
+                  '<span class="mr-2">🤝</span> Partner' +
+                '</button>' +
+                '<button onclick="loginWithGoogle(\\\'job_seeker\\\')" class="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
+                  '<span class="mr-2">💼</span> Job Seeker' +
+                '</button>' +
+                '<button onclick="loginWithGoogle(\\\'other\\\')" class="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
+                  '<span class="mr-2">✨</span> Other' +
+                '</button>' +
+              '</div>' +
+              '<button onclick="closeAuthModal()" class="mt-6 text-gray-400 hover:text-white">Close</button>' +
+            '</div>';
+          modalContent.innerHTML = loginHtml;
+        } else if (mode === 'register') {
+          showAuthModal('login');
+        }
+      }
+
+      function closeAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        if (modal) {
+          modal.classList.add('hidden');
+          document.body.style.overflow = '';
+        }
+      }
+
+      function loginWithGoogle(role) {
+        window.location.href = '/api/auth/google?role=' + role;
+      }
+
+      // Close modal on outside click
+      document.getElementById('auth-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+          closeAuthModal();
+        }
+      });
+    </script>
+</body>
+</html>
+  `);
+});
+
+// Project detail page
+app.get('/project/:id', async (c) => {
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
