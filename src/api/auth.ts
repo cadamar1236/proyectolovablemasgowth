@@ -590,39 +590,29 @@ auth.post('/complete-onboarding', async (c) => {
 
     const data = await c.req.json();
 
-    // Build dynamic UPDATE query based on provided fields
-    const allowedFields = [
-      'startup_name', 'startup_stage', 'industry', 'funding_status', 'funding_goal', 'team_size', 'target_market', 'pitch_deck_url',
-      'investor_type', 'investment_stage', 'check_size', 'investment_focus', 'geographic_focus', 'portfolio_size', 'notable_investments',
-      'scout_for', 'scout_focus', 'scout_commission', 'deals_closed',
-      'partner_type', 'services_offered', 'target_clients', 'case_studies',
-      'job_title', 'experience_years', 'skills', 'looking_for', 'salary_expectation', 'resume_url', 'github_url', 'portfolio_url',
-      'bio', 'company', 'location', 'phone', 'linkedin_url', 'twitter_url', 'website_url'
-    ];
-
+    // Try to update basic fields that we know exist
+    const basicFields = ['bio', 'company'];
     const updates = [];
     const values = [];
 
-    for (const field of allowedFields) {
+    for (const field of basicFields) {
       if (data[field] !== undefined) {
         updates.push(`${field} = ?`);
-        // Convert arrays to JSON strings
-        if (Array.isArray(data[field])) {
-          values.push(JSON.stringify(data[field]));
-        } else {
-          values.push(data[field]);
-        }
+        values.push(data[field]);
       }
     }
 
-    // Always mark onboarding as completed
-    updates.push('onboarding_completed = 1');
-    values.push(userId);
-
-    if (updates.length > 1) { // More than just onboarding_completed
+    if (updates.length > 0) {
+      values.push(userId);
       const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
       await c.env.DB.prepare(query).bind(...values).run();
     }
+
+    // Store all onboarding data in the sessions table as JSON
+    await c.env.DB.prepare(`
+      INSERT INTO onboarding_sessions (user_id, session_data, completed, completed_at)
+      VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+    `).bind(userId, JSON.stringify(data)).run();
 
     return c.json({ success: true });
   } catch (error) {
