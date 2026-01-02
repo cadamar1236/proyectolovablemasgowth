@@ -587,6 +587,7 @@ auth.post('/complete-onboarding', async (c) => {
     const token = authHeader.substring(7);
     const payload = await verify(token, c.env.JWT_SECRET || JWT_SECRET) as any;
     const userId = payload.userId;
+    const userRole = payload.role;
 
     const data = await c.req.json();
 
@@ -613,6 +614,110 @@ auth.post('/complete-onboarding', async (c) => {
       INSERT INTO onboarding_sessions (user_id, session_data, completed, completed_at)
       VALUES (?, ?, 1, CURRENT_TIMESTAMP)
     `).bind(userId, JSON.stringify(data)).run();
+
+    // If user is a founder, create or update their product in the marketplace
+    if (userRole === 'founder' && data.startup_name) {
+      // Check if they already have a product
+      const existingProduct = await c.env.DB.prepare(`
+        SELECT id FROM beta_products WHERE company_user_id = ?
+      `).bind(userId).first();
+
+      const productTitle = data.startup_name;
+      const productDescription = data.industry 
+        ? `${data.startup_name} - ${data.industry} startup at ${data.startup_stage || 'early'} stage`
+        : `${data.startup_name} - Building the future`;
+      
+      const category = data.industry || 'Tech';
+      const stage = data.startup_stage === 'idea' ? 'concept' 
+                  : data.startup_stage === 'mvp' ? 'alpha'
+                  : data.startup_stage === 'early_revenue' ? 'beta'
+                  : 'production';
+      
+      const lookingFor = data.funding_status === 'bootstrapped' || data.funding_status === 'pre_seed'
+        ? 'Early feedback, validators, and potential investors'
+        : 'Product validation and user feedback';
+
+      if (existingProduct) {
+        // Update existing product
+        await c.env.DB.prepare(`
+          UPDATE beta_products 
+          SET title = ?,
+              description = ?,
+              category = ?,
+              stage = ?,
+              looking_for = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(
+          productTitle,
+          productDescription,
+          category,
+          stage,
+          lookingFor,
+          existingProduct.id
+        ).run();
+      } else {
+        // Create new product
+        await c.env.DB.prepare(`
+          INSERT INTO beta_products (
+            company_user_id, 
+            title, 
+            description, 
+            category, 
+            stage, 
+            looking_for,
+            compensation_type,
+            status
+          ) VALUES (?, ?, ?, ?, ?, ?, 'free_access', 'active')
+        `).bind(
+          userId,
+          productTitle,
+          productDescription,
+          category,
+          stage,
+          lookingFor
+        ).run();
+      }
+
+      // Also create/update a project entry
+      const existingProject = await c.env.DB.prepare(`
+        SELECT id FROM projects WHERE user_id = ?
+      `).bind(userId).first();
+
+      if (existingProject) {
+        // Update existing project
+        await c.env.DB.prepare(`
+          UPDATE projects 
+          SET title = ?,
+              description = ?,
+              target_market = ?,
+              status = 'draft',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(
+          productTitle,
+          productDescription,
+          data.target_market || data.industry || 'General',
+          existingProject.id
+        ).run();
+      } else {
+        // Create new project
+        await c.env.DB.prepare(`
+          INSERT INTO projects (
+            user_id,
+            title,
+            description,
+            target_market,
+            status
+          ) VALUES (?, ?, ?, ?, 'draft')
+        `).bind(
+          userId,
+          productTitle,
+          productDescription,
+          data.target_market || data.industry || 'General'
+        ).run();
+      }
+    }
 
     return c.json({ success: true });
   } catch (error) {
