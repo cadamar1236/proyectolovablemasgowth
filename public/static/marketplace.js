@@ -243,6 +243,11 @@ async function loadProductDetail(productId) {
                 
                 <div class="flex items-center mb-4">
                   <span class="text-sm text-gray-600 mr-4">Por ${escapeHtml(product.company_name)}</span>
+                  ${product.company_user_id ? `
+                    <button onclick="event.stopPropagation(); showValidatorProfile(${product.company_user_id})" class="text-primary hover:text-primary/80 text-sm font-medium mr-4">
+                      <i class="fas fa-user mr-1"></i>Ver perfil del founder
+                    </button>
+                  ` : ''}
                   <span class="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">${escapeHtml(product.category)}</span>
                 </div>
 
@@ -981,7 +986,14 @@ function renderMarketplaceItems() {
         <div class="flex items-start justify-between mb-3 sm:mb-4">
           <div class="flex-1 min-w-0">
             <h3 class="text-base sm:text-lg font-bold text-gray-900 mb-1 truncate">${escapeHtml(item.title)}</h3>
-            <p class="text-xs sm:text-sm text-gray-600 truncate">${escapeHtml(item.company_name)}</p>
+            <div class="flex items-center gap-2">
+              <p class="text-xs sm:text-sm text-gray-600 truncate">${escapeHtml(item.company_name)}</p>
+              ${item.type === 'product' && item.company_user_id ? `
+                <button onclick="event.stopPropagation(); showValidatorProfile(${item.company_user_id})" class="text-primary hover:text-primary/80 text-xs" title="Ver perfil">
+                  <i class="fas fa-user"></i>
+                </button>
+              ` : ''}
+            </div>
           </div>
         </div>
         <p class="text-gray-700 mb-3 sm:mb-4 line-clamp-2 text-sm leading-relaxed">${escapeHtml(item.description)}</p>

@@ -1185,8 +1185,12 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       }
 
       function viewValidatorProfile(validatorUserId) {
-        console.log('Viewing validator profile:', validatorUserId);
-        alert('Validator profile coming soon');
+        if (typeof window.showValidatorProfile === 'function') {
+          window.showValidatorProfile(validatorUserId);
+        } else {
+          console.error('showValidatorProfile function not found');
+          alert('Profile feature is loading...');
+        }
       }
 
       // Load users by role
@@ -1201,28 +1205,16 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
             return;
           }
           
-          const roleIcons = {
-            founder: 'fa-rocket',
-            investor: 'fa-hand-holding-usd',
-            scout: 'fa-search',
-            partner: 'fa-handshake',
-            job_seeker: 'fa-briefcase'
-          };
-          
-          const roleLabels = {
-            founder: 'Founder',
-            investor: 'Investor',
-            scout: 'Scout',
-            partner: 'Partner',
-            job_seeker: 'Looking for opportunities'
-          };
-          
           container.innerHTML = users.map(u => {
-            const avatarUrl = u.avatar_url || \`https://ui-avatars.com/api/?name=\${encodeURIComponent(u.name || 'U')}&background=random&color=fff\`;
-            const skills = u.skills ? (Array.isArray(u.skills) ? u.skills : JSON.parse(u.skills || '[]')) : [];
-            const skillsTags = skills.slice(0, 3).map(skill => 
-              \`<span class="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded mr-1">\${skill}</span>\`
-            ).join('');
+            const avatarUrl = u.avatar_url || \`https://ui-avatars.com/api/?name=\${encodeURIComponent(u.name || 'U')}&background=random\`;
+            const roleLabels = {
+              founder: '🚀 Founder',
+              investor: '💰 Investor',
+              scout: '🔍 Scout',
+              partner: '🤝 Partner',
+              job_seeker: '👨‍💻 Talent'
+            };
+            const roleLabel = roleLabels[role] || role;
             
             return \`
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition">
@@ -1230,24 +1222,17 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
                 <img src="\${avatarUrl}" class="w-14 h-14 rounded-full" alt="\${u.name}"/>
                 <div class="flex-1">
                   <h3 class="font-bold text-gray-900">\${u.name || 'User'}</h3>
-                  <p class="text-sm text-gray-500 flex items-center">
-                    <i class="fas \${roleIcons[role] || 'fa-user'} mr-1"></i>
-                    \${u.company || roleLabels[role] || 'User'}
-                  </p>
-                  \${u.location ? \`<p class="text-xs text-gray-400 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>\${u.location}</p>\` : ''}
+                  <p class="text-sm text-gray-500">\${roleLabel}</p>
+                  \${u.company ? \`<p class="text-xs text-gray-400 mt-1">\${u.company}</p>\` : ''}
                 </div>
               </div>
-              \${u.looking_for ? \`<p class="text-sm text-gray-600 mb-3 line-clamp-2"><strong>Looking for:</strong> \${u.looking_for}</p>\` : ''}
-              \${u.investment_range && role === 'investor' ? \`<p class="text-sm text-gray-600 mb-3"><strong>Range:</strong> \${u.investment_range}</p>\` : ''}
-              <div class="mb-3">
-                \${skillsTags}
-              </div>
+              \${u.bio ? \`<p class="text-sm text-gray-600 mb-3 line-clamp-2">\${u.bio}</p>\` : ''}
               <div class="flex gap-2">
-                <button onclick="startChatWithUser(\${u.id})" class="flex-1 bg-primary text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition">
-                  <i class="fas fa-comment mr-1"></i>Chat
+                <button onclick="viewValidatorProfile(\${u.id})" class="flex-1 bg-primary text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition">
+                  <i class="fas fa-user mr-1"></i>View Profile
                 </button>
-                <button onclick="viewUserProfile(\${u.id})" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
-                  <i class="fas fa-user"></i>
+                <button onclick="startChatWithValidator(\${u.id})" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition" title="Chat">
+                  <i class="fas fa-comment"></i>
                 </button>
               </div>
             </div>
@@ -1287,8 +1272,12 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       }
 
       function viewUserProfile(userId) {
-        console.log('Viewing user profile:', userId);
-        alert('User profile coming soon');
+        if (typeof window.showValidatorProfile === 'function') {
+          window.showValidatorProfile(userId);
+        } else {
+          console.error('showValidatorProfile function not found');
+          alert('Profile feature is loading...');
+        }
       }
 
       function searchUsers(type) {
