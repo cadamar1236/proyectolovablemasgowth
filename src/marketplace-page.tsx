@@ -25,13 +25,15 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       <!-- Tab Navigation -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
         <div class="flex border-b border-gray-200">
+          ${userRole === 'founder' ? `
           <button onclick="switchTab('home')" id="tab-home" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-primary border-b-2 border-primary">
             <i class="fas fa-home mr-2"></i>Home
           </button>
           <button onclick="switchTab('traction')" id="tab-traction" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
             <i class="fas fa-chart-line mr-2"></i>Traction
           </button>
-          <button onclick="switchTab('inbox')" id="tab-inbox" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
+          ` : ''}
+          <button onclick="switchTab('inbox')" id="tab-inbox" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold ${userRole === 'founder' ? 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent' : 'text-primary border-b-2 border-primary'}">
             <i class="fas fa-inbox mr-2"></i>Inbox
             <span id="unread-badge" class="hidden ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">0</span>
           </button>
@@ -43,6 +45,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
 
       <!-- Tab Contents -->
       
+      ${userRole === 'founder' ? `
       <!-- HOME TAB -->
       <div id="content-home" class="tab-content">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -219,9 +222,10 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           </div>
         </div>
       </div>
+      ` : ''}
 
       <!-- INBOX TAB -->
-      <div id="content-inbox" class="tab-content hidden">
+      <div id="content-inbox" class="tab-content ${userRole === 'founder' ? 'hidden' : ''}">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Conversations List -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -1458,9 +1462,19 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       }
 
       // Initialize
+      const currentUserRole = '${userRole || 'founder'}';
+      
       window.addEventListener('load', () => {
-        loadDashboardData();
+        // Load data only for founders
+        if (currentUserRole === 'founder') {
+          loadDashboardData();
+        }
         loadConversations();
+        
+        // Switch to inbox tab for non-founders
+        if (currentUserRole !== 'founder') {
+          switchTab('inbox');
+        }
       });
     </script>
   `;
@@ -1470,6 +1484,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
     currentPage: 'marketplace',
     userName,
     userAvatar,
-    pageTitle: 'Dashboard'
+    pageTitle: 'Dashboard',
+    userRole
   });
 }

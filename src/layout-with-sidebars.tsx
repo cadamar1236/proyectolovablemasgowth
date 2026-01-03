@@ -9,10 +9,11 @@ export interface LayoutProps {
   userName: string;
   userAvatar?: string;
   pageTitle: string;
+  userRole?: string;
 }
 
 export function createLayoutWithSidebars(props: LayoutProps): string {
-  const { content, currentPage, userName, userAvatar, pageTitle } = props;
+  const { content, currentPage, userName, userAvatar, pageTitle, userRole } = props;
 
   return `
 <!DOCTYPE html>
@@ -174,6 +175,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
             <!-- Navigation Links -->
             <nav class="flex-1 p-4 overflow-y-auto">
+                ${userRole === 'founder' ? `
                 <a href="#" onclick="switchTab('home'); return false;" class="nav-item sidebar-nav-home flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
                     <i class="fas fa-home mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Home (HQ)</span>
@@ -189,6 +191,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     <i class="fas fa-chart-line mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Traction</span>
                 </a>
+                ` : ''}
 
                 <a href="#" onclick="switchTab('inbox'); return false;" class="nav-item sidebar-nav-inbox flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
                     <i class="fas fa-inbox mr-3 text-lg w-5"></i>
@@ -210,10 +213,12 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     <span class="font-semibold">Trending Products</span>
                 </a>
 
+                ${userRole === 'founder' ? `
                 <a href="#" onclick="switchTab('home'); return false;" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-calendar-alt mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Planner</span>
                 </a>
+                ` : ''}
             </nav>
 
             <!-- Bottom Actions -->
