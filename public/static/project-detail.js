@@ -1,8 +1,15 @@
 // Load project details
 async function loadProjectDetails() {
   try {
-    const response = await axios.get(`/api/projects/${projectId}`);
-    const data = response.data;
+    const [projectResponse, foundersResponse] = await Promise.all([
+      axios.get(`/api/projects/${projectId}`),
+      axios.get(`/api/projects/${projectId}/founders`)
+    ]);
+    
+    const data = {
+      ...projectResponse.data,
+      founders: foundersResponse.data.founders || []
+    };
     
     renderProjectDetails(data);
   } catch (error) {
@@ -18,7 +25,10 @@ async function loadProjectDetails() {
 
 // Render project details
 function renderProjectDetails(data) {
-  const { project, marketAnalysis, mvpPrototype, testResults, growthStrategies, metrics } = data;
+  const { project, marketAnalysis, mvpPrototype, testResults, growthStrategies, metrics, founders } = data;
+  
+  // Store data globally for founder edit access
+  window.projectData = data;
   
   const container = document.getElementById('project-details');
   
@@ -50,6 +60,57 @@ function renderProjectDetails(data) {
           <h3 class="font-semibold text-gray-700 mb-2">Propuesta de Valor</h3>
           <p class="text-gray-600">${escapeHtml(project.value_proposition)}</p>
         </div>
+      </div>
+    </div>
+
+    <!-- Founders Section -->
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center">
+          <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
+            <i class="fas fa-users text-purple-600 text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Team & Founders</h2>
+            <p class="text-sm text-gray-600">${founders ? founders.length : 0} founders</p>
+          </div>
+        </div>
+        <button onclick="openFounderModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center">
+          <i class="fas fa-plus mr-2"></i>Add Founder
+        </button>
+      </div>
+      
+      <div id="founders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        ${founders && founders.length > 0 ? founders.map(founder => `
+          <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+            <div class="flex items-start justify-between">
+              <div class="flex items-start space-x-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                  ${founder.name.charAt(0).toUpperCase()}
+                </div>
+                <div class="flex-1">
+                  <h3 class="font-semibold text-gray-900">
+                    ${escapeHtml(founder.name)}
+                    ${founder.is_creator ? '<span class="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">Creator</span>' : ''}
+                  </h3>
+                  <p class="text-sm text-gray-600">${escapeHtml(founder.role || 'Founder')}</p>
+                  ${founder.email ? `<p class="text-xs text-gray-500 mt-1"><i class="fas fa-envelope mr-1"></i>${escapeHtml(founder.email)}</p>` : ''}
+                  ${founder.equity_percentage ? `<p class="text-xs text-purple-600 mt-1 font-semibold"><i class="fas fa-chart-pie mr-1"></i>${founder.equity_percentage}% equity</p>` : ''}
+                </div>
+              </div>
+              ${!founder.is_creator ? `
+              <div class="flex gap-2">
+                <button onclick="editFounder(${founder.id})" class="text-gray-400 hover:text-purple-600">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="deleteFounder(${founder.id})" class="text-gray-400 hover:text-red-600">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+        `).join('') : '<p class="text-gray-500 text-center py-8 col-span-2">No founders added yet. Click "Add Founder" to get started.</p>'}
       </div>
     </div>
 
@@ -922,6 +983,187 @@ function deployMethodLocal() {
 
 function deployMethodGitHub() {
   alert('Sube el código a GitHub y conecta el repositorio a Cloudflare Pages desde el dashboard');
+}
+
+// ========================================
+// FOUNDER MANAGEMENT FUNCTIONS
+// ========================================
+
+let currentFounder = null; // Store founder being edited
+
+// Open founder modal (add or edit mode)
+function openFounderModal(founder = null) {
+  currentFounder = founder;
+  
+  const modalHTML = `
+    <div id="founder-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-gray-900">
+            ${founder ? 'Edit Founder' : 'Add Founder'}
+          </h3>
+          <button onclick="closeFounderModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <form id="founder-form" onsubmit="saveFounder(event)" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Name <span class="text-red-500">*</span>
+            </label>
+            <input type="text" id="founder-name" required
+                   value="${founder ? escapeHtml(founder.name) : ''}"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   placeholder="John Doe">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Email
+            </label>
+            <input type="email" id="founder-email"
+                   value="${founder ? escapeHtml(founder.email || '') : ''}"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   placeholder="john@example.com">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Role <span class="text-red-500">*</span>
+            </label>
+            <input type="text" id="founder-role" required
+                   value="${founder ? escapeHtml(founder.role || 'Founder') : 'Founder'}"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   placeholder="CEO, CTO, CFO, etc.">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Equity Percentage
+            </label>
+            <div class="relative">
+              <input type="number" id="founder-equity" min="0" max="100" step="0.01"
+                     value="${founder && founder.equity_percentage ? founder.equity_percentage : ''}"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
+                     placeholder="25.00">
+              <span class="absolute right-3 top-2.5 text-gray-500">%</span>
+            </div>
+          </div>
+          
+          <div class="flex gap-3 pt-4">
+            <button type="button" onclick="closeFounderModal()"
+                    class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+              Cancel
+            </button>
+            <button type="submit"
+                    class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold">
+              ${founder ? 'Update' : 'Add'} Founder
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// Close founder modal
+function closeFounderModal() {
+  const modal = document.getElementById('founder-modal');
+  if (modal) modal.remove();
+  currentFounder = null;
+}
+
+// Save founder (add or update)
+async function saveFounder(event) {
+  event.preventDefault();
+  
+  const name = document.getElementById('founder-name').value;
+  const email = document.getElementById('founder-email').value;
+  const role = document.getElementById('founder-role').value;
+  const equityPercentage = document.getElementById('founder-equity').value;
+  
+  const founderData = {
+    name,
+    email: email || null,
+    role,
+    equity_percentage: equityPercentage ? parseFloat(equityPercentage) : null
+  };
+  
+  try {
+    if (currentFounder) {
+      // Update existing founder
+      await axios.put(`/api/projects/${projectId}/founders/${currentFounder.id}`, founderData, {
+        headers: { 'x-user-id': localStorage.getItem('userId') }
+      });
+      showNotification('Founder updated successfully', 'success');
+    } else {
+      // Add new founder
+      await axios.post(`/api/projects/${projectId}/founders`, founderData, {
+        headers: { 'x-user-id': localStorage.getItem('userId') }
+      });
+      showNotification('Founder added successfully', 'success');
+    }
+    
+    closeFounderModal();
+    loadProjectDetails(); // Reload to show updated founders
+    
+  } catch (error) {
+    console.error('Error saving founder:', error);
+    const message = error.response?.data?.error || 'Error saving founder';
+    showNotification(message, 'error');
+  }
+}
+
+// Edit founder
+function editFounder(founderId) {
+  // Find founder in current data
+  const projectData = window.projectData; // Store in global for access
+  if (projectData && projectData.founders) {
+    const founder = projectData.founders.find(f => f.id === founderId);
+    if (founder) {
+      openFounderModal(founder);
+    }
+  }
+}
+
+// Delete founder
+async function deleteFounder(founderId) {
+  if (!confirm('Are you sure you want to remove this founder from the project?')) {
+    return;
+  }
+  
+  try {
+    await axios.delete(`/api/projects/${projectId}/founders/${founderId}`, {
+      headers: { 'x-user-id': localStorage.getItem('userId') }
+    });
+    
+    showNotification('Founder removed successfully', 'success');
+    loadProjectDetails(); // Reload to show updated founders
+    
+  } catch (error) {
+    console.error('Error deleting founder:', error);
+    const message = error.response?.data?.error || 'Error removing founder';
+    showNotification(message, 'error');
+  }
+}
+
+// Show notification
+function showNotification(message, type = 'success') {
+  const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+  const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+  
+  const notification = document.createElement('div');
+  notification.className = `fixed top-4 right-4 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-slide-in`;
+  notification.innerHTML = `
+    <i class="fas ${icon}"></i>
+    <span>${message}</span>
+  `;
+  
+  document.body.appendChild(notification);
+  setTimeout(() => notification.remove(), 3000);
 }
 
 // Initialize
