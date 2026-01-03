@@ -543,9 +543,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             { field: 'task', question: '¿Cuál es la tarea específica?', type: 'text' },
             { field: 'priority', question: '¿Qué prioridad tiene?\\n- P0: Urgent & important\\n- P1: Urgent or important\\n- P2: Urgent but not important\\n- P3: Neither but cool', options: ['P0', 'P1', 'P2', 'P3'] },
             { field: 'cadence', question: '¿Es una tarea única o recurrente? (One time / Recurrent)', options: ['One time', 'Recurrent'] },
-            { field: 'dri', question: '¿Quién es el responsable directo (DRI)?', type: 'text' },
+            { field: 'dri', question: '¿Quién es el responsable directo (DRI)? Escribe el nombre de la persona.', type: 'text' },
             { field: 'goal_status', question: '¿Cuál es el estado actual?\\n- To start\\n- WIP\\n- On Hold\\n- Delayed\\n- Blocked\\n- Done', options: ['To start', 'WIP', 'On Hold', 'Delayed', 'Blocked', 'Done'] },
-            { field: 'week_of', question: '¿Para qué semana es este goal? (ej: "December 30")', type: 'text', optional: true }
+            { field: 'week_of', question: '¿Para qué semana es este goal? (ej: "December 30" o puedes dejarlo en blanco)', type: 'text', optional: true }
         ];
 
         function startGoalCreation() {

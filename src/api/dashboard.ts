@@ -74,7 +74,7 @@ dashboard.post('/goals', requireAuth, async (c) => {
       priority || 'P0',
       priority_label || 'Urgent & important',
       cadence || 'One time',
-      dri || 'Giorgio',
+      dri,
       goal_status || 'To start',
       week_of || null,
       order_index || 0

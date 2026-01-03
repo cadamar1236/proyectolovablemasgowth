@@ -404,7 +404,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">DRI</label>
-                <input type="text" id="goal-dri" value="Giorgio" placeholder="Responsible person" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                <input type="text" id="goal-dri" required placeholder="Responsible person" class="w-full border border-gray-300 rounded-lg px-4 py-2">
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -823,7 +823,6 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           closeGoalModal();
           // Reset form
           e.target.reset();
-          document.getElementById('goal-dri').value = 'Giorgio';
           await loadDashboardData();
         } catch (e) { 
           console.error('Error creating goal:', e);

@@ -363,4 +363,147 @@ projects.get('/leaderboard/categories', async (c) => {
   }
 });
 
+// ============================================
+// PROJECT FOUNDERS MANAGEMENT
+// ============================================
+
+// Get founders for a project
+projects.get('/:id/founders', async (c) => {
+  const projectId = c.req.param('id');
+  
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        pf.*,
+        u.email as user_email,
+        u.avatar_url as user_avatar
+      FROM project_founders pf
+      LEFT JOIN users u ON pf.user_id = u.id
+      WHERE pf.project_id = ?
+      ORDER BY pf.is_creator DESC, pf.joined_at ASC
+    `).bind(projectId).all();
+
+    return c.json({ founders: results || [] });
+  } catch (error) {
+    console.error('Error fetching founders:', error);
+    return c.json({ error: 'Failed to fetch founders' }, 500);
+  }
+});
+
+// Add founder to project
+projects.post('/:id/founders', requireAuth, async (c) => {
+  const projectId = c.req.param('id');
+  const userId = c.var.userId;
+  const body = await c.req.json();
+  
+  const { name, email, role, equity_percentage, user_id } = body;
+
+  if (!name || !role) {
+    return c.json({ error: 'Name and role are required' }, 400);
+  }
+
+  try {
+    // Verify user owns the project
+    const project = await c.env.DB.prepare(
+      'SELECT user_id FROM projects WHERE id = ?'
+    ).bind(projectId).first();
+
+    if (!project) {
+      return c.json({ error: 'Project not found' }, 404);
+    }
+
+    if ((project as any).user_id !== userId) {
+      return c.json({ error: 'Not authorized to add founders to this project' }, 403);
+    }
+
+    const result = await c.env.DB.prepare(`
+      INSERT INTO project_founders (project_id, user_id, name, email, role, equity_percentage, is_creator)
+      VALUES (?, ?, ?, ?, ?, ?, 0)
+    `).bind(projectId, user_id || null, name, email || null, role, equity_percentage || null).run();
+
+    return c.json({
+      success: true,
+      id: result.meta.last_row_id,
+      message: 'Founder added successfully'
+    });
+  } catch (error) {
+    console.error('Error adding founder:', error);
+    return c.json({ error: 'Failed to add founder' }, 500);
+  }
+});
+
+// Update founder
+projects.put('/:id/founders/:founderId', requireAuth, async (c) => {
+  const projectId = c.req.param('id');
+  const founderId = c.req.param('founderId');
+  const userId = c.var.userId;
+  const body = await c.req.json();
+  
+  const { name, email, role, equity_percentage } = body;
+
+  try {
+    // Verify user owns the project
+    const project = await c.env.DB.prepare(
+      'SELECT user_id FROM projects WHERE id = ?'
+    ).bind(projectId).first();
+
+    if (!project || (project as any).user_id !== userId) {
+      return c.json({ error: 'Not authorized' }, 403);
+    }
+
+    await c.env.DB.prepare(`
+      UPDATE project_founders
+      SET name = ?, email = ?, role = ?, equity_percentage = ?
+      WHERE id = ? AND project_id = ?
+    `).bind(name, email, role, equity_percentage, founderId, projectId).run();
+
+    return c.json({
+      success: true,
+      message: 'Founder updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating founder:', error);
+    return c.json({ error: 'Failed to update founder' }, 500);
+  }
+});
+
+// Delete founder
+projects.delete('/:id/founders/:founderId', requireAuth, async (c) => {
+  const projectId = c.req.param('id');
+  const founderId = c.req.param('founderId');
+  const userId = c.var.userId;
+
+  try {
+    // Verify user owns the project
+    const project = await c.env.DB.prepare(
+      'SELECT user_id FROM projects WHERE id = ?'
+    ).bind(projectId).first();
+
+    if (!project || (project as any).user_id !== userId) {
+      return c.json({ error: 'Not authorized' }, 403);
+    }
+
+    // Don't allow deleting the creator
+    const founder = await c.env.DB.prepare(
+      'SELECT is_creator FROM project_founders WHERE id = ? AND project_id = ?'
+    ).bind(founderId, projectId).first();
+
+    if ((founder as any)?.is_creator === 1) {
+      return c.json({ error: 'Cannot delete project creator' }, 400);
+    }
+
+    await c.env.DB.prepare(
+      'DELETE FROM project_founders WHERE id = ? AND project_id = ?'
+    ).bind(founderId, projectId).run();
+
+    return c.json({
+      success: true,
+      message: 'Founder removed successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting founder:', error);
+    return c.json({ error: 'Failed to delete founder' }, 500);
+  }
+});
+
 export default projects;

@@ -11,7 +11,7 @@ ALTER TABLE goals ADD COLUMN priority_label TEXT DEFAULT 'Urgent & Important' CH
 ALTER TABLE goals ADD COLUMN cadence TEXT DEFAULT 'One time' CHECK (
   cadence IN ('One time', 'Recurrent', 'One time')
 );
-ALTER TABLE goals ADD COLUMN dri TEXT DEFAULT 'Giorgio'; -- Directly Responsible Individual
+ALTER TABLE goals ADD COLUMN dri TEXT; -- Directly Responsible Individual
 ALTER TABLE goals ADD COLUMN goal_status TEXT DEFAULT 'To start' CHECK (
   goal_status IN ('WIP', 'To start', 'On Hold', 'Delayed', 'Blocked', 'Done')
 );
