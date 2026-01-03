@@ -96,20 +96,82 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           </div>
         </div>
         
+        <!-- Goals Table Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+          <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+            <div>
+              <h3 class="font-bold text-gray-900 text-xl">GOAL OF THE WEEK:</h3>
+              <div class="flex gap-2 mt-2 text-sm">
+                <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full font-medium">P0 - Urgent & important</span>
+                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">P1 - Urgent or important</span>
+                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium">P2 - Urgent but not important</span>
+                <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full font-medium">P3 - Neither but cool</span>
+              </div>
+            </div>
+            <button onclick="openGoalModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+              <i class="fas fa-plus mr-2"></i>New Goal
+            </button>
+          </div>
+          
+          <!-- Goals Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Category</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Description</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Task</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Priority</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Cadence</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">DRI</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
+                  <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" colspan="3">December 30</th>
+                  <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
+                </tr>
+                <tr class="bg-purple-500">
+                  <th colspan="7"></th>
+                  <th class="px-2 py-2 text-center text-xs font-medium">MON</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium">TUE</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium">WED</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="goals-table-body" class="divide-y divide-gray-200 bg-white">
+                <tr>
+                  <td colspan="11" class="px-4 py-8 text-center text-gray-500">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p>Loading goals...</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
-              <h3 class="font-bold text-gray-900">Active Goals</h3>
-              <button onclick="switchTab('traction')" class="text-primary text-sm font-medium hover:underline">View all →</button>
+              <h3 class="font-bold text-gray-900">Quick Stats</h3>
             </div>
-            <div id="home-goals" class="space-y-3">
-              <div class="animate-pulse"><div class="h-12 bg-gray-200 rounded"></div></div>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <span class="text-sm text-gray-700">Total Goals</span>
+                <span id="quick-total-goals" class="font-bold text-purple-600">0</span>
+              </div>
+              <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <span class="text-sm text-gray-700">Completed This Week</span>
+                <span id="quick-completed-goals" class="font-bold text-green-600">0</span>
+              </div>
+              <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                <span class="text-sm text-gray-700">In Progress</span>
+                <span id="quick-wip-goals" class="font-bold text-yellow-600">0</span>
+              </div>
             </div>
           </div>
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-bold text-gray-900">Recent Messages</h3>
-              <button onclick="switchTab('inbox')" class="text-primary text-sm font-medium hover:underline">View all →</button>
+              <button onclick="switchTab('inbox')" class="text-purple-600 text-sm font-medium hover:underline">View all →</button>
             </div>
             <div id="home-messages" class="space-y-3">
               <div class="animate-pulse"><div class="h-12 bg-gray-200 rounded"></div></div>
@@ -298,40 +360,72 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
 
     <!-- Goal Modal -->
     <div id="goal-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center">
-      <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
-          <h3 class="text-xl font-bold">New Goal</h3>
+          <h3 class="text-xl font-bold text-gray-900">New Goal</h3>
           <button onclick="closeGoalModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
         </div>
         <form onsubmit="createGoal(event)">
           <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <input type="text" id="goal-description" required placeholder="e.g., Reach 1000 users" class="w-full border border-gray-300 rounded-lg px-4 py-2">
-            </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Target</label>
-                <input type="number" id="goal-target" value="100" min="1" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                <select id="goal-category" required class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                  <option value="ASTAR">ASTAR</option>
+                  <option value="MAGCIENT">MAGCIENT</option>
+                  <option value="OTHER">OTHER</option>
+                </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Current</label>
-                <input type="number" id="goal-current" value="0" min="0" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Priority *</label>
+                <select id="goal-priority" required class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                  <option value="P0">P0 - Urgent & important</option>
+                  <option value="P1">P1 - Urgent or important</option>
+                  <option value="P2">P2 - Urgent but not important</option>
+                  <option value="P3">P3 - Neither but cool</option>
+                </select>
               </div>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select id="goal-category" class="w-full border border-gray-300 rounded-lg px-4 py-2">
-                <option value="growth">Growth</option>
-                <option value="revenue">Revenue</option>
-                <option value="product">Product</option>
-                <option value="marketing">Marketing</option>
-              </select>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+              <input type="text" id="goal-description" required placeholder="e.g., Product Design Roadmap for Cerios" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Task *</label>
+              <input type="text" id="goal-task" required placeholder="e.g., Create Marketing Plan Structure" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Cadence</label>
+                <select id="goal-cadence" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                  <option value="One time">One time</option>
+                  <option value="Recurrent">Recurrent</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">DRI</label>
+                <input type="text" id="goal-dri" value="Giorgio" placeholder="Responsible person" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select id="goal-status" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                  <option value="To start">To start</option>
+                  <option value="WIP">WIP</option>
+                  <option value="On Hold">On Hold</option>
+                  <option value="Delayed">Delayed</option>
+                  <option value="Blocked">Blocked</option>
+                  <option value="Done">Done</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Week Of</label>
+              <input type="text" id="goal-week" placeholder="e.g., December 30" class="w-full border border-gray-300 rounded-lg px-4 py-2">
             </div>
           </div>
           <div class="flex space-x-3 mt-6">
-            <button type="button" onclick="closeGoalModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-semibold">Cancel</button>
-            <button type="submit" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg font-semibold">Create</button>
+            <button type="button" onclick="closeGoalModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold">Create Goal</button>
           </div>
         </form>
       </div>
@@ -538,16 +632,141 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
 
       function renderHomeGoals() {
         const active = allGoals.filter(g => g.status === 'active' || g.status === 'in_progress').slice(0, 3);
-        const container = document.getElementById('home-goals');
+        
+        // Render goals table
+        renderGoalsTable();
+        
+        // Update quick stats
+        const completed = allGoals.filter(g => g.goal_status === 'Done' || g.status === 'completed');
+        const wip = allGoals.filter(g => g.goal_status === 'WIP');
+        document.getElementById('quick-total-goals').textContent = allGoals.length;
+        document.getElementById('quick-completed-goals').textContent = completed.length;
+        document.getElementById('quick-wip-goals').textContent = wip.length;
+        
+        const container = document.getElementById('home-messages');
         if (!active.length) {
-          container.innerHTML = '<div class="text-center py-6 text-gray-500"><p class="text-sm">No active goals</p><button onclick="switchTab(\\'traction\\'); setTimeout(openGoalModal, 100);" class="text-primary text-sm mt-2">Create your first goal</button></div>';
+          container.innerHTML = '<div class="text-center py-6 text-gray-500"><p class="text-sm">No active goals</p><button onclick="switchTab(\\'traction\\'); setTimeout(openGoalModal, 100);" class="text-purple-600 text-sm mt-2">Create your first goal</button></div>';
           return;
         }
-        container.innerHTML = active.map(g => {
-          const p = g.target_value > 0 ? Math.min(100, Math.round((g.current_value / g.target_value) * 100)) : 0;
-          return \`<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"><div class="flex-1"><p class="text-sm font-medium text-gray-900 truncate">\${g.description}</p><div class="flex items-center gap-2 mt-1"><div class="flex-1 h-1.5 bg-gray-200 rounded-full"><div class="h-full bg-primary rounded-full" style="width:\${p}%"></div></div><span class="text-xs text-gray-500">\${p}%</span></div></div></div>\`;
+        container.innerHTML = '<div class="text-center py-6 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">No messages yet</p></div>';
+      }
+
+      function renderGoalsTable() {
+        const tbody = document.getElementById('goals-table-body');
+        if (!allGoals.length) {
+          tbody.innerHTML = \`
+            <tr>
+              <td colspan="11" class="px-4 py-8 text-center text-gray-500">
+                <i class="fas fa-bullseye text-4xl mb-2 text-gray-300"></i>
+                <p>No goals yet</p>
+                <button onclick="openGoalModal()" class="text-purple-600 text-sm mt-2 hover:underline">Create your first goal</button>
+              </td>
+            </tr>
+          \`;
+          return;
+        }
+
+        // Group goals by category
+        const categories = {};
+        allGoals.forEach(goal => {
+          const cat = goal.category || 'ASTAR';
+          if (!categories[cat]) categories[cat] = [];
+          categories[cat].push(goal);
+        });
+
+        tbody.innerHTML = Object.entries(categories).map(([category, goals]) => {
+          const categoryColor = category === 'ASTAR' ? 'bg-blue-50' : category === 'MAGCIENT' ? 'bg-red-50' : 'bg-gray-50';
+          const categoryRows = goals.sort((a, b) => {
+            const priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };
+            return (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99) || (a.order_index || 0) - (b.order_index || 0);
+          });
+
+          return categoryRows.map((goal, idx) => {
+            const priorityColors = {
+              'P0': 'bg-yellow-100 text-yellow-800',
+              'P1': 'bg-blue-100 text-blue-800',
+              'P2': 'bg-green-100 text-green-800',
+              'P3': 'bg-gray-100 text-gray-800'
+            };
+            const statusColors = {
+              'WIP': 'bg-blue-100 text-blue-800',
+              'To start': 'bg-yellow-100 text-yellow-800',
+              'On Hold': 'bg-orange-100 text-orange-800',
+              'Delayed': 'bg-red-100 text-red-800',
+              'Blocked': 'bg-red-200 text-red-900',
+              'Done': 'bg-green-100 text-green-800'
+            };
+
+            return \`
+              <tr class="\${idx === 0 ? categoryColor : 'hover:bg-gray-50'}">
+                <td class="px-4 py-3 text-sm font-medium text-gray-900">\${idx === 0 ? category : ''}</td>
+                <td class="px-4 py-3 text-sm text-gray-700">\${goal.description || ''}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 font-medium">\${goal.task || goal.description || ''}</td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 text-xs font-medium rounded-full \${priorityColors[goal.priority] || 'bg-gray-100 text-gray-800'}">
+                    \${goal.priority || 'P0'}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600">\${goal.cadence || 'One time'}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">\${goal.dri || 'Giorgio'}</td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 text-xs font-medium rounded-full \${statusColors[goal.goal_status] || 'bg-gray-100 text-gray-800'}">
+                    \${goal.goal_status || 'To start'}
+                  </span>
+                </td>
+                <td class="px-2 py-3 text-center">
+                  <button onclick="toggleDay(\${goal.id}, 'day_mon')" class="w-8 h-8 rounded \${goal.day_mon ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'} hover:opacity-80">
+                    \${goal.day_mon || 0}
+                  </button>
+                </td>
+                <td class="px-2 py-3 text-center">
+                  <button onclick="toggleDay(\${goal.id}, 'day_tue')" class="w-8 h-8 rounded \${goal.day_tue ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'} hover:opacity-80">
+                    \${goal.day_tue || 0}
+                  </button>
+                </td>
+                <td class="px-2 py-3 text-center">
+                  <button onclick="toggleDay(\${goal.id}, 'day_wed')" class="w-8 h-8 rounded \${goal.day_wed ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'} hover:opacity-80">
+                    \${goal.day_wed || 0}
+                  </button>
+                </td>
+                <td class="px-2 py-3 text-center">
+                  <div class="flex gap-1 justify-center">
+                    <button onclick="editGoal(\${goal.id})" class="text-gray-400 hover:text-purple-600">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteGoal(\${goal.id})" class="text-gray-400 hover:text-red-600">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            \`;
+          }).join('');
         }).join('');
       }
+
+      window.toggleDay = async function(goalId, dayField) {
+        try {
+          const goal = allGoals.find(g => g.id === goalId);
+          if (!goal) return;
+          
+          const newValue = goal[dayField] ? 0 : 1;
+          await axios.put(\`/api/dashboard/goals/\${goalId}\`, { [dayField]: newValue });
+          goal[dayField] = newValue;
+          renderGoalsTable();
+        } catch (e) {
+          console.error('Error toggling day:', e);
+          alert('Failed to update goal');
+        }
+      };
+
+      window.editGoal = function(goalId) {
+        const goal = allGoals.find(g => g.id === goalId);
+        if (!goal) return;
+        
+        // TODO: Open edit modal with goal data
+        alert('Edit goal feature coming soon!\\nGoal: ' + goal.description);
+      };
 
       function initCharts() {
         const userM = metricsHistory.filter(m => m.metric_name === 'users').sort((a,b) => new Date(a.recorded_date) - new Date(b.recorded_date)).slice(-10);
@@ -580,16 +799,36 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       async function createGoal(e) {
         e.preventDefault();
         try {
+          const priority = document.getElementById('goal-priority').value;
+          const priorityLabels = {
+            'P0': 'Urgent & important',
+            'P1': 'Urgent or important',
+            'P2': 'Urgent but not important',
+            'P3': 'Neither but cool'
+          };
+          
           await axios.post('/api/dashboard/goals', {
             description: document.getElementById('goal-description').value,
-            target_value: parseInt(document.getElementById('goal-target').value) || 100,
-            current_value: parseInt(document.getElementById('goal-current').value) || 0,
-            category: document.getElementById('goal-category').value
+            task: document.getElementById('goal-task').value,
+            category: document.getElementById('goal-category').value,
+            priority: priority,
+            priority_label: priorityLabels[priority],
+            cadence: document.getElementById('goal-cadence').value,
+            dri: document.getElementById('goal-dri').value,
+            goal_status: document.getElementById('goal-status').value,
+            week_of: document.getElementById('goal-week').value || null,
+            target_value: 100,
+            current_value: 0
           });
           closeGoalModal();
-          document.getElementById('goal-description').value = '';
+          // Reset form
+          e.target.reset();
+          document.getElementById('goal-dri').value = 'Giorgio';
           await loadDashboardData();
-        } catch (e) { alert('Error creating goal'); }
+        } catch (e) { 
+          console.error('Error creating goal:', e);
+          alert('Error creating goal'); 
+        }
       }
 
       async function updateGoal(id, current) {
