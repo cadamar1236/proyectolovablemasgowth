@@ -365,7 +365,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           <h3 class="text-xl font-bold text-gray-900">New Goal</h3>
           <button onclick="closeGoalModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
         </div>
-        <form onsubmit="createGoal(event)">
+        <form id="goal-form" onsubmit="createGoal(event)">
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
               <div>
