@@ -865,7 +865,8 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           };
           
           // Check if editing existing goal
-          const editingGoalId = e.target.dataset.editingGoalId;
+          const form = document.getElementById('goal-form');
+          const editingGoalId = form ? form.dataset.editingGoalId : null;
           
           if (editingGoalId) {
             // Update existing goal
