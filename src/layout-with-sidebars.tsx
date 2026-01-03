@@ -424,7 +424,14 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
                 // Add assistant response
                 if (response.data && response.data.message) {
-                    addMessageToChat('assistant', response.data.message);
+                    const aiMessage = response.data.message;
+                    
+                    // Check if AI wants to trigger goal creation flow
+                    if (aiMessage.includes('TRIGGER:START_GOAL_FLOW')) {
+                        startGoalCreation();
+                    } else {
+                        addMessageToChat('assistant', aiMessage);
+                    }
                 } else {
                     addMessageToChat('assistant', 'Recibí tu mensaje pero no pude generar una respuesta.');
                 }
@@ -613,6 +620,17 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             const message = input.value.trim();
             
             if (!message) return;
+
+            // Check if user wants to create a goal
+            const goalKeywords = ['crear goal', 'añadir goal', 'nuevo goal', 'create goal', 'add goal', 'new goal', 'crear objetivo', 'añadir objetivo'];
+            const messageClean = message.toLowerCase().trim();
+            
+            if (!goalCreationFlow.active && goalKeywords.some(keyword => messageClean.includes(keyword))) {
+                input.value = '';
+                addMessageToChat('user', message);
+                startGoalCreation();
+                return;
+            }
 
             if (goalCreationFlow.active) {
                 removeQuickReplyOptions();
