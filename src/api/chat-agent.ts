@@ -149,18 +149,34 @@ async function getStartupContext(db: any, userId: number) {
 
 // Helper: Generate AI response using Groq or Cloudflare AI
 async function generateAIResponse(apiKey: string, systemPrompt: string, userMessage: string, context: any, cloudflareAI?: any) {
+  const MAX_RETRIES = 2;
+  const TIMEOUT_MS = 25000; // 25 seconds timeout for mobile
+  
+  // Simplify context for mobile/slow connections
+  const simplifiedContext = {
+    goals: {
+      totalCount: context.goals.totalCount,
+      completedCount: context.goals.completedCount,
+      active: context.goals.active.slice(0, 5) // Only first 5 active goals
+    },
+    metrics: {
+      current: context.metrics.current,
+      growth: context.metrics.growth
+    }
+  };
+  
   // Try Cloudflare AI first if available
   if (cloudflareAI) {
     try {
       console.log('[AI] Using Cloudflare Workers AI');
       const messages = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Contexto de la startup:\n${JSON.stringify(context, null, 2)}\n\nPregunta del usuario: ${userMessage}` }
+        { role: 'user', content: `Contexto: ${JSON.stringify(simplifiedContext)}\n\nPregunta: ${userMessage}` }
       ];
       
       const response = await cloudflareAI.run('@cf/meta/llama-3.1-8b-instruct', {
         messages,
-        max_tokens: 2000,
+        max_tokens: 1500,
         temperature: 0.7
       });
       
@@ -171,41 +187,74 @@ async function generateAIResponse(apiKey: string, systemPrompt: string, userMess
     }
   }
   
-  // Try Groq as fallback
+  // Try Groq with retry logic
   if (apiKey) {
-    try {
-      console.log('[AI] Using Groq API');
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Contexto de la startup:\n${JSON.stringify(context, null, 2)}\n\nPregunta del usuario: ${userMessage}` }
-          ],
-          max_tokens: 2000,
-          temperature: 0.7
-        })
-      });
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[AI] Using Groq API (attempt ${attempt}/${MAX_RETRIES})`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+        
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-70b-versatile',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Contexto: ${JSON.stringify(simplifiedContext)}\n\nPregunta: ${userMessage}` }
+            ],
+            max_tokens: 1500,
+            temperature: 0.7
+          }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[AI] Groq API error:', response.status, errorText);
-        throw new Error(`Groq API error: ${response.status}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[AI] Groq API error:', response.status, errorText);
+          
+          if (attempt < MAX_RETRIES && (response.status === 429 || response.status >= 500)) {
+            // Retry on rate limit or server errors
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+          
+          throw new Error(`Groq API error: ${response.status}`);
+        }
+
+        const data = await response.json() as any;
+        console.log('[AI] Groq response received successfully');
+        return data.choices[0]?.message?.content || 'No pude generar una respuesta.';
+        
+      } catch (error: any) {
+        console.error(`[AI] Groq attempt ${attempt} error:`, error);
+        
+        if (error.name === 'AbortError') {
+          console.log('[AI] Request timed out');
+          if (attempt < MAX_RETRIES) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            continue;
+          }
+        }
+        
+        if (attempt >= MAX_RETRIES) {
+          throw error;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
-
-      const data = await response.json() as any;
-      return data.choices[0]?.message?.content || 'No pude generar una respuesta.';
-    } catch (error) {
-      console.error('[AI] Groq generation error:', error);
-      throw error;
     }
   }
   
+  console.error('[AI] All AI providers failed, using fallback');
   throw new Error('No AI provider available');
 }
 
@@ -324,9 +373,29 @@ REGLAS:
   } catch (error) {
     console.error('[CHAT] Error processing message:', error);
     console.error('[CHAT] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('[CHAT] Error name:', error instanceof Error ? error.name : 'Unknown');
+    
+    // Determine error type for better user messaging
+    let userMessage = 'Lo siento, ocurrió un error. Por favor intenta de nuevo.';
+    let errorType = 'unknown';
+    
+    if (error instanceof Error) {
+      if (error.name === 'AbortError' || error.message.includes('aborted')) {
+        userMessage = 'La respuesta tardó demasiado. Intenta con una pregunta más corta.';
+        errorType = 'timeout';
+      } else if (error.message.includes('429')) {
+        userMessage = 'Muchas solicitudes. Espera un momento e intenta de nuevo.';
+        errorType = 'rate_limit';
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        userMessage = 'Problema de conexión. Verifica tu internet e intenta de nuevo.';
+        errorType = 'network';
+      }
+    }
+    
     return c.json({ 
       error: 'Failed to process message',
-      message: 'Lo siento, ocurrió un error. Por favor intenta de nuevo.',
+      errorType,
+      message: userMessage,
       details: error instanceof Error ? error.message : String(error)
     }, 500);
   }
