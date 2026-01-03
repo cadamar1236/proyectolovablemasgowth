@@ -31,7 +31,7 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
           <div class="bg-gradient-to-r from-purple-600 via-blue-600 to-pink-600 px-6 py-5">
             <div class="flex items-center space-x-4">
               <div class="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-lg">
-                <span class="text-3xl">🤖</span>
+                <span class="text-3xl">⭐</span>
               </div>
               <div>
                 <h3 class="text-white font-bold text-lg">ASTAR* Assistant</h3>
@@ -411,14 +411,21 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
       function showQuickReplyButtons(options, multiple = false) {
         const container = document.getElementById('quickReplyButtons');
         container.classList.remove('hidden');
-        container.innerHTML = options.map(opt => \`
+        container.innerHTML = options.map((opt, idx) => \`
           <button 
-            onclick="handleQuickReply('\${opt.value}', '\${opt.label.replace(/'/g, "\\'")}', \${multiple})" 
-            class="px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 hover:from-purple-200 hover:to-pink-200 text-purple-700 rounded-lg font-medium transition-all border border-purple-200 hover:border-purple-300"
+            data-quick-reply-index="\${idx}"
+            class="quick-reply-btn px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 hover:from-purple-200 hover:to-pink-200 text-purple-700 rounded-lg font-medium transition-all border border-purple-200 hover:border-purple-300"
           >
             \${opt.label}
           </button>
         \`).join('');
+        
+        // Add click event listeners to buttons
+        container.querySelectorAll('.quick-reply-btn').forEach((btn, idx) => {
+          btn.addEventListener('click', () => {
+            handleQuickReply(options[idx].value, options[idx].label, multiple);
+          });
+        });
         
         // Hide text input for single choice
         if (!multiple) {
@@ -435,7 +442,7 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
         document.getElementById('sendButton').style.display = 'block';
       }
 
-      window.handleQuickReply = function(value, label, multiple) {
+      function handleQuickReply(value, label, multiple) {
         if (multiple) {
           // For multiple choice, allow selecting multiple then pressing send
           // TODO: implement multi-select logic
@@ -508,7 +515,7 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
           const messageHtml = \`
             <div class="flex items-start space-x-3 animate-fade-in">
               <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-md">
-                <span class="text-white text-lg">🤖</span>
+                <span class="text-white text-lg">⭐</span>
               </div>
               <div class="flex-1">
                 <div class="bg-white rounded-2xl shadow-lg p-4 border border-gray-100">
