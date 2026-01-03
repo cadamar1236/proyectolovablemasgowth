@@ -1185,12 +1185,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       }
 
       function viewValidatorProfile(validatorUserId) {
-        if (typeof window.showValidatorProfile === 'function') {
-          window.showValidatorProfile(validatorUserId);
-        } else {
-          console.error('showValidatorProfile function not found');
-          alert('Profile feature is loading...');
-        }
+        showUserProfile(validatorUserId);
       }
 
       // Load users by role
@@ -1272,12 +1267,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       }
 
       function viewUserProfile(userId) {
-        if (typeof window.showValidatorProfile === 'function') {
-          window.showValidatorProfile(userId);
-        } else {
-          console.error('showValidatorProfile function not found');
-          alert('Profile feature is loading...');
-        }
+        showUserProfile(userId);
       }
 
       function searchUsers(type) {
@@ -1449,6 +1439,232 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           loadProducts();
         } catch (e) { alert('Error creating product'); }
       }
+
+      // Show user profile with onboarding data
+      async function showUserProfile(userId) {
+        try {
+          const token = getAuthToken();
+          const response = await axios.get(\`/api/auth/user-profile/\${userId}\`);
+          const profile = response.data;
+
+          if (!profile) {
+            alert('Profile not found');
+            return;
+          }
+
+          // Create modal
+          const modal = document.createElement('div');
+          modal.id = 'user-profile-modal';
+          modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50';
+          modal.style.display = 'flex';
+
+          const onboardingHTML = renderOnboardingData(profile.onboarding, profile.role);
+
+          modal.innerHTML = \`
+            <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div class="bg-gradient-to-r from-primary to-secondary p-6 text-white sticky top-0 z-10">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-start space-x-4">
+                    <div class="w-20 h-20 rounded-full bg-white flex items-center justify-center text-primary text-3xl font-bold shadow-lg">
+                      \${profile.name?.charAt(0) || 'U'}
+                    </div>
+                    <div>
+                      <h2 class="text-2xl font-bold">\${profile.name}</h2>
+                      <p class="text-purple-100 text-sm mt-1">\${profile.email}</p>
+                      <div class="mt-2 inline-block bg-white/20 px-3 py-1 rounded-full text-sm font-medium">
+                        \${getRoleLabel(profile.role)}
+                      </div>
+                    </div>
+                  </div>
+                  <button onclick="closeUserProfileModal()" class="text-white hover:text-purple-200 transition text-2xl">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-6 space-y-6">
+                \${profile.bio ? \`
+                  <div class="bg-gray-50 rounded-xl p-4">
+                    <h3 class="font-semibold text-gray-900 mb-2 flex items-center">
+                      <i class="fas fa-user text-primary mr-2"></i>
+                      About
+                    </h3>
+                    <p class="text-gray-700">\${profile.bio}</p>
+                  </div>
+                \` : ''}
+
+                \${profile.company ? \`
+                  <div class="bg-gray-50 rounded-xl p-4">
+                    <h3 class="font-semibold text-gray-900 mb-2 flex items-center">
+                      <i class="fas fa-building text-primary mr-2"></i>
+                      Company
+                    </h3>
+                    <p class="text-gray-700">\${profile.company}</p>
+                  </div>
+                \` : ''}
+
+                \${onboardingHTML}
+
+                \${(profile.linkedin_url || profile.twitter_url || profile.website_url) ? \`
+                  <div class="bg-gray-50 rounded-xl p-4">
+                    <h3 class="font-semibold text-gray-900 mb-3 flex items-center">
+                      <i class="fas fa-link text-primary mr-2"></i>
+                      Links
+                    </h3>
+                    <div class="flex flex-wrap gap-3">
+                      \${profile.linkedin_url ? \`
+                        <a href="\${profile.linkedin_url}" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center space-x-2">
+                          <i class="fab fa-linkedin"></i>
+                          <span>LinkedIn</span>
+                        </a>
+                      \` : ''}
+                      \${profile.twitter_url ? \`
+                        <a href="\${profile.twitter_url}" target="_blank" class="bg-sky-400 text-white px-4 py-2 rounded-lg hover:bg-sky-500 transition flex items-center space-x-2">
+                          <i class="fab fa-twitter"></i>
+                          <span>Twitter</span>
+                        </a>
+                      \` : ''}
+                      \${profile.website_url ? \`
+                        <a href="\${profile.website_url}" target="_blank" class="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition flex items-center space-x-2">
+                          <i class="fas fa-globe"></i>
+                          <span>Website</span>
+                        </a>
+                      \` : ''}
+                    </div>
+                  </div>
+                \` : ''}
+
+                <div class="text-center text-sm text-gray-500 pt-4 border-t border-gray-200">
+                  <i class="fas fa-calendar text-primary mr-1"></i>
+                  Member since \${new Date(profile.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
+              </div>
+            </div>
+          \`;
+
+          document.body.appendChild(modal);
+
+          modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+              closeUserProfileModal();
+            }
+          });
+
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+          alert('Failed to load profile');
+        }
+      }
+
+      function getRoleLabel(role) {
+        const labels = {
+          founder: '🚀 Founder',
+          investor: '💰 Investor',
+          validator: '✅ Validator',
+          scout: '🔍 Scout',
+          partner: '🤝 Partner',
+          job_seeker: '👨‍💻 Job Seeker',
+          other: '✨ Other'
+        };
+        return labels[role] || '👤 User';
+      }
+
+      function renderOnboardingData(onboarding, role) {
+        if (!onboarding) return '';
+
+        const fieldLabels = {
+          founder: {
+            startup_name: { icon: 'fas fa-rocket', label: 'Startup Name' },
+            startup_stage: { icon: 'fas fa-chart-line', label: 'Stage' },
+            industry: { icon: 'fas fa-industry', label: 'Industry' },
+            funding_status: { icon: 'fas fa-money-bill-wave', label: 'Funding Status' },
+            funding_goal: { icon: 'fas fa-bullseye', label: 'Funding Goal' },
+            team_size: { icon: 'fas fa-users', label: 'Team Size' },
+            pitch_deck_url: { icon: 'fas fa-file-powerpoint', label: 'Pitch Deck' }
+          },
+          investor: {
+            investor_type: { icon: 'fas fa-briefcase', label: 'Investor Type' },
+            investment_stage: { icon: 'fas fa-seedling', label: 'Investment Stage' },
+            check_size: { icon: 'fas fa-dollar-sign', label: 'Check Size' },
+            investment_focus: { icon: 'fas fa-bullseye', label: 'Investment Focus' },
+            geographic_focus: { icon: 'fas fa-globe-americas', label: 'Geographic Focus' },
+            notable_investments: { icon: 'fas fa-star', label: 'Notable Investments' }
+          },
+          validator: {
+            expertise: { icon: 'fas fa-certificate', label: 'Expertise' },
+            years_experience: { icon: 'fas fa-calendar-alt', label: 'Years of Experience' },
+            hourly_rate: { icon: 'fas fa-dollar-sign', label: 'Hourly Rate' },
+            availability: { icon: 'fas fa-clock', label: 'Availability' },
+            portfolio_url: { icon: 'fas fa-briefcase', label: 'Portfolio' }
+          },
+          scout: {
+            scout_for: { icon: 'fas fa-search', label: 'Scouting For' },
+            scout_focus: { icon: 'fas fa-target', label: 'Focus Areas' },
+            scout_commission: { icon: 'fas fa-percentage', label: 'Commission Structure' },
+            deals_closed: { icon: 'fas fa-handshake', label: 'Deals Closed' }
+          },
+          partner: {
+            partner_type: { icon: 'fas fa-handshake', label: 'Partner Type' },
+            services_offered: { icon: 'fas fa-cogs', label: 'Services Offered' },
+            target_clients: { icon: 'fas fa-users', label: 'Target Clients' },
+            case_studies: { icon: 'fas fa-trophy', label: 'Case Studies' }
+          },
+          job_seeker: {
+            job_title: { icon: 'fas fa-id-badge', label: 'Job Title' },
+            experience_years: { icon: 'fas fa-calendar-check', label: 'Experience Level' },
+            skills: { icon: 'fas fa-code', label: 'Skills' },
+            looking_for: { icon: 'fas fa-search', label: 'Looking For' },
+            portfolio_url: { icon: 'fas fa-folder-open', label: 'Portfolio' }
+          }
+        };
+
+        const fields = fieldLabels[role] || {};
+        const entries = Object.entries(onboarding).filter(([key]) => 
+          fields[key] && onboarding[key] && onboarding[key] !== '' && key !== 'role' && key !== 'email' && key !== 'name'
+        );
+
+        if (entries.length === 0) return '';
+
+        return \`
+          <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6">
+            <h3 class="font-bold text-gray-900 mb-4 flex items-center text-lg">
+              <i class="fas fa-info-circle text-primary mr-2"></i>
+              Profile Details
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              \${entries.map(([key, value]) => {
+                const field = fields[key];
+                if (!field) return '';
+                
+                return \`
+                  <div class="bg-white rounded-lg p-4 shadow-sm">
+                    <div class="flex items-start space-x-3">
+                      <div class="text-primary mt-1">
+                        <i class="\${field.icon}"></i>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">\${field.label}</p>
+                        <p class="text-gray-900 font-medium break-words">\${String(value)}</p>
+                      </div>
+                    </div>
+                  </div>
+                \`;
+              }).join('')}
+            </div>
+          </div>
+        \`;
+      }
+
+      function closeUserProfileModal() {
+        const modal = document.getElementById('user-profile-modal');
+        if (modal) {
+          modal.remove();
+        }
+      }
+
+      // Make functions available globally
+      window.showUserProfile = showUserProfile;
+      window.closeUserProfileModal = closeUserProfileModal;
 
       // Initialize
       const currentUserRole = '${userRole || 'founder'}';
