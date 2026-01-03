@@ -15,10 +15,12 @@ dashboard.get('/goals', requireAuth, async (c) => {
   try {
     const { results } = await c.env.DB.prepare(`
       SELECT id, user_id, description, status, target_value, current_value, 
-             deadline, category, created_at, updated_at
+             deadline, category, task, priority, priority_label, cadence, dri, 
+             goal_status, day_mon, day_tue, day_wed, day_thu, day_fri, day_sat, day_sun,
+             week_of, order_index, created_at, updated_at
       FROM goals 
       WHERE user_id = ? 
-      ORDER BY created_at DESC
+      ORDER BY order_index ASC, priority ASC, created_at DESC
     `).bind(userId).all();
 
     return c.json({ goals: results || [] });
@@ -32,7 +34,21 @@ dashboard.get('/goals', requireAuth, async (c) => {
 dashboard.post('/goals', requireAuth, async (c) => {
   const userId = c.get('userId');
   const body = await c.req.json();
-  const { description, target_value, current_value, deadline, category } = body;
+  const { 
+    description, 
+    target_value, 
+    current_value, 
+    deadline, 
+    category,
+    task,
+    priority,
+    priority_label,
+    cadence,
+    dri,
+    goal_status,
+    week_of,
+    order_index
+  } = body;
 
   if (!description?.trim()) {
     return c.json({ error: 'Description is required' }, 400);
@@ -40,8 +56,12 @@ dashboard.post('/goals', requireAuth, async (c) => {
 
   try {
     const result = await c.env.DB.prepare(`
-      INSERT INTO goals (user_id, description, target_value, current_value, deadline, category, status) 
-      VALUES (?, ?, ?, ?, ?, ?, 'active') 
+      INSERT INTO goals (
+        user_id, description, target_value, current_value, deadline, category, 
+        task, priority, priority_label, cadence, dri, goal_status, week_of, 
+        order_index, status
+      ) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active') 
       RETURNING *
     `).bind(
       userId, 
@@ -49,7 +69,15 @@ dashboard.post('/goals', requireAuth, async (c) => {
       target_value || 100, 
       current_value || 0, 
       deadline || null, 
-      category || 'general'
+      category || 'ASTAR',
+      task || description.trim(),
+      priority || 'P0',
+      priority_label || 'Urgent & important',
+      cadence || 'One time',
+      dri || 'Giorgio',
+      goal_status || 'To start',
+      week_of || null,
+      order_index || 0
     ).first();
 
     return c.json({ goal: result, success: true }, 201);
@@ -64,7 +92,28 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
   const userId = c.get('userId');
   const goalId = c.req.param('id');
   const body = await c.req.json();
-  const { status, current_value, target_value, description } = body;
+  const { 
+    status, 
+    current_value, 
+    target_value, 
+    description,
+    task,
+    priority,
+    priority_label,
+    cadence,
+    dri,
+    goal_status,
+    day_mon,
+    day_tue,
+    day_wed,
+    day_thu,
+    day_fri,
+    day_sat,
+    day_sun,
+    week_of,
+    order_index,
+    category
+  } = body;
 
   try {
     // Build dynamic update query
@@ -86,6 +135,70 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
     if (description !== undefined) {
       updates.push('description = ?');
       values.push(description);
+    }
+    if (task !== undefined) {
+      updates.push('task = ?');
+      values.push(task);
+    }
+    if (priority !== undefined) {
+      updates.push('priority = ?');
+      values.push(priority);
+    }
+    if (priority_label !== undefined) {
+      updates.push('priority_label = ?');
+      values.push(priority_label);
+    }
+    if (cadence !== undefined) {
+      updates.push('cadence = ?');
+      values.push(cadence);
+    }
+    if (dri !== undefined) {
+      updates.push('dri = ?');
+      values.push(dri);
+    }
+    if (goal_status !== undefined) {
+      updates.push('goal_status = ?');
+      values.push(goal_status);
+    }
+    if (day_mon !== undefined) {
+      updates.push('day_mon = ?');
+      values.push(day_mon);
+    }
+    if (day_tue !== undefined) {
+      updates.push('day_tue = ?');
+      values.push(day_tue);
+    }
+    if (day_wed !== undefined) {
+      updates.push('day_wed = ?');
+      values.push(day_wed);
+    }
+    if (day_thu !== undefined) {
+      updates.push('day_thu = ?');
+      values.push(day_thu);
+    }
+    if (day_fri !== undefined) {
+      updates.push('day_fri = ?');
+      values.push(day_fri);
+    }
+    if (day_sat !== undefined) {
+      updates.push('day_sat = ?');
+      values.push(day_sat);
+    }
+    if (day_sun !== undefined) {
+      updates.push('day_sun = ?');
+      values.push(day_sun);
+    }
+    if (week_of !== undefined) {
+      updates.push('week_of = ?');
+      values.push(week_of);
+    }
+    if (order_index !== undefined) {
+      updates.push('order_index = ?');
+      values.push(order_index);
+    }
+    if (category !== undefined) {
+      updates.push('category = ?');
+      values.push(category);
     }
 
     if (updates.length === 0) {

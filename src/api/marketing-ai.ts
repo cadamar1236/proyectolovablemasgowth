@@ -210,6 +210,174 @@ marketingAI.post('/social-strategy', async (c) => {
 });
 
 // ============================================
+// GOALS MANAGEMENT FOR MARKETING AGENT
+// ============================================
+
+// POST /api/marketing-ai/create-goal - Crear goal desde el agente
+marketingAI.post('/create-goal', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const { 
+      description, 
+      task,
+      priority,
+      priority_label,
+      cadence,
+      dri,
+      goal_status,
+      category,
+      week_of
+    } = await c.req.json();
+
+    if (!description || !task) {
+      return c.json({ error: 'Description and task are required' }, 400);
+    }
+
+    const result = await c.env.DB.prepare(`
+      INSERT INTO goals (
+        user_id, description, task, priority, priority_label, 
+        cadence, dri, goal_status, category, week_of, 
+        order_index, status
+      ) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active') 
+      RETURNING *
+    `).bind(
+      userId,
+      description,
+      task,
+      priority || 'P0',
+      priority_label || 'Urgent & important',
+      cadence || 'One time',
+      dri || 'Giorgio',
+      goal_status || 'To start',
+      category || 'ASTAR',
+      week_of || null
+    ).first();
+
+    return c.json({
+      success: true,
+      goal: result,
+      message: `✅ Goal created: ${task}`
+    });
+
+  } catch (error) {
+    console.error('[MARKETING AI] Error creating goal:', error);
+    return c.json({ error: 'Failed to create goal' }, 500);
+  }
+});
+
+// PUT /api/marketing-ai/update-goal/:id - Actualizar goal desde el agente
+marketingAI.put('/update-goal/:id', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const goalId = c.req.param('id');
+    const updates = await c.req.json();
+
+    const allowedFields = [
+      'description', 'task', 'priority', 'priority_label', 'cadence', 
+      'dri', 'goal_status', 'category', 'week_of', 'order_index',
+      'day_mon', 'day_tue', 'day_wed', 'day_thu', 'day_fri', 'day_sat', 'day_sun'
+    ];
+
+    const updateFields: string[] = [];
+    const values: any[] = [];
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key) && value !== undefined) {
+        updateFields.push(`${key} = ?`);
+        values.push(value);
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return c.json({ error: 'No valid fields to update' }, 400);
+    }
+
+    updateFields.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(goalId, userId);
+
+    await c.env.DB.prepare(`
+      UPDATE goals 
+      SET ${updateFields.join(', ')}
+      WHERE id = ? AND user_id = ?
+    `).bind(...values).run();
+
+    return c.json({
+      success: true,
+      message: `✅ Goal updated successfully`
+    });
+
+  } catch (error) {
+    console.error('[MARKETING AI] Error updating goal:', error);
+    return c.json({ error: 'Failed to update goal' }, 500);
+  }
+});
+
+// GET /api/marketing-ai/get-goals - Obtener goals del usuario
+marketingAI.get('/get-goals', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const category = c.req.query('category');
+    const priority = c.req.query('priority');
+
+    let query = `
+      SELECT id, description, task, priority, priority_label, cadence, 
+             dri, goal_status, category, week_of, order_index,
+             day_mon, day_tue, day_wed, day_thu, day_fri, day_sat, day_sun,
+             created_at, updated_at
+      FROM goals 
+      WHERE user_id = ? AND status = 'active'
+    `;
+
+    const params: any[] = [userId];
+
+    if (category) {
+      query += ' AND category = ?';
+      params.push(category);
+    }
+
+    if (priority) {
+      query += ' AND priority = ?';
+      params.push(priority);
+    }
+
+    query += ' ORDER BY order_index ASC, priority ASC, created_at DESC';
+
+    const { results } = await c.env.DB.prepare(query).bind(...params).all();
+
+    return c.json({
+      success: true,
+      goals: results || []
+    });
+
+  } catch (error) {
+    console.error('[MARKETING AI] Error fetching goals:', error);
+    return c.json({ error: 'Failed to fetch goals' }, 500);
+  }
+});
+
+// DELETE /api/marketing-ai/delete-goal/:id - Eliminar goal desde el agente
+marketingAI.delete('/delete-goal/:id', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const goalId = c.req.param('id');
+
+    await c.env.DB.prepare(`
+      DELETE FROM goals WHERE id = ? AND user_id = ?
+    `).bind(goalId, userId).run();
+
+    return c.json({
+      success: true,
+      message: `✅ Goal deleted successfully`
+    });
+
+  } catch (error) {
+    console.error('[MARKETING AI] Error deleting goal:', error);
+    return c.json({ error: 'Failed to delete goal' }, 500);
+  }
+});
+
+// ============================================
 // FUNCIONES AUXILIARES PARA LLAMAR AL AGENTE
 // ============================================
 
