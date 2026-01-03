@@ -545,7 +545,6 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         };
 
         const goalQuestions = [
-            { field: 'category', question: '¿En qué categoría está este goal? (ASTAR / MAGCIENT / OTHER)', options: ['ASTAR', 'MAGCIENT', 'OTHER'] },
             { field: 'description', question: '¿Cuál es la descripción del goal?', type: 'text' },
             { field: 'task', question: '¿Cuál es la tarea específica?', type: 'text' },
             { field: 'priority', question: '¿Qué prioridad tiene?\\n- P0: Urgent & important\\n- P1: Urgent or important\\n- P2: Urgent but not important\\n- P3: Neither but cool', options: ['P0', 'P1', 'P2', 'P3'] },
@@ -671,8 +670,21 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     'P3': 'Neither but cool'
                 };
                 
+                // Ask AI to determine the category based on description and task
+                addMessageToChat('assistant', '🤖 Analizando con IA para determinar la categoría...');
+                
+                const categoryResponse = await axios.post('/api/chat-agent/determine-category', {
+                    description: goalCreationFlow.data.description,
+                    task: goalCreationFlow.data.task
+                }, {
+                    withCredentials: true
+                });
+                
+                const category = categoryResponse.data.category || 'OTHER';
+                
                 const goalData = {
                     ...goalCreationFlow.data,
+                    category: category,
                     priority_label: priorityLabels[goalCreationFlow.data.priority]
                 };
                 
@@ -683,7 +695,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 document.getElementById('chat-loading').classList.add('hidden');
                 
                 if (response.data.success) {
-                    addMessageToChat('assistant', \`✅ ¡Goal creado exitosamente!\\n\\n📋 **\${goalData.task}**\\n🏷️ Categoría: \${goalData.category}\\n⚡ Prioridad: \${goalData.priority}\\n👤 Responsable: \${goalData.dri}\\n📊 Estado: \${goalData.goal_status}\\n\\n¡El goal ya está disponible en tu Founder Hub!\`);
+                    addMessageToChat('assistant', \`✅ ¡Goal creado exitosamente!\\n\\n📋 **\${goalData.task}**\\n🏷️ Categoría: \${goalData.category} (determinada por IA)\\n⚡ Prioridad: \${goalData.priority}\\n👤 Responsable: \${goalData.dri}\\n📊 Estado: \${goalData.goal_status}\\n\\n¡El goal ya está disponible en tu Founder Hub!\`);
                     
                     // Refresh the page to show new goal
                     setTimeout(() => {

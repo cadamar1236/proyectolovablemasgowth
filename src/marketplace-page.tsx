@@ -764,8 +764,29 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         const goal = allGoals.find(g => g.id === goalId);
         if (!goal) return;
         
-        // TODO: Open edit modal with goal data
-        alert('Edit goal feature coming soon!\\nGoal: ' + goal.description);
+        // Populate modal with existing goal data
+        document.getElementById('goal-description').value = goal.description || '';
+        document.getElementById('goal-task').value = goal.task || '';
+        document.getElementById('goal-category').value = goal.category || 'OTHER';
+        document.getElementById('goal-priority').value = goal.priority || 'P2';
+        document.getElementById('goal-cadence').value = goal.cadence || 'One time';
+        document.getElementById('goal-dri').value = goal.dri || '';
+        document.getElementById('goal-status').value = goal.goal_status || 'To start';
+        document.getElementById('goal-week').value = goal.week_of || '';
+        
+        // Change modal title and button text
+        const modalTitle = document.querySelector('#goal-modal h3');
+        if (modalTitle) modalTitle.textContent = 'Edit Goal';
+        
+        const submitBtn = document.querySelector('#goal-modal button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Update Goal';
+        
+        // Store goal ID for update
+        const form = document.getElementById('goal-form');
+        form.dataset.editingGoalId = goalId;
+        
+        // Open modal
+        openGoalModal();
       };
 
       function initCharts() {
@@ -793,8 +814,30 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       }
 
       // Goal CRUD
-      function openGoalModal() { document.getElementById('goal-modal').classList.remove('hidden'); document.getElementById('goal-modal').classList.add('flex'); }
-      function closeGoalModal() { document.getElementById('goal-modal').classList.add('hidden'); document.getElementById('goal-modal').classList.remove('flex'); }
+      function openGoalModal() { 
+        // Reset modal to create mode
+        const modalTitle = document.querySelector('#goal-modal h3');
+        if (modalTitle) modalTitle.textContent = 'Create New Goal';
+        
+        const submitBtn = document.querySelector('#goal-modal button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Create Goal';
+        
+        const form = document.getElementById('goal-form');
+        delete form.dataset.editingGoalId;
+        form.reset();
+        
+        document.getElementById('goal-modal').classList.remove('hidden'); 
+        document.getElementById('goal-modal').classList.add('flex'); 
+      }
+      
+      function closeGoalModal() { 
+        const form = document.getElementById('goal-form');
+        delete form.dataset.editingGoalId;
+        form.reset();
+        
+        document.getElementById('goal-modal').classList.add('hidden'); 
+        document.getElementById('goal-modal').classList.remove('flex'); 
+      }
       
       async function createGoal(e) {
         e.preventDefault();
@@ -807,7 +850,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
             'P3': 'Neither but cool'
           };
           
-          await axios.post('/api/dashboard/goals', {
+          const goalData = {
             description: document.getElementById('goal-description').value,
             task: document.getElementById('goal-task').value,
             category: document.getElementById('goal-category').value,
@@ -819,14 +862,24 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
             week_of: document.getElementById('goal-week').value || null,
             target_value: 100,
             current_value: 0
-          });
+          };
+          
+          // Check if editing existing goal
+          const editingGoalId = e.target.dataset.editingGoalId;
+          
+          if (editingGoalId) {
+            // Update existing goal
+            await axios.put('/api/dashboard/goals/' + editingGoalId, goalData);
+          } else {
+            // Create new goal
+            await axios.post('/api/dashboard/goals', goalData);
+          }
+          
           closeGoalModal();
-          // Reset form
-          e.target.reset();
           await loadDashboardData();
         } catch (e) { 
-          console.error('Error creating goal:', e);
-          alert('Error creating goal'); 
+          console.error('Error saving goal:', e);
+          alert('Error saving goal'); 
         }
       }
 

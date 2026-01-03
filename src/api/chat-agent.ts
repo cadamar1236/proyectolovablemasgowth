@@ -339,6 +339,79 @@ REGLAS:
   }
 });
 
+// Determine category for a goal using AI
+app.post('/determine-category', jwtMiddleware, async (c) => {
+  const user = c.get('user') as AuthContext;
+  const { description, task } = await c.req.json();
+
+  if (!description || !task) {
+    return c.json({ category: 'OTHER' });
+  }
+
+  try {
+    const groqKey = c.env.GROQ_API_KEY;
+    
+    if (!groqKey) {
+      // Fallback: simple keyword matching
+      const text = `${description} ${task}`.toLowerCase();
+      if (text.includes('astar') || text.includes('blockchain') || text.includes('web3')) {
+        return c.json({ category: 'ASTAR' });
+      } else if (text.includes('magcient') || text.includes('ai') || text.includes('machine learning')) {
+        return c.json({ category: 'MAGCIENT' });
+      }
+      return c.json({ category: 'OTHER' });
+    }
+
+    // Use AI to determine category
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-70b-versatile',
+        messages: [
+          { 
+            role: 'system', 
+            content: `Eres un clasificador de goals para startups. Debes clasificar cada goal en una de estas 3 categorías:
+
+- ASTAR: Todo lo relacionado con blockchain, web3, Astar Network, smart contracts, DeFi, NFTs, crypto
+- MAGCIENT: Todo lo relacionado con IA, Machine Learning, automation, data science, AI agents, LLMs
+- OTHER: Todo lo demás (marketing, ventas, producto, operaciones, finanzas, etc.)
+
+Responde SOLO con una palabra: ASTAR, MAGCIENT u OTHER.`
+          },
+          { 
+            role: 'user', 
+            content: `Descripción: ${description}\nTarea: ${task}\n\n¿Categoría?` 
+          }
+        ],
+        max_tokens: 10,
+        temperature: 0.3
+      })
+    });
+
+    if (!response.ok) {
+      return c.json({ category: 'OTHER' });
+    }
+
+    const data = await response.json() as any;
+    const category = data.choices[0]?.message?.content?.trim().toUpperCase() || 'OTHER';
+    
+    // Validate category
+    if (['ASTAR', 'MAGCIENT', 'OTHER'].includes(category)) {
+      return c.json({ category });
+    }
+    
+    return c.json({ category: 'OTHER' });
+
+  } catch (error) {
+    console.error('[DETERMINE-CATEGORY] Error:', error);
+    return c.json({ category: 'OTHER' });
+  }
+});
+
 // Process AI actions (create goals, add metrics, etc.)
 async function processAIActions(db: any, userId: number, aiResponse: string, context: any): Promise<string> {
   console.log('[PROCESS-ACTIONS] AI Response:', aiResponse);
