@@ -463,13 +463,13 @@ app.get('/', async (c) => {
                     <p class="text-gray-400 text-sm">Looking for a job at a promising startup</p>
                 </div>
 
-                <!-- Other Planet -->
-                <div class="flex flex-col items-center" onclick="selectRole('other')">
+                <!-- Validator Planet -->
+                <div class="flex flex-col items-center" onclick="selectRole('validator')">
                     <div class="planet planet-other">
-                        <span class="planet-badge">OTHER</span>
+                        <span class="planet-badge">VALIDATOR</span>
                     </div>
-                    <h3 class="text-xl font-bold mt-6 mb-2">OTHER</h3>
-                    <p class="text-gray-400 text-sm">I am curious about the ASTAR* ecosystem</p>
+                    <h3 class="text-xl font-bold mt-6 mb-2">VALIDATOR</h3>
+                    <p class="text-gray-400 text-sm">Validating and voting on promising projects</p>
                 </div>
             </div>
         </div>
@@ -515,8 +515,8 @@ app.get('/', async (c) => {
                 '<button onclick="loginWithGoogle(\\\'job_seeker\\\')" class="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
                   '<span class="mr-2">💼</span> Job Seeker' +
                 '</button>' +
-                '<button onclick="loginWithGoogle(\\\'other\\\')" class="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
-                  '<span class="mr-2">✨</span> Other' +
+                '<button onclick="loginWithGoogle(\\\'validator\\\')" class="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center">' +
+                  '<span class="mr-2">✅</span> Validator' +
                 '</button>' +
               '</div>' +
               '<button onclick="closeAuthModal()" class="mt-6 text-gray-400 hover:text-white">Close</button>' +
@@ -2329,8 +2329,8 @@ app.get('/leaderboard', (c) => {
         theme: {
           extend: {
             colors: {
-              primary: '#FF6154',
-              secondary: '#FB651E',
+              primary: '#8B5CF6',
+              secondary: '#A78BFA',
             }
           }
         }
@@ -2352,7 +2352,7 @@ app.get('/leaderboard', (c) => {
       }
       
       .text-gradient {
-        background: linear-gradient(135deg, #FF6154 0%, #FB651E 100%);
+        background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
@@ -2363,18 +2363,18 @@ app.get('/leaderboard', (c) => {
       }
       .card-hover:hover {
         transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(255, 97, 84, 0.2);
+        box-shadow: 0 20px 40px rgba(139, 92, 246, 0.2);
       }
       
       .nav-blur {
         backdrop-filter: blur(12px);
-        background-color: rgba(255, 255, 255, 0.8);
+        background-color: rgba(0, 0, 0, 0.9);
       }
     </style>
 </head>
-<body class="bg-white min-h-screen">
+<body class="bg-black min-h-screen">
     <!-- Navigation -->
-    <nav class="nav-blur sticky top-0 z-50 border-b border-gray-200/50">
+    <nav class="nav-blur sticky top-0 z-50 border-b border-gray-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
@@ -2386,15 +2386,15 @@ app.get('/leaderboard', (c) => {
                 
                 <!-- Desktop Navigation -->
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="/" class="text-gray-700 hover:text-primary transition font-semibold">Home</a>
-                    <a href="/leaderboard" class="text-primary font-bold">
-                        <i class="fas fa-trophy mr-1 text-yellow-500"></i>Leaderboard
+                    <a href="/" class="text-gray-300 hover:text-white transition font-semibold">Home</a>
+                    <a href="/leaderboard" class="text-purple-400 font-bold">
+                        <i class="fas fa-trophy mr-1 text-purple-400"></i>Leaderboard
                     </a>
-                    <a href="/marketplace" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-star mr-1 text-yellow-500"></i>Marketplace
+                    <a href="/marketplace" class="text-gray-300 hover:text-white transition font-semibold">
+                        <i class="fas fa-star mr-1 text-purple-400"></i>Marketplace
                     </a>
-                    <a href="/pricing" class="text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-tag mr-1 text-green-500"></i>Pricing
+                    <a href="/pricing" class="text-gray-300 hover:text-white transition font-semibold">
+                        <i class="fas fa-tag mr-1 text-purple-400"></i>Pricing
                     </a>
                 </div>
                 
@@ -2407,19 +2407,19 @@ app.get('/leaderboard', (c) => {
             </div>
             
             <!-- Mobile Navigation Menu -->
-            <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-200">
+            <div id="mobile-menu" class="hidden md:hidden bg-black border-t border-gray-800">
                 <div class="px-2 pt-2 pb-3 space-y-1">
-                    <a href="/" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition font-semibold">
+                    <a href="/" class="flex items-center px-3 py-2 text-gray-300 hover:text-white transition font-semibold">
                         <i class="fas fa-home mr-2"></i>Home
                     </a>
-                    <a href="/leaderboard" class="flex items-center px-3 py-2 text-primary font-bold">
-                        <i class="fas fa-trophy mr-2 text-yellow-500"></i>Leaderboard
+                    <a href="/leaderboard" class="flex items-center px-3 py-2 text-purple-400 font-bold">
+                        <i class="fas fa-trophy mr-2 text-purple-400"></i>Leaderboard
                     </a>
-                    <a href="/marketplace" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-star mr-2 text-yellow-500"></i>Marketplace
+                    <a href="/marketplace" class="flex items-center px-3 py-2 text-gray-300 hover:text-white transition font-semibold">
+                        <i class="fas fa-star mr-2 text-purple-400"></i>Marketplace
                     </a>
-                    <a href="/pricing" class="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition font-semibold">
-                        <i class="fas fa-tag mr-2 text-green-500"></i>Pricing
+                    <a href="/pricing" class="flex items-center px-3 py-2 text-gray-300 hover:text-white transition font-semibold">
+                        <i class="fas fa-tag mr-2 text-purple-400"></i>Pricing
                     </a>
                 </div>
             </div>
@@ -2450,7 +2450,7 @@ app.get('/leaderboard', (c) => {
     </script>
 
     <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-primary to-secondary text-white py-16 sm:py-20">
+    <div class="bg-gradient-to-r from-purple-600 to-purple-400 text-white py-16 sm:py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 class="text-5xl sm:text-6xl font-black mb-4">
                 🏆 Project Leaderboard
@@ -2491,57 +2491,57 @@ app.get('/leaderboard', (c) => {
         </div>
 
         <!-- Leaderboard Table -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div class="px-4 sm:px-6 py-4 bg-gradient-to-r from-primary to-secondary text-white">
+        <div class="bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-purple-600">
+            <div class="px-4 sm:px-6 py-4 bg-gradient-to-r from-purple-600 to-purple-400 text-white">
                 <h2 class="text-xl sm:text-2xl font-black">🏅 Project Rankings</h2>
             </div>
             
             <div id="leaderboard-loading" class="p-12 text-center">
-                <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="text-gray-600 font-medium">Loading leaderboard...</p>
+                <div class="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-gray-300 font-medium">Loading leaderboard...</p>
             </div>
             
             <div id="leaderboard-content" class="hidden">
                 <div class="overflow-x-auto scrollbar-hide">
                     <table class="w-full min-w-[1000px]">
-                        <thead class="bg-gray-50">
+                        <thead class="bg-gray-800 border-b border-gray-700">
                             <tr>
-                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Rank</th>
-                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-gray-900">Project</th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-white">Rank</th>
+                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-white">Project</th>
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
                                     <div class="flex flex-col items-center">
-                                        <i class="fas fa-trophy text-primary mr-1"></i>
+                                        <i class="fas fa-trophy text-purple-400 mr-1"></i>
                                         <span>Score</span>
                                     </div>
                                 </th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
                                     <div class="flex flex-col items-center">
-                                        <i class="fas fa-star text-yellow-500 mr-1"></i>
+                                        <i class="fas fa-star text-purple-400 mr-1"></i>
                                         <span>Rating</span>
                                     </div>
                                 </th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
                                     <div class="flex flex-col items-center">
-                                        <i class="fas fa-users text-blue-500 mr-1"></i>
+                                        <i class="fas fa-users text-purple-400 mr-1"></i>
                                         <span>Users</span>
                                     </div>
                                 </th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
                                     <div class="flex flex-col items-center">
-                                        <i class="fas fa-dollar-sign text-green-500 mr-1"></i>
+                                        <i class="fas fa-dollar-sign text-purple-400 mr-1"></i>
                                         <span>Revenue</span>
                                     </div>
                                 </th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-gray-900">
+                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
                                     <div class="flex flex-col items-center">
-                                        <i class="fas fa-bullseye text-purple-500 mr-1"></i>
+                                        <i class="fas fa-bullseye text-purple-400 mr-1"></i>
                                         <span>Goals</span>
                                     </div>
                                 </th>
-                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-gray-900 hidden md:table-cell">Created</th>
+                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-white hidden md:table-cell">Created</th>
                             </tr>
                         </thead>
-                        <tbody id="leaderboard-tbody" class="divide-y divide-gray-200">
+                        <tbody id="leaderboard-tbody" class="divide-y divide-gray-800">
                             <!-- Projects will be loaded here -->
                         </tbody>
                     </table>
@@ -2549,9 +2549,9 @@ app.get('/leaderboard', (c) => {
             </div>
             
             <div id="leaderboard-empty" class="hidden p-12 text-center">
-                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
-                <h3 class="text-xl font-semibold text-gray-600 mb-2">No projects in this category</h3>
-                <p class="text-gray-500">Be the first to publish a project in this category.</p>
+                <i class="fas fa-inbox text-6xl text-gray-600 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-300 mb-2">No projects in this category</h3>
+                <p class="text-gray-400">Be the first to publish a project in this category.</p>
             </div>
         </div>
     </div>
@@ -2604,12 +2604,12 @@ app.get('/leaderboard', (c) => {
             
             // Update button styles
             document.querySelectorAll('.category-btn').forEach(btn => {
-                btn.classList.remove('active', 'bg-primary', 'text-white');
-                btn.classList.add('bg-gray-200', 'text-gray-700');
+                btn.classList.remove('active', 'bg-purple-600', 'text-white');
+                btn.classList.add('bg-gray-800', 'text-gray-300');
             });
             
-            event.target.classList.add('active', 'bg-primary', 'text-white');
-            event.target.classList.remove('bg-gray-200', 'text-gray-700');
+            event.target.classList.add('active', 'bg-purple-600', 'text-white');
+            event.target.classList.remove('bg-gray-800', 'text-gray-300');
             
             renderLeaderboard();
         }
@@ -2641,34 +2641,34 @@ app.get('/leaderboard', (c) => {
                 const currentUsers = project.current_users || 0;
                 const currentRevenue = project.current_revenue || 0;
                 
-                return '<tr class="hover:bg-gray-50 transition cursor-pointer" onclick="viewProjectDetail(' + project.id + ')">' +
+                return '<tr class="hover:bg-gray-800 transition cursor-pointer bg-gray-900" onclick="viewProjectDetail(' + project.id + ')">' +
                     '<td class="px-2 sm:px-6 py-4">' +
                         '<span class="text-2xl font-bold">' + medal + '</span>' +
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4">' +
                         '<div class="flex items-center space-x-3">' +
                             '<div>' +
-                                '<div class="font-bold text-gray-900">' + escapedTitle + '</div>' +
-                                '<div class="text-sm text-gray-500">' + escapedCategory + '</div>' +
-                                '<div class="text-xs text-gray-400 mt-1">by ' + escapedCreator + '</div>' +
+                                '<div class="font-bold text-white">' + escapedTitle + '</div>' +
+                                '<div class="text-sm text-gray-400">' + escapedCategory + '</div>' +
+                                '<div class="text-xs text-gray-500 mt-1">by ' + escapedCreator + '</div>' +
                             '</div>' +
                         '</div>' +
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4">' +
                         '<div class="text-center">' +
-                            '<div class="text-2xl sm:text-3xl font-black text-primary">' + score.toFixed(1) + '</div>' +
-                            '<div class="text-xs text-gray-500 mt-2 space-y-1">' +
+                            '<div class="text-2xl sm:text-3xl font-black text-purple-400">' + score.toFixed(1) + '</div>' +
+                            '<div class="text-xs text-gray-400 mt-2 space-y-1">' +
                                 '<div class="flex items-center justify-center space-x-2 sm:space-x-3">' +
                                     '<span title="Rating Score (40%)" class="flex items-center text-xs">' +
-                                        '<i class="fas fa-star text-yellow-400 mr-1"></i>' +
+                                        '<i class="fas fa-star text-purple-400 mr-1"></i>' +
                                         '<span class="hidden sm:inline">' + (breakdown.rating ? breakdown.rating.toFixed(0) : 0) + '</span>' +
                                     '</span>' +
                                     '<span title="Growth Score (35%)" class="flex items-center text-xs">' +
-                                        '<i class="fas fa-chart-line text-green-500 mr-1"></i>' +
+                                        '<i class="fas fa-chart-line text-purple-400 mr-1"></i>' +
                                         '<span class="hidden sm:inline">' + (breakdown.growth ? breakdown.growth.toFixed(0) : 0) + '</span>' +
                                     '</span>' +
                                     '<span title="Goals Score (25%)" class="flex items-center text-xs">' +
-                                        '<i class="fas fa-check-circle text-blue-500 mr-1"></i>' +
+                                        '<i class="fas fa-check-circle text-purple-400 mr-1"></i>' +
                                         '<span class="hidden sm:inline">' + (breakdown.goals ? breakdown.goals.toFixed(0) : 0) + '</span>' +
                                     '</span>' +
                                 '</div>' +
@@ -2677,26 +2677,26 @@ app.get('/leaderboard', (c) => {
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4">' +
                         '<div class="flex items-center justify-center">' +
-                            '<span class="text-yellow-400 mr-1">★</span>' +
-                            '<span class="font-semibold">' + (project.rating_average || 0).toFixed(1) + '</span>' +
+                            '<span class="text-purple-400 mr-1">★</span>' +
+                            '<span class="font-semibold text-white">' + (project.rating_average || 0).toFixed(1) + '</span>' +
                             '<span class="text-gray-400 text-sm ml-1">(' + (project.votes_count || 0) + ')</span>' +
                         '</div>' +
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<div class="font-semibold text-gray-900">' + formatNumber(currentUsers) + '</div>' +
+                        '<div class="font-semibold text-white">' + formatNumber(currentUsers) + '</div>' +
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<div class="font-semibold text-green-600">$' + formatNumber(currentRevenue) + '</div>' +
+                        '<div class="font-semibold text-purple-400">$' + formatNumber(currentRevenue) + '</div>' +
                     '</td>' +
                     '<td class="px-2 sm:px-6 py-4 text-center">' +
                         '<div class="flex flex-col items-center">' +
-                            '<div class="w-full bg-gray-200 rounded-full h-2 mb-1">' +
-                                '<div class="bg-blue-600 h-2 rounded-full" style="width: ' + goalsPercent + '%"></div>' +
+                            '<div class="w-full bg-gray-700 rounded-full h-2 mb-1">' +
+                                '<div class="bg-purple-600 h-2 rounded-full" style="width: ' + goalsPercent + '%"></div>' +
                             '</div>' +
-                            '<span class="text-xs text-gray-600">' + completedGoals + '/' + totalGoals + '</span>' +
+                            '<span class="text-xs text-gray-400">' + completedGoals + '/' + totalGoals + '</span>' +
                         '</div>' +
                     '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-gray-500 text-sm hidden md:table-cell">' +
+                    '<td class="px-2 sm:px-6 py-4 text-gray-400 text-sm hidden md:table-cell">' +
                         formatDate(project.created_at) +
                     '</td>' +
                 '</tr>';

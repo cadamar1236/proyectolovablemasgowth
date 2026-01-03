@@ -951,4 +951,68 @@ auth.get('/users-by-role', async (c) => {
   }
 });
 
+// Get user profile with onboarding data
+auth.get('/user-profile/:userId', async (c) => {
+  try {
+    const userId = c.req.param('userId');
+    
+    if (!userId) {
+      return c.json({ error: 'User ID is required' }, 400);
+    }
+
+    // Get user basic info
+    const user = await c.env.DB.prepare(`
+      SELECT 
+        id,
+        name,
+        email,
+        role,
+        bio,
+        company,
+        avatar_url,
+        location,
+        skills,
+        interests,
+        investment_range,
+        looking_for,
+        linkedin_url,
+        twitter_url,
+        website_url,
+        created_at
+      FROM users
+      WHERE id = ?
+    `).bind(userId).first();
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Get onboarding data
+    const onboardingSession = await c.env.DB.prepare(`
+      SELECT session_data, completed, completed_at
+      FROM onboarding_sessions
+      WHERE user_id = ?
+      ORDER BY completed_at DESC
+      LIMIT 1
+    `).bind(userId).first();
+
+    let onboardingData = null;
+    if (onboardingSession && onboardingSession.session_data) {
+      try {
+        onboardingData = JSON.parse(onboardingSession.session_data);
+      } catch (e) {
+        console.error('Error parsing onboarding data:', e);
+      }
+    }
+
+    return c.json({
+      ...user,
+      onboarding: onboardingData
+    });
+  } catch (error) {
+    console.error('[AUTH] Error getting user profile:', error);
+    return c.json({ error: 'Failed to get user profile' }, 500);
+  }
+});
+
 export default auth;
