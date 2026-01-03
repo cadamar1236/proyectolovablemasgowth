@@ -245,7 +245,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                            <i class="fas fa-robot text-primary text-lg"></i>
+                            <span class="text-2xl">⭐</span>
                         </div>
                         <div>
                             <h3 class="font-bold text-white">Marketing Agent</h3>
@@ -262,6 +262,10 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             <div class="p-4 border-b border-gray-100 bg-gray-50">
                 <p class="text-xs font-bold text-gray-600 mb-3 uppercase">Quick Actions</p>
                 <div class="grid grid-cols-2 gap-2">
+                    <button onclick="startGoalCreation()" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:shadow-lg px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center justify-center">
+                        <i class="fas fa-plus-circle mr-1.5"></i>
+                        Create Goal
+                    </button>
                     <button onclick="analyzeGoals()" class="bg-white border border-gray-200 hover:border-primary hover:shadow-md px-3 py-2 rounded-lg text-xs font-semibold text-gray-700 hover:text-primary transition flex items-center justify-center">
                         <i class="fas fa-chart-bar mr-1.5"></i>
                         Analyze Goals
@@ -274,17 +278,13 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                         <i class="fas fa-pencil-alt mr-1.5"></i>
                         Content Ideas
                     </button>
-                    <button onclick="analyzeCompetition()" class="bg-white border border-gray-200 hover:border-primary hover:shadow-md px-3 py-2 rounded-lg text-xs font-semibold text-gray-700 hover:text-primary transition flex items-center justify-center">
-                        <i class="fas fa-crosshairs mr-1.5"></i>
-                        Competition
-                    </button>
                 </div>
             </div>
 
             <!-- Chat Messages -->
             <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
                 <div class="text-center text-gray-500 text-sm">
-                    <i class="fas fa-robot text-3xl text-gray-300 mb-2"></i>
+                    <span class="text-3xl mb-2 block">⭐</span>
                     <p class="font-semibold">Start chatting with your Marketing Agent</p>
                     <p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>
                 </div>
@@ -526,7 +526,162 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('Error generating content ideas:', error);
-                addMessageToChat('assistant', 'Error al generar ideas de contenido. Por favor intenta de nuevo.');
+                addMessageToChat('assistant', 'Error al analizar competencia. Por favor intenta de nuevo.');
+            }
+        }
+
+        // Goal Creation Flow
+        let goalCreationFlow = {
+            active: false,
+            step: 0,
+            data: {}
+        };
+
+        const goalQuestions = [
+            { field: 'category', question: '¿En qué categoría está este goal? (ASTAR / MAGCIENT / OTHER)', options: ['ASTAR', 'MAGCIENT', 'OTHER'] },
+            { field: 'description', question: '¿Cuál es la descripción del goal?', type: 'text' },
+            { field: 'task', question: '¿Cuál es la tarea específica?', type: 'text' },
+            { field: 'priority', question: '¿Qué prioridad tiene?\\n- P0: Urgent & important\\n- P1: Urgent or important\\n- P2: Urgent but not important\\n- P3: Neither but cool', options: ['P0', 'P1', 'P2', 'P3'] },
+            { field: 'cadence', question: '¿Es una tarea única o recurrente? (One time / Recurrent)', options: ['One time', 'Recurrent'] },
+            { field: 'dri', question: '¿Quién es el responsable directo (DRI)?', type: 'text' },
+            { field: 'goal_status', question: '¿Cuál es el estado actual?\\n- To start\\n- WIP\\n- On Hold\\n- Delayed\\n- Blocked\\n- Done', options: ['To start', 'WIP', 'On Hold', 'Delayed', 'Blocked', 'Done'] },
+            { field: 'week_of', question: '¿Para qué semana es este goal? (ej: "December 30")', type: 'text', optional: true }
+        ];
+
+        function startGoalCreation() {
+            goalCreationFlow.active = true;
+            goalCreationFlow.step = 0;
+            goalCreationFlow.data = {};
+            
+            addMessageToChat('assistant', '✨ ¡Perfecto! Voy a ayudarte a crear un nuevo goal. Te haré algunas preguntas para completar toda la información necesaria.\\n\\n' + goalQuestions[0].question);
+            
+            if (goalQuestions[0].options) {
+                showQuickReplyOptions(goalQuestions[0].options);
+            }
+        }
+
+        function showQuickReplyOptions(options) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'quick-reply-options flex flex-wrap gap-2 mb-4';
+            optionsDiv.id = 'quick-reply-buttons';
+            
+            options.forEach(option => {
+                const btn = document.createElement('button');
+                btn.className = 'px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-medium transition';
+                btn.textContent = option;
+                btn.onclick = () => handleQuickReply(option);
+                optionsDiv.appendChild(btn);
+            });
+            
+            messagesContainer.appendChild(optionsDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function removeQuickReplyOptions() {
+            const buttons = document.getElementById('quick-reply-buttons');
+            if (buttons) buttons.remove();
+        }
+
+        async function handleQuickReply(value) {
+            if (!goalCreationFlow.active) return;
+            
+            removeQuickReplyOptions();
+            addMessageToChat('user', value);
+            
+            const currentQuestion = goalQuestions[goalCreationFlow.step];
+            goalCreationFlow.data[currentQuestion.field] = value;
+            
+            goalCreationFlow.step++;
+            
+            if (goalCreationFlow.step < goalQuestions.length) {
+                const nextQuestion = goalQuestions[goalCreationFlow.step];
+                addMessageToChat('assistant', nextQuestion.question);
+                
+                if (nextQuestion.options) {
+                    showQuickReplyOptions(nextQuestion.options);
+                }
+            } else {
+                await completeGoalCreation();
+            }
+        }
+
+        // Modify sendChatMessage to handle goal creation flow
+        const originalSendChatMessage = sendChatMessage;
+        sendChatMessage = async function() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            if (goalCreationFlow.active) {
+                removeQuickReplyOptions();
+                addMessageToChat('user', message);
+                input.value = '';
+                
+                const currentQuestion = goalQuestions[goalCreationFlow.step];
+                goalCreationFlow.data[currentQuestion.field] = message;
+                
+                goalCreationFlow.step++;
+                
+                if (goalCreationFlow.step < goalQuestions.length) {
+                    const nextQuestion = goalQuestions[goalCreationFlow.step];
+                    addMessageToChat('assistant', nextQuestion.question);
+                    
+                    if (nextQuestion.options) {
+                        showQuickReplyOptions(nextQuestion.options);
+                    }
+                } else {
+                    await completeGoalCreation();
+                }
+                return;
+            }
+
+            // Original behavior for normal chat
+            await originalSendChatMessage();
+        };
+
+        async function completeGoalCreation() {
+            goalCreationFlow.active = false;
+            document.getElementById('chat-loading').classList.remove('hidden');
+            
+            try {
+                const priorityLabels = {
+                    'P0': 'Urgent & important',
+                    'P1': 'Urgent or important',
+                    'P2': 'Urgent but not important',
+                    'P3': 'Neither but cool'
+                };
+                
+                const goalData = {
+                    ...goalCreationFlow.data,
+                    priority_label: priorityLabels[goalCreationFlow.data.priority]
+                };
+                
+                const response = await axios.post('/api/marketing-ai/create-goal', goalData, {
+                    withCredentials: true
+                });
+                
+                document.getElementById('chat-loading').classList.add('hidden');
+                
+                if (response.data.success) {
+                    addMessageToChat('assistant', \`✅ ¡Goal creado exitosamente!\\n\\n📋 **\${goalData.task}**\\n🏷️ Categoría: \${goalData.category}\\n⚡ Prioridad: \${goalData.priority}\\n👤 Responsable: \${goalData.dri}\\n📊 Estado: \${goalData.goal_status}\\n\\n¡El goal ya está disponible en tu Founder Hub!\`);
+                    
+                    // Refresh the page to show new goal
+                    setTimeout(() => {
+                        if (typeof loadDashboardData === 'function') {
+                            loadDashboardData();
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 2000);
+                } else {
+                    addMessageToChat('assistant', '❌ Hubo un error al crear el goal. Por favor intenta de nuevo.');
+                }
+            } catch (error) {
+                document.getElementById('chat-loading').classList.add('hidden');
+                console.error('Error creating goal:', error);
+                addMessageToChat('assistant', '❌ Error al crear el goal. Por favor intenta de nuevo o usa el botón "New Goal" en el Hub.');
             }
         }
 
@@ -560,8 +715,8 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 });
                 
                 document.getElementById('chat-messages').innerHTML = \`
-                    <div class="text-center text-gray-500 text-sm">
-                        <i class="fas fa-robot text-3xl text-gray-300 mb-2"></i>
+                    <div class="text-center text-gray-500 text-sm py-8">
+                        <span class="text-3xl mb-2 block">⭐</span>
                         <p class="font-semibold">Start chatting with your Marketing Agent</p>
                         <p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>
                     </div>
@@ -605,8 +760,8 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 const messagesContainer = document.getElementById('chat-messages');
                 if (messagesContainer) {
                     messagesContainer.innerHTML = \`
-                        <div class="text-center text-gray-500 text-sm">
-                            <i class="fas fa-robot text-3xl text-gray-300 mb-2"></i>
+                        <div class="text-center text-gray-500 text-sm py-8">
+                            <span class="text-3xl mb-2 block">⭐</span>
                             <p class="font-semibold">Start chatting with your Marketing Agent</p>
                             <p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>
                         </div>
