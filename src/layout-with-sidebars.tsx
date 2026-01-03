@@ -429,7 +429,13 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     // Check if AI wants to trigger goal creation flow
                     if (aiMessage.includes('TRIGGER:START_GOAL_FLOW')) {
                         startGoalCreation();
-                    } else {
+                    } 
+                    // Check if AI wants to trigger goal edit flow
+                    else if (aiMessage.includes('TRIGGER:EDIT_GOAL_FLOW|')) {
+                        const goalId = aiMessage.split('TRIGGER:EDIT_GOAL_FLOW|')[1].split('\\n')[0].trim();
+                        startGoalCreation(parseInt(goalId));
+                    } 
+                    else {
                         addMessageToChat('assistant', aiMessage);
                     }
                 } else {
@@ -537,11 +543,12 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             }
         }
 
-        // Goal Creation Flow
+        // Goal Creation/Edit Flow
         let goalCreationFlow = {
             active: false,
             step: 0,
-            data: {}
+            data: {},
+            editingGoalId: null
         };
 
         const goalQuestions = [
@@ -554,12 +561,14 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             { field: 'week_of', question: '¿Para qué semana es este goal? (ej: "December 30" o puedes dejarlo en blanco)', type: 'text', optional: true }
         ];
 
-        function startGoalCreation() {
+        function startGoalCreation(goalId = null) {
             goalCreationFlow.active = true;
             goalCreationFlow.step = 0;
             goalCreationFlow.data = {};
+            goalCreationFlow.editingGoalId = goalId;
             
-            addMessageToChat('assistant', '✨ ¡Perfecto! Voy a ayudarte a crear un nuevo goal. Te haré algunas preguntas para completar toda la información necesaria.\\n\\n' + goalQuestions[0].question);
+            const actionText = goalId ? 'editar este goal' : 'crear un nuevo goal';
+            addMessageToChat('assistant', \`✨ ¡Perfecto! Voy a ayudarte a \${actionText}. Te haré algunas preguntas para completar toda la información necesaria.\\n\\n\` + goalQuestions[0].question);
             
             if (goalQuestions[0].options) {
                 showQuickReplyOptions(goalQuestions[0].options);
@@ -688,16 +697,28 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     priority_label: priorityLabels[goalCreationFlow.data.priority]
                 };
                 
-                const response = await axios.post('/api/marketing-ai/create-goal', goalData, {
-                    withCredentials: true
-                });
+                const isEditing = goalCreationFlow.editingGoalId !== null;
+                let response;
+                
+                if (isEditing) {
+                    // Update existing goal
+                    response = await axios.put(\`/api/dashboard/goals/\${goalCreationFlow.editingGoalId}\`, goalData, {
+                        withCredentials: true
+                    });
+                } else {
+                    // Create new goal
+                    response = await axios.post('/api/marketing-ai/create-goal', goalData, {
+                        withCredentials: true
+                    });
+                }
                 
                 document.getElementById('chat-loading').classList.add('hidden');
                 
-                if (response.data.success) {
-                    addMessageToChat('assistant', \`✅ ¡Goal creado exitosamente!\\n\\n📋 **\${goalData.task}**\\n🏷️ Categoría: \${goalData.category} (determinada por IA)\\n⚡ Prioridad: \${goalData.priority}\\n👤 Responsable: \${goalData.dri}\\n📊 Estado: \${goalData.goal_status}\\n\\n¡El goal ya está disponible en tu Founder Hub!\`);
+                if (response.data.success || response.status === 200) {
+                    const actionText = isEditing ? 'actualizado' : 'creado';
+                    addMessageToChat('assistant', \`✅ ¡Goal \${actionText} exitosamente!\\n\\n📋 **\${goalData.task}**\\n🏷️ Categoría: \${goalData.category} (determinada por IA)\\n⚡ Prioridad: \${goalData.priority}\\n👤 Responsable: \${goalData.dri}\\n📊 Estado: \${goalData.goal_status}\\n\\n¡El goal ya está disponible en tu Founder Hub!\`);
                     
-                    // Refresh the page to show new goal
+                    // Refresh the page to show updated goal
                     setTimeout(() => {
                         if (typeof loadDashboardData === 'function') {
                             loadDashboardData();
@@ -706,7 +727,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                         }
                     }, 2000);
                 } else {
-                    addMessageToChat('assistant', '❌ Hubo un error al crear el goal. Por favor intenta de nuevo.');
+                    addMessageToChat('assistant', '❌ Hubo un error al guardar el goal. Por favor intenta de nuevo.');
                 }
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');

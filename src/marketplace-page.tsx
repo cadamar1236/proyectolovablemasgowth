@@ -764,7 +764,15 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         const goal = allGoals.find(g => g.id === goalId);
         if (!goal) return;
         
-        // Populate modal with existing goal data
+        // Store goal ID FIRST before opening modal
+        const form = document.getElementById('goal-form');
+        if (form) form.dataset.editingGoalId = goalId;
+        
+        // Show modal first
+        document.getElementById('goal-modal').classList.remove('hidden'); 
+        document.getElementById('goal-modal').classList.add('flex');
+        
+        // Then populate with existing goal data
         document.getElementById('goal-description').value = goal.description || '';
         document.getElementById('goal-task').value = goal.task || '';
         document.getElementById('goal-category').value = goal.category || 'OTHER';
@@ -780,13 +788,6 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         
         const submitBtn = document.querySelector('#goal-modal button[type="submit"]');
         if (submitBtn) submitBtn.textContent = 'Update Goal';
-        
-        // Store goal ID for update
-        const form = document.getElementById('goal-form');
-        form.dataset.editingGoalId = goalId;
-        
-        // Open modal
-        openGoalModal();
       };
 
       function initCharts() {
