@@ -72,7 +72,7 @@ class LinkedInConnectorTeam:
                 "When you have enough details, confirm with the user before searching"
             ],
             markdown=True,
-            add_history_to_messages=True,
+            add_history_to_context=True,
             add_datetime_to_instructions=True
         )
         
