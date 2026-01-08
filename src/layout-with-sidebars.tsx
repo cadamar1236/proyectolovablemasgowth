@@ -1,11 +1,11 @@
 /**
  * Layout Component with Left Navigation Sidebar and Right Chat Sidebar
- * Used across Dashboard, Marketplace, and other authenticated pages
+ * Used across Dashboard, Directory, and other authenticated pages
  */
 
 export interface LayoutProps {
   content: string;
-  currentPage: 'dashboard' | 'marketplace' | 'leaderboard' | 'planner' | 'inbox' | 'notifications';
+  currentPage: 'dashboard' | 'directory' | 'leaderboard' | 'planner' | 'inbox' | 'notifications' | 'competitions';
   userName: string;
   userAvatar?: string;
   pageTitle: string;
@@ -124,11 +124,15 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                         <span>🚀</span>
                         <span class="hidden sm:inline">Hub</span>
                     </a>
+                    <a href="/competitions" class="text-gray-300 hover:text-white text-sm flex items-center space-x-1 transition">
+                        <span>🏅</span>
+                        <span class="hidden sm:inline">Competitions</span>
+                    </a>
                     <a href="/leaderboard" class="text-gray-300 hover:text-white text-sm flex items-center space-x-1 transition">
                         <span>🏆</span>
                         <span class="hidden sm:inline">Leaderboard</span>
                     </a>
-                    <a href="/marketplace" class="text-gray-300 hover:text-white text-sm flex items-center space-x-1 transition">
+                    <a href="/dashboard?tab=directory" class="text-gray-300 hover:text-white text-sm flex items-center space-x-1 transition">
                         <span>🔥</span>
                         <span class="hidden sm:inline">Trending</span>
                     </a>
@@ -143,8 +147,8 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
     <!-- Layout Container -->
     <div class="flex h-screen overflow-hidden pt-12">
         
-        <!-- Left Sidebar - Navigation Menu -->
-        <aside id="left-sidebar" class="left-sidebar w-64 bg-gray-900 border-r border-gray-800 flex-shrink-0 hidden md:flex flex-col fixed md:static inset-y-0 left-0 z-40">
+        <!-- Left Sidebar - Navigation Menu (Hidden) -->
+        <aside id="left-sidebar" class="left-sidebar w-64 bg-gray-900 border-r border-gray-800 flex-shrink-0 hidden flex-col fixed md:static inset-y-0 left-0 z-40" style="display: none;">
             <!-- Logo/Brand -->
             <div class="p-6 border-b border-gray-800">
                 <div class="flex items-center space-x-3">
@@ -203,12 +207,24 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     <span class="font-semibold">Leaderboard</span>
                 </a>
 
-                <a href="#" onclick="switchTab('marketplace'); return false;" class="nav-item sidebar-nav-marketplace flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
-                    <i class="fas fa-store mr-3 text-lg w-5"></i>
-                    <span class="font-semibold">Marketplace</span>
+                <a href="/competitions" class="nav-item ${currentPage === 'competitions' ? 'active' : ''} flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
+                    <i class="fas fa-medal mr-3 text-lg w-5"></i>
+                    <span class="font-semibold">Competitions</span>
                 </a>
 
-                <a href="#" onclick="switchTab('marketplace'); return false;" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                ${userRole === 'admin' ? `
+                <a href="/admin" class="nav-item flex items-center px-4 py-3 text-yellow-400 hover:text-yellow-300 rounded-lg mb-2 border border-yellow-400">
+                    <i class="fas fa-shield-alt mr-3 text-lg w-5"></i>
+                    <span class="font-semibold">Admin</span>
+                </a>
+                ` : ''}
+
+                <a href="#" onclick="switchTab('directory'); return false;" class="nav-item sidebar-nav-directory flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
+                    <i class="fas fa-store mr-3 text-lg w-5"></i>
+                    <span class="font-semibold">Directory</span>
+                </a>
+
+                <a href="#" onclick="switchTab('directory'); return false;" class="nav-item flex items-center px-4 py-3 text-gray-600 hover:text-primary rounded-lg mb-2">
                     <i class="fas fa-fire mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Trending Products</span>
                 </a>
@@ -243,28 +259,28 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             ${content}
         </main>
 
-        <!-- Right Sidebar - Marketing Agent Chat -->
-        <aside id="chat-sidebar" class="bg-white border-l border-gray-200 transition-all duration-300 ease-in-out flex flex-col" style="width: 400px;">
+        <!-- Right Sidebar - ASTAR Agent Chat -->
+        ${userRole !== 'guest' ? `
+        <aside id="chat-sidebar" class="bg-white border-l border-gray-200 transition-all duration-300 ease-in-out flex flex-col overflow-hidden" style="width: 400px;">
             <!-- Chat Header -->
             <div class="p-4 border-b border-gray-200 bg-gradient-to-r from-primary to-secondary">
                 <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+                    <div id="chat-header-content" class="flex items-center space-x-3 transition-opacity duration-300">
+                        <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
                             <span class="text-2xl">⭐</span>
                         </div>
-                        <div>
-                            <h3 class="font-bold text-white">Marketing Agent</h3>
-                            <p class="text-xs text-white/80">Powered by Groq AI</p>
+                        <div class="chat-sidebar-text">
+                            <h3 class="font-bold text-white">ASTAR Agent</h3>
                         </div>
                     </div>
-                    <button onclick="toggleChatSidebar()" class="text-white hover:bg-white/20 p-2 rounded-lg transition">
+                    <button onclick="toggleChatSidebar()" class="text-white hover:bg-white/20 p-2 rounded-lg transition flex-shrink-0">
                         <i class="fas fa-chevron-right text-sm"></i>
                     </button>
                 </div>
             </div>
 
             <!-- Quick Actions -->
-            <div class="p-4 border-b border-gray-100 bg-gray-50">
+            <div id="quick-actions" class="p-4 border-b border-gray-100 bg-gray-50 chat-sidebar-text">
                 <p class="text-xs font-bold text-gray-600 mb-3 uppercase">Quick Actions</p>
                 <div class="grid grid-cols-2 gap-2">
                     <button onclick="startGoalCreation()" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:shadow-lg px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center justify-center">
@@ -287,7 +303,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             </div>
 
             <!-- Chat Messages -->
-            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 chat-sidebar-text">
                 <div class="text-center text-gray-500 text-sm">
                     <span class="text-3xl mb-2 block">⭐</span>
                     <p class="font-semibold">Start chatting with your Marketing Agent</p>
@@ -296,7 +312,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             </div>
 
             <!-- Loading Indicator -->
-            <div id="chat-loading" class="hidden px-4 py-2">
+            <div id="chat-loading" class="hidden px-4 py-2 chat-sidebar-text">
                 <div class="flex items-center space-x-2 text-gray-500">
                     <div class="flex space-x-1">
                         <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay: 0s"></div>
@@ -308,7 +324,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             </div>
 
             <!-- Chat Input -->
-            <div class="p-4 border-t border-gray-200 bg-white">
+            <div id="chat-input-container" class="p-4 border-t border-gray-200 bg-white chat-sidebar-text">
                 <div class="flex items-end space-x-2">
                     <textarea 
                         id="chat-input" 
@@ -332,6 +348,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 </div>
             </div>
         </aside>
+        ` : ''}
     </div>
 
     <script>
@@ -380,14 +397,29 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
         function toggleChatSidebar() {
             const sidebar = document.getElementById('chat-sidebar');
+            if (!sidebar) return; // No sidebar for guests
+            
+            const textElements = sidebar.querySelectorAll('.chat-sidebar-text');
             chatSidebarOpen = !chatSidebarOpen;
             
             if (chatSidebarOpen) {
                 sidebar.style.width = '400px';
                 sidebar.querySelector('.fa-chevron-right')?.classList.replace('fa-chevron-left', 'fa-chevron-right');
+                // Show text content after animation
+                setTimeout(() => {
+                    textElements.forEach(el => {
+                        el.style.display = '';
+                        el.style.opacity = '1';
+                    });
+                }, 150);
             } else {
                 sidebar.style.width = '60px';
                 sidebar.querySelector('.fa-chevron-right')?.classList.replace('fa-chevron-right', 'fa-chevron-left');
+                // Hide text content immediately
+                textElements.forEach(el => {
+                    el.style.display = 'none';
+                    el.style.opacity = '0';
+                });
             }
         }
 
@@ -406,6 +438,8 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         // Chat Functions
         async function sendChatMessage() {
             const input = document.getElementById('chat-input');
+            if (!input) return; // No chat for guests
+            
             const message = input.value.trim();
             
             if (!message) return;
@@ -763,6 +797,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         }
 
         async function clearChatHistory() {
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return; // No chat for guests
+            
             if (!confirm('¿Estás seguro de que quieres limpiar el historial del chat?')) return;
             
             try {
@@ -773,7 +810,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 document.getElementById('chat-messages').innerHTML = \`
                     <div class="text-center text-gray-500 text-sm py-8">
                         <span class="text-3xl mb-2 block">⭐</span>
-                        <p class="font-semibold">Start chatting with your Marketing Agent</p>
+                        <p class="font-semibold">Start chatting with your ASTAR Agent</p>
                         <p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>
                     </div>
                 \`;
@@ -818,7 +855,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     messagesContainer.innerHTML = \`
                         <div class="text-center text-gray-500 text-sm py-8">
                             <span class="text-3xl mb-2 block">⭐</span>
-                            <p class="font-semibold">Start chatting with your Marketing Agent</p>
+                            <p class="font-semibold">Start chatting with your ASTAR Agent</p>
                             <p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>
                         </div>
                     \`;

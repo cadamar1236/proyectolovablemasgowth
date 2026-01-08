@@ -1,17 +1,17 @@
 /**
  * ASTAR* Hub - Startup Dashboard
- * Dashboard with 4 tabs: Home, Traction, Inbox, Marketplace
+ * Dashboard with 4 tabs: Home, Traction, Inbox, Directory
  */
 
 import { createLayoutWithSidebars } from './layout-with-sidebars';
 
-export interface MarketplacePageProps {
+export interface DirectoryPageProps {
   userName: string;
   userAvatar?: string;
   userRole?: string;
 }
 
-export function getMarketplacePage(props: MarketplacePageProps): string {
+export function getDirectoryPage(props: DirectoryPageProps): string {
   const { userName, userAvatar, userRole } = props;
 
   const content = `
@@ -27,7 +27,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         <div class="flex border-b border-gray-200">
           ${userRole === 'founder' ? `
           <button onclick="switchTab('home')" id="tab-home" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-primary border-b-2 border-primary">
-            <i class="fas fa-home mr-2"></i>Home
+            <i class="fas fa-home mr-2"></i>Hub
           </button>
           <button onclick="switchTab('traction')" id="tab-traction" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
             <i class="fas fa-chart-line mr-2"></i>Traction
@@ -37,8 +37,11 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
             <i class="fas fa-inbox mr-2"></i>Inbox
             <span id="unread-badge" class="hidden ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">0</span>
           </button>
-          <button onclick="switchTab('marketplace')" id="tab-marketplace" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
-            <i class="fas fa-store mr-2"></i>Marketplace
+          <button onclick="window.location.href='/competitions'" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
+            <i class="fas fa-trophy mr-2"></i>Competitions
+          </button>
+          <button onclick="switchTab('directory')" id="tab-directory" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
+            <i class="fas fa-store mr-2"></i>Directory
           </button>
         </div>
       </div>
@@ -230,9 +233,27 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           <!-- Conversations List -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200">
             <div class="p-4 border-b border-gray-200">
-              <h3 class="font-bold text-gray-900">Conversations</h3>
+              <h3 class="font-bold text-gray-900">Messages</h3>
+              <div class="flex gap-2 mt-2">
+                <button onclick="showInboxSection('active')" id="inbox-active-btn" class="flex-1 px-3 py-2 text-sm font-semibold text-primary border-b-2 border-primary bg-primary/5 rounded-t-lg">
+                  Active Users
+                </button>
+                <button onclick="showInboxSection('conversations')" id="inbox-conversations-btn" class="flex-1 px-3 py-2 text-sm font-semibold text-gray-500 border-b-2 border-transparent rounded-t-lg hover:bg-gray-50">
+                  Conversations
+                </button>
+              </div>
             </div>
-            <div id="conversations-list" class="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+            
+            <!-- Active Users Section -->
+            <div id="active-users-list" class="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+              <div class="p-8 text-center text-gray-500">
+                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                <p>Loading active users...</p>
+              </div>
+            </div>
+            
+            <!-- Conversations Section -->
+            <div id="conversations-list" class="divide-y divide-gray-200 max-h-[600px] overflow-y-auto hidden">
               <div class="p-8 text-center text-gray-500">
                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                 <p>Loading...</p>
@@ -261,16 +282,16 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         </div>
       </div>
 
-      <!-- MARKETPLACE TAB -->
-      <div id="content-marketplace" class="tab-content hidden">
+      <!-- DIRECTORY TAB -->
+      <div id="content-directory" class="tab-content hidden">
         <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
-          <button onclick="showMarketplaceSection('products')" id="mp-products-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-primary border-b-2 border-primary whitespace-nowrap">Products</button>
-          <button onclick="showMarketplaceSection('founders')" id="mp-founders-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Founders</button>
-          <button onclick="showMarketplaceSection('investors')" id="mp-investors-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Investors</button>
-          <button onclick="showMarketplaceSection('validators')" id="mp-validators-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Validators</button>
-          <button onclick="showMarketplaceSection('scouts')" id="mp-scouts-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Scouts</button>
-          <button onclick="showMarketplaceSection('partners')" id="mp-partners-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Partners</button>
-          <button onclick="showMarketplaceSection('talent')" id="mp-talent-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Talent</button>
+          <button onclick="showDirectorySection('products')" id="mp-products-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-primary border-b-2 border-primary whitespace-nowrap">Products</button>
+          <button onclick="showDirectorySection('founders')" id="mp-founders-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Founders</button>
+          <button onclick="showDirectorySection('investors')" id="mp-investors-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Investors</button>
+          <button onclick="showDirectorySection('validators')" id="mp-validators-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Validators</button>
+          <button onclick="showDirectorySection('scouts')" id="mp-scouts-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Scouts</button>
+          <button onclick="showDirectorySection('partners')" id="mp-partners-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Partners</button>
+          <button onclick="showDirectorySection('talent')" id="mp-talent-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Talent</button>
         </div>
 
         <!-- Products Section -->
@@ -526,6 +547,8 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
       let allGoals = [], metricsHistory = [], conversations = [], currentConversation = null;
       let currentFilter = 'all';
       let usersChart = null, revenueChart = null;
+      let activeUsers = [];
+      let currentInboxSection = 'active';
 
       // Tab switching
       function switchTab(tab) {
@@ -541,7 +564,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         
         if (tab === 'traction') setTimeout(initCharts, 100);
         if (tab === 'inbox') loadConversations();
-        if (tab === 'marketplace') { loadProducts(); loadValidators(); }
+        if (tab === 'directory') { loadProducts(); loadValidators(); }
       }
 
       // Load dashboard data
@@ -873,19 +896,29 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           const form = document.getElementById('goal-form');
           const editingGoalId = form ? form.dataset.editingGoalId : null;
           
+          console.log('[GOAL] Saving goal:', { editingGoalId, goalData });
+          
           if (editingGoalId) {
             // Update existing goal
-            await axios.put('/api/dashboard/goals/' + editingGoalId, goalData);
+            console.log('[GOAL] Updating goal:', editingGoalId);
+            const response = await axios.put('/api/dashboard/goals/' + editingGoalId, goalData);
+            console.log('[GOAL] Update response:', response.data);
           } else {
             // Create new goal
-            await axios.post('/api/dashboard/goals', goalData);
+            console.log('[GOAL] Creating new goal');
+            const response = await axios.post('/api/dashboard/goals', goalData);
+            console.log('[GOAL] Create response:', response.data);
           }
           
           closeGoalModal();
+          console.log('[GOAL] Reloading dashboard data...');
           await loadDashboardData();
+          console.log('[GOAL] Dashboard data reloaded successfully');
+          alert('Goal saved successfully! ✅');
         } catch (e) { 
-          console.error('Error saving goal:', e);
-          alert('Error saving goal'); 
+          console.error('[GOAL] Error saving goal:', e);
+          console.error('[GOAL] Error details:', e.response?.data);
+          alert('Error saving goal: ' + (e.response?.data?.error || e.message)); 
         }
       }
 
@@ -927,6 +960,113 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         } catch (e) { 
           console.error('Error loading conversations:', e);
           document.getElementById('conversations-list').innerHTML = '<div class="p-8 text-center text-gray-500"><p>No conversations yet</p></div>';
+        }
+      }
+
+      // Load active users
+      async function loadActiveUsers() {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          // Get all users from validators and founders
+          const [validatorsRes, foundersRes] = await Promise.all([
+            axios.get('/api/validation/validators', { headers: { Authorization: 'Bearer ' + token } }),
+            axios.get('/api/marketplace/products?limit=100', { headers: { Authorization: 'Bearer ' + token } })
+          ]);
+          
+          const validators = validatorsRes.data || [];
+          const founders = (foundersRes.data?.products || []).map(p => ({
+            id: p.company_user_id || p.id,
+            name: p.company_name || p.company || p.title,
+            role: 'founder',
+            avatar: p.company_avatar,
+            title: p.title
+          }));
+          
+          activeUsers = [
+            ...validators.map(v => ({ ...v, role: 'validator' })),
+            ...founders
+          ];
+          
+          renderActiveUsers();
+        } catch (e) {
+          console.error('Error loading active users:', e);
+          document.getElementById('active-users-list').innerHTML = '<div class="p-8 text-center text-gray-500"><p>No active users</p></div>';
+        }
+      }
+
+      function renderActiveUsers() {
+        const container = document.getElementById('active-users-list');
+        if (!activeUsers.length) {
+          container.innerHTML = '<div class="p-8 text-center text-gray-500"><i class="fas fa-users text-4xl mb-4 text-gray-300"></i><p>No active users</p></div>';
+          return;
+        }
+        
+        container.innerHTML = activeUsers.map(user => \`
+          <div onclick="startConversationWith(\${user.id}, '\${(user.name || '').replace(/'/g, "\\\\'")}', '\${user.role}')" class="p-4 hover:bg-gray-50 cursor-pointer transition">
+            <div class="flex items-center gap-3">
+              <div class="relative">
+                <div class="w-10 h-10 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                  \${user.avatar ? \`<img src="\${user.avatar}" class="w-full h-full rounded-full object-cover" />\` : (user.name || 'U')[0].toUpperCase()}
+                </div>
+                <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-gray-900 truncate">\${user.name || 'User'}</p>
+                <p class="text-xs text-gray-500 truncate">
+                  \${user.role === 'validator' ? '✅ Validator' : '🚀 Founder'}
+                  \${user.title ? ' • ' + user.title : ''}
+                </p>
+              </div>
+              <i class="fas fa-comment-dots text-gray-400"></i>
+            </div>
+          </div>
+        \`).join('');
+      }
+
+      function showInboxSection(section) {
+        currentInboxSection = section;
+        
+        // Update buttons
+        const activeBtn = document.getElementById('inbox-active-btn');
+        const conversationsBtn = document.getElementById('inbox-conversations-btn');
+        
+        if (section === 'active') {
+          activeBtn.classList.add('text-primary', 'border-primary', 'bg-primary/5');
+          activeBtn.classList.remove('text-gray-500', 'border-transparent');
+          conversationsBtn.classList.remove('text-primary', 'border-primary', 'bg-primary/5');
+          conversationsBtn.classList.add('text-gray-500', 'border-transparent');
+          
+          document.getElementById('active-users-list').classList.remove('hidden');
+          document.getElementById('conversations-list').classList.add('hidden');
+        } else {
+          conversationsBtn.classList.add('text-primary', 'border-primary', 'bg-primary/5');
+          conversationsBtn.classList.remove('text-gray-500', 'border-transparent');
+          activeBtn.classList.remove('text-primary', 'border-primary', 'bg-primary/5');
+          activeBtn.classList.add('text-gray-500', 'border-transparent');
+          
+          document.getElementById('conversations-list').classList.remove('hidden');
+          document.getElementById('active-users-list').classList.add('hidden');
+        }
+      }
+
+      async function startConversationWith(userId, userName, userRole) {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          // Create or get conversation with this user
+          const res = await axios.post('/api/chat/conversations', {
+            other_user_id: userId
+          }, { headers: { Authorization: 'Bearer ' + token } });
+          
+          if (res.data.conversation_id) {
+            selectConversation(res.data.conversation_id);
+            // Switch to conversations tab to show the chat
+            showInboxSection('conversations');
+            // Reload conversations to update the list
+            loadConversations();
+          }
+        } catch (e) {
+          console.error('Error starting conversation:', e);
+          alert('Error al iniciar conversación. Por favor intenta de nuevo.');
         }
       }
 
@@ -1045,8 +1185,8 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
         } catch (e) { return null; }
       }
 
-      // Marketplace
-      function showMarketplaceSection(section) {
+      // Directory
+      function showDirectorySection(section) {
         document.querySelectorAll('.mp-btn').forEach(b => {
           b.classList.remove('text-primary', 'border-primary');
           b.classList.add('text-gray-500', 'border-transparent');
@@ -1675,9 +1815,17 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
           loadDashboardData();
         }
         loadConversations();
+        loadActiveUsers(); // Load active users for inbox
         
-        // Switch to inbox tab for non-founders
-        if (currentUserRole !== 'founder') {
+        // Check if URL has tab parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        
+        if (tabParam && ['home', 'traction', 'inbox', 'directory'].includes(tabParam)) {
+          // Switch to the requested tab
+          switchTab(tabParam);
+        } else if (currentUserRole !== 'founder') {
+          // Switch to inbox tab for non-founders if no tab specified
           switchTab('inbox');
         }
       });
@@ -1686,7 +1834,7 @@ export function getMarketplacePage(props: MarketplacePageProps): string {
 
   return createLayoutWithSidebars({
     content,
-    currentPage: 'marketplace',
+    currentPage: 'directory',
     userName,
     userAvatar,
     pageTitle: 'Dashboard',

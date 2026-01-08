@@ -314,7 +314,7 @@ app.get('/', async (c) => {
       }
 
       // ============================================
-      // MARKETING AGENT FUNCTIONS
+      // ASTAR AGENT FUNCTIONS (usando sistema multiagente)
       // ============================================
 
       async function analyzeGoals() {
@@ -326,21 +326,25 @@ app.get('/', async (c) => {
         state.messages.push({
           id: Date.now().toString(),
           role: 'user',
-          content: '🎯 Analizar mis objetivos actuales',
+          content: '🎯 Analizar mis objetivos actuales con el agente de métricas',
           timestamp: new Date()
         });
         
         render();
 
         try {
-          const response = await axios.post('/api/chat-agent/analyze-goals', {}, {
+          // Usar el nuevo endpoint del agente multiagente
+          const response = await axios.post('/api/chat-agent/message', {
+            message: 'Analiza mis objetivos actuales y dame un reporte detallado con recomendaciones. Usa los datos reales de la base de datos.',
+            useMetricsAgent: true // Flag para indicar que use el metrics agent
+          }, {
             withCredentials: true
           });
 
           state.messages.push({
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: response.data.analysis,
+            content: response.data.message,
             timestamp: new Date()
           });
         } catch (error) {
@@ -544,7 +548,7 @@ app.get('/', async (c) => {
                     <button onclick="switchView(\\'inbox\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'inbox' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
                       <i class="fas fa-inbox mr-2"></i>Inbox
                     </button>
-                    <button onclick="switchView(\\'marketplace\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'marketplace' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
+                    <button onclick="switchView(\\'directory\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'directory' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
                       <i class="fas fa-users mr-2"></i>Validators
                     </button>
                   </div>
@@ -680,9 +684,9 @@ app.get('/', async (c) => {
         } else if (state.currentView === 'inbox') {
           contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-primary"></i><p class="text-gray-600 mt-4">Cargando conversaciones...</p></div>';
           contentDiv.innerHTML = await getInboxHTML();
-        } else if (state.currentView === 'marketplace') {
+        } else if (state.currentView === 'directory') {
           contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-primary"></i><p class="text-gray-600 mt-4">Cargando validators...</p></div>';
-          contentDiv.innerHTML = await getMarketplaceHTML();
+          contentDiv.innerHTML = await getDirectoryHTML();
         }
         console.log('Content updated');
       }
@@ -937,7 +941,7 @@ app.get('/', async (c) => {
         alert('Funcionalidad de conversación en desarrollo');
       };
       
-      async function getMarketplaceHTML() {
+      async function getDirectoryHTML() {
         try {
           // Load validators from API
           const response = await axios.get('/api/validation/validators');
@@ -1238,7 +1242,7 @@ app.get('/', async (c) => {
       // Handle hash changes
       window.addEventListener('hashchange', () => {
         const view = window.location.hash ? window.location.hash.substring(1) : 'dashboard';
-        if (['dashboard', 'traction', 'inbox', 'marketplace'].includes(view)) {
+        if (['dashboard', 'traction', 'inbox', 'directory'].includes(view)) {
           window.switchView(view);
         }
       });

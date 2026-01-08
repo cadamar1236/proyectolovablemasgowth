@@ -1,6 +1,6 @@
 """
-LinkedIn Connector API Server
-Flask REST API para el agente de LinkedIn Connector
+Multi-Agent API Server
+Flask REST API para el sistema multi-agente (LinkedIn, Metrics, Brand Marketing)
 """
 
 from flask import Flask, request, jsonify
@@ -19,11 +19,14 @@ CORS(app)
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+FAL_KEY = os.getenv("FAL_KEY")
 
 if not APIFY_API_TOKEN:
-    raise ValueError("APIFY_API_TOKEN environment variable is required")
+    print("Warning: APIFY_API_TOKEN not set - LinkedIn and scraping features will be limited")
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable is required")
+if not FAL_KEY:
+    print("Warning: FAL_KEY not set - Image generation features will be limited")
 
 # Initialize clients
 apify_client = ApifyClient(APIFY_API_TOKEN)
@@ -331,6 +334,346 @@ def generate_message():
             "error": str(e)
         }), 500
 
+
+# ==============================================
+# METRICS & BRAND MARKETING ENDPOINTS
+# ==============================================
+
+@app.route('/api/agents/metrics/analyze', methods=['POST'])
+def analyze_startup_metrics():
+    """
+    POST /api/agents/metrics/analyze
+    Body: {
+        "user_id": number (required - for database access),
+        "query": "string (optional - specific question)",
+        "industry": "SaaS|fintech|ecommerce|healthtech",
+        "stage": "seed|series_a|series_b|growth"
+    }
+    """
+    try:
+        from metrics_agent import MetricsTeam
+        
+        data = request.json
+        user_id = data.get('user_id')
+        query = data.get('query', 'Analiza mis métricas actuales y dame recomendaciones')
+        industry = data.get('industry', 'SaaS')
+        stage = data.get('stage', 'seed')
+        
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required for database access"
+            }), 400
+        
+        metrics_team = MetricsTeam()
+        result = metrics_team.analyze_with_real_data(
+            user_id=user_id,
+            query=query
+        )
+        
+        return jsonify({
+            "success": result.get("success", False),
+            "analysis": result.get("response"),
+            "error": result.get("error"),
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/agents/metrics/chat', methods=['POST'])
+def metrics_chat():
+    """
+    POST /api/agents/metrics/chat
+    Body: {
+        "user_id": number (required),
+        "message": "string",
+        "session_id": "string (optional)"
+    }
+    """
+    try:
+        from metrics_agent import MetricsTeam
+        
+        data = request.json
+        user_id = data.get('user_id')
+        message = data.get('message', '')
+        session_id = data.get('session_id', f"session_{user_id}")
+        
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required"
+            }), 400
+        
+        if not message:
+            return jsonify({
+                "success": False,
+                "error": "message is required"
+            }), 400
+        
+        metrics_team = MetricsTeam()
+        result = metrics_team.chat(
+            message=message,
+            session_id=session_id,
+            user_id=user_id
+        )
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/agents/metrics/report', methods=['POST'])
+def generate_weekly_report():
+    """
+    POST /api/agents/metrics/report
+    Body: {
+        "user_id": number (required),
+        "period": "weekly|monthly|quarterly"
+    }
+    """
+    try:
+        from metrics_agent import MetricsTeam
+        
+        data = request.json
+        user_id = data.get('user_id')
+        period = data.get('period', 'weekly')
+        
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required"
+            }), 400
+        
+        metrics_team = MetricsTeam()
+        result = metrics_team.get_weekly_report(user_id=user_id)
+        
+        return jsonify({
+            "success": result.get("success", False),
+            "report": result.get("report"),
+            "raw_data": result.get("raw_data"),
+            "period": period,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/agents/metrics/compare', methods=['POST'])
+def compare_to_benchmarks():
+    """
+    POST /api/agents/metrics/compare
+    Body: {
+        "user_id": number (required),
+        "industry": "SaaS|fintech|ecommerce",
+        "stage": "seed|series_a|series_b"
+    }
+    """
+    try:
+        from metrics_agent import MetricsTeam
+        
+        data = request.json
+        user_id = data.get('user_id')
+        industry = data.get('industry', 'SaaS')
+        stage = data.get('stage', 'seed')
+        
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required"
+            }), 400
+        
+        metrics_team = MetricsTeam()
+        result = metrics_team.compare_to_industry(
+            user_id=user_id,
+            industry=industry,
+            stage=stage
+        )
+        
+        return jsonify({
+            "success": result.get("success", False),
+            "comparison": result.get("comparison"),
+            "insights": result.get("insights"),
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/agents/brand/analyze', methods=['POST'])
+def analyze_brand_identity():
+    """
+    POST /api/agents/brand/analyze
+    Body: {
+        "website_url": "string"
+    }
+    """
+    try:
+        from brand_marketing_agent import BrandMarketingTeam
+        
+        data = request.json
+        website_url = data.get('website_url', '')
+        
+        if not website_url:
+            return jsonify({
+                "success": False,
+                "error": "website_url is required"
+            }), 400
+        
+        brand_team = BrandMarketingTeam()
+        result = brand_team.analyze_full_brand(website_url)
+        
+        return jsonify({
+            "success": True,
+            "brand_analysis": result,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/agents/brand/generate-images', methods=['POST'])
+def generate_marketing_images():
+    """
+    POST /api/agents/brand/generate-images
+    Body: {
+        "website_url": "string",
+        "content_types": ["social_post", "banner", "story", "ad"],
+        "campaign_name": "string (optional)"
+    }
+    """
+    try:
+        from brand_marketing_agent import BrandMarketingTeam
+        
+        data = request.json
+        website_url = data.get('website_url', '')
+        content_types = data.get('content_types', ['social_post'])
+        campaign_name = data.get('campaign_name', f"campaign_{datetime.now().strftime('%Y%m%d')}")
+        
+        if not website_url:
+            return jsonify({
+                "success": False,
+                "error": "website_url is required"
+            }), 400
+        
+        brand_team = BrandMarketingTeam()
+        result = brand_team.generate_brand_marketing(
+            website_url=website_url,
+            content_types=content_types,
+            campaign_name=campaign_name
+        )
+        
+        return jsonify({
+            "success": True,
+            "images": result.get("images", []),
+            "brand_identity": result.get("brand_identity", {}),
+            "campaign_name": campaign_name,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/agents/orchestrator/analyze', methods=['POST'])
+def orchestrator_full_analysis():
+    """
+    POST /api/agents/orchestrator/analyze
+    Full startup analysis using all agent teams
+    Body: {
+        "startup_url": "string",
+        "startup_name": "string",
+        "description": "string",
+        "metrics": {...} (optional),
+        "generate_images": boolean (default: true)
+    }
+    """
+    try:
+        from orchestrator_agent import MultiAgentOrchestrator
+        
+        data = request.json
+        startup_url = data.get('startup_url', '')
+        startup_name = data.get('startup_name', 'Startup')
+        description = data.get('description', '')
+        metrics = data.get('metrics')
+        generate_images = data.get('generate_images', True)
+        
+        if not startup_url:
+            return jsonify({
+                "success": False,
+                "error": "startup_url is required"
+            }), 400
+        
+        orchestrator = MultiAgentOrchestrator()
+        result = orchestrator.analyze_startup(
+            startup_url=startup_url,
+            startup_name=startup_name,
+            description=description,
+            metrics=metrics,
+            generate_images=generate_images
+        )
+        
+        return jsonify({
+            "success": True,
+            "analysis": result,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/agents/health', methods=['GET'])
+def agents_health_check():
+    """Health check for all agent systems"""
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "agents": {
+            "linkedin": {
+                "status": "available" if APIFY_API_TOKEN else "limited",
+                "apify_configured": bool(APIFY_API_TOKEN)
+            },
+            "metrics": {
+                "status": "available" if OPENAI_API_KEY else "unavailable",
+                "openai_configured": bool(OPENAI_API_KEY)
+            },
+            "brand_marketing": {
+                "status": "available" if (OPENAI_API_KEY and FAL_KEY) else "limited",
+                "openai_configured": bool(OPENAI_API_KEY),
+                "fal_configured": bool(FAL_KEY),
+                "apify_configured": bool(APIFY_API_TOKEN)
+            },
+            "orchestrator": {
+                "status": "available" if OPENAI_API_KEY else "unavailable"
+            }
+        }
+    }
+    return jsonify(health_status)
+
+
+# ==============================================
+# MAIN ENTRY POINT
+# ==============================================
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 8000))

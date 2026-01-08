@@ -5,8 +5,11 @@ import { verify } from 'hono/jwt';
 import { jsx } from 'hono/jsx';
 import type { Bindings } from './types';
 import { getNotFoundPage, getVotePage } from './html-templates';
-import { getMarketplacePage } from './marketplace-page';
+import { getDirectoryPage } from './marketplace-page';
 import { getOnboardingPage } from './onboarding-page';
+import { getCompetitionsPage } from './competitions-page';
+import { getAdminDashboard } from './admin-dashboard';
+import { getCompetitionLeaderboard } from './competition-leaderboard';
 
 // JWT Secret for token verification
 const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
@@ -30,6 +33,9 @@ import whatsapp from './api/whatsapp';
 import chatAgent from './api/chat-agent';
 import dashboardPage from './dashboard-page';
 import marketingAI from './api/marketing-ai';
+import competitions from './api/competitions';
+import admin from './api/admin';
+import metricsData from './api/metrics-data';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -57,6 +63,9 @@ app.route('/api/quick-pitch', quickPitch);
 app.route('/api/whatsapp', whatsapp);
 app.route('/api/chat-agent', chatAgent);
 app.route('/api/marketing-ai', marketingAI);
+app.route('/api/competitions', competitions);
+app.route('/api/admin', admin);
+app.route('/api/metrics-data', metricsData);
 
 // Page Routes - Onboarding for new users
 app.get('/onboarding', async (c) => {
@@ -93,8 +102,71 @@ app.get('/onboarding', async (c) => {
   return c.html(html);
 });
 
-// Page Routes - Use marketplace page as main dashboard
+// Page Routes - Use directory page as main dashboard
 app.get('/dashboard', async (c) => {
+  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  const tokenInUrl = c.req.query('token');
+
+  let payload: any = null;
+  const tokenToVerify = authToken || tokenInUrl;
+  
+  if (tokenToVerify) {
+    try {
+      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+    } catch (error) {
+      // Invalid token, continue as guest
+    }
+  }
+
+  // Allow viewing dashboard as guest
+  if (!payload) {
+    payload = { userName: 'Guest', email: '', userId: 0, role: 'guest' };
+  }
+
+  const html = getDirectoryPage({
+    userName: payload.userName || payload.name || payload.email || 'User',
+    userAvatar: payload.avatar_url,
+    userRole: payload.role || 'founder'
+  });
+
+  return c.html(html);
+});
+
+// Old dashboard route removed - now using marketplace
+// app.route('/dashboard', dashboardPage);
+
+// Competitions page
+app.get('/competitions', async (c) => {
+  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  const tokenInUrl = c.req.query('token');
+
+  let payload: any = null;
+  const tokenToVerify = authToken || tokenInUrl;
+  
+  if (tokenToVerify) {
+    try {
+      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+    } catch (error) {
+      // Invalid token, continue as guest
+    }
+  }
+
+  // Allow viewing competitions as guest
+  if (!payload) {
+    payload = { userName: 'Guest', email: '', userId: 0, role: 'guest' };
+  }
+
+  const html = getCompetitionsPage({
+    userName: payload.userName || payload.name || payload.email || 'Guest',
+    userAvatar: payload.avatar_url,
+    userRole: payload.role || 'guest'
+  });
+
+  return c.html(html);
+});
+
+// Admin dashboard page (admin only)
+app.get('/admin', async (c) => {
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
   const tokenInUrl = c.req.query('token');
 
@@ -109,27 +181,76 @@ app.get('/dashboard', async (c) => {
     try {
       payload = await verify(tokenToVerify, JWT_SECRET) as any;
     } catch (error) {
-      if (!tokenInUrl) {
-        return c.redirect('/');
-      }
+      return c.redirect('/');
     }
   }
 
-  if (!payload) {
-    payload = { userName: 'User', email: '', userId: 0, role: 'founder' };
+  // Check if user is admin
+  if (!payload || !payload.userId) {
+    return c.redirect('/');
   }
 
-  const html = getMarketplacePage({
-    userName: payload.userName || payload.name || payload.email || 'User',
-    userAvatar: payload.avatar_url,
-    userRole: payload.role || 'founder'
+  const user = await c.env.DB.prepare(`
+    SELECT id, email, name, role, avatar_url FROM users WHERE id = ?
+  `).bind(payload.userId).first();
+
+  if (!user || user.role !== 'admin') {
+    return c.html('<html><body><h1>403 Forbidden</h1><p>Admin access required</p></body></html>', 403);
+  }
+
+  const html = getAdminDashboard({
+    userName: user.name || payload.name || payload.email || 'Admin',
+    userAvatar: user.avatar_url || payload.avatar_url,
+    userRole: user.role
   });
 
   return c.html(html);
 });
 
-// Old dashboard route removed - now using marketplace
-// app.route('/dashboard', dashboardPage);
+// Competition Leaderboard Page
+app.get('/competitions/:id/leaderboard', async (c) => {
+  try {
+    const competitionId = c.req.param('id');
+
+    // Get competition details
+    const competition = await c.env.DB.prepare(`
+      SELECT * FROM competitions WHERE id = ?
+    `).bind(competitionId).first();
+
+    if (!competition) {
+      return c.html('<html><body><h1>404 Not Found</h1><p>Competition not found</p></body></html>', 404);
+    }
+
+    // Get participants ordered by registration date (first come, first serve ranking)
+    const participants = await c.env.DB.prepare(`
+      SELECT 
+        cp.*,
+        u.name,
+        u.email,
+        u.avatar_url,
+        p.title as project_title,
+        p.description as project_description
+      FROM competition_participants cp
+      JOIN users u ON cp.user_id = u.id
+      LEFT JOIN projects p ON cp.project_id = p.id
+      WHERE cp.competition_id = ?
+      ORDER BY cp.registration_date ASC
+    `).bind(competitionId).all();
+
+    const html = getCompetitionLeaderboard({
+      competitionId,
+      competitionTitle: competition.title,
+      competitionDescription: competition.description,
+      prizeAmount: competition.prize_amount,
+      participants: participants.results || []
+    });
+
+    return c.html(html);
+  } catch (error) {
+    console.error('[LEADERBOARD] Error loading competition leaderboard:', error);
+    return c.html('<html><body><h1>500 Error</h1><p>Failed to load leaderboard</p></body></html>', 500);
+  }
+});
 
 // Marketplace page - Redirect to unified dashboard
 app.get('/marketplace', async (c) => {
@@ -177,7 +298,7 @@ app.get('/vote/:projectId', async (c) => {
   }
 });
 
-// Frontend Routes - Redirect to Dashboard (Unified Marketplace)
+// Frontend Routes - Redirect to Dashboard (Unified Directory)
 app.get('/', async (c) => {
   // Check if user is authenticated
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
@@ -365,9 +486,9 @@ app.get('/', async (c) => {
     <nav class="fixed top-0 w-full z-50 bg-black bg-opacity-50 backdrop-blur-sm border-b border-white/10">
         <div class="max-w-7xl mx-auto px-6 py-4">
             <div class="flex justify-between items-center">
-                <div class="flex items-center space-x-2">
+                <div class="flex flex-col">
                     <span class="text-2xl font-bold">ASTAR*</span>
-                    <span class="text-gray-400 text-sm hidden sm:inline">Connecting the brightest minds in the universe</span>
+                    <span class="text-gray-400 text-xs hidden sm:inline">Connecting the brightest minds in the world</span>
                 </div>
                 
                 <div class="flex items-center space-x-6">
@@ -375,17 +496,21 @@ app.get('/', async (c) => {
                         <span>🏠</span>
                         <span class="hidden sm:inline">Home</span>
                     </a>
-                    <a href="/dashboard" class="nav-link text-white flex items-center space-x-2">
-                        <span>🚀</span>
+                    <a href="/dashboard" onclick="event.preventDefault(); const token = document.cookie.match(/authToken=([^;]+)/)?.[1]; if (!token) { showAuthModal('login'); } else { window.location.href='/dashboard'; }" class="nav-link text-white flex items-center space-x-2 cursor-pointer">
+                        <span>🎯</span>
                         <span class="hidden sm:inline">Hub</span>
+                    </a>
+                    <a href="/dashboard?tab=directory" class="nav-link text-white flex items-center space-x-2">
+                        <span>🚀</span>
+                        <span class="hidden sm:inline">Startups</span>
+                    </a>
+                    <a href="/competitions" class="nav-link text-white flex items-center space-x-2">
+                        <span>🏅</span>
+                        <span class="hidden sm:inline">Competitions</span>
                     </a>
                     <a href="/leaderboard" class="nav-link text-white flex items-center space-x-2">
                         <span>🏆</span>
                         <span class="hidden sm:inline">Leaderboard</span>
-                    </a>
-                    <a href="/marketplace" class="nav-link text-white flex items-center space-x-2">
-                        <span>🔥</span>
-                        <span class="hidden sm:inline">Trending Startups</span>
                     </a>
                     <button onclick="showAuthModal('login')" class="bg-white text-black px-6 py-2 rounded-full font-semibold hover:bg-gray-200 transition">
                         Sign In
@@ -402,14 +527,18 @@ app.get('/', async (c) => {
     <main class="relative z-10 min-h-screen flex items-center justify-center px-6 pt-32 pb-20">
         <div class="max-w-6xl w-full text-center" id="roles">
             <!-- Hero Title -->
-            <h1 class="text-5xl md:text-6xl font-bold mb-6 leading-tight">
-                Welcome to the <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">ASTAR* ecosystem!</span><br/>
-                Choose your trajectory 🚀
+            <h1 class="text-5xl md:text-7xl font-bold mb-8 leading-tight">
+                Welcome to the <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500">ASTAR*</span> ecosystem
             </h1>
             
-            <p class="text-xl text-gray-300 mb-16 max-w-3xl mx-auto">
-                We make thoughtful introductions between startup founders, customers, investors,<br/>
-                partners and talent. Which role defines your mission in the ASTAR* ecosystem?
+            <p class="text-2xl md:text-3xl font-semibold text-gray-200 mb-4">
+                Choose your trajectory 🚀
+            </p>
+            
+            <p class="text-lg md:text-xl text-gray-400 mb-16 max-w-4xl mx-auto leading-relaxed">
+                We make thoughtful introductions between startup founders, customers, investors, partners and talent.
+                <br/>
+                <span class="text-gray-300 font-medium">Which role defines your mission in the ASTAR* ecosystem?</span>
             </p>
 
             <!-- Planets Grid -->
@@ -419,8 +548,8 @@ app.get('/', async (c) => {
                     <div class="planet planet-founder">
                         <span class="planet-badge">FOUNDER</span>
                     </div>
-                    <h3 class="text-xl font-bold mt-6 mb-2">FOUNDER</h3>
-                    <p class="text-gray-400 text-sm">Building the next big thing in the universe</p>
+                    <h3 class="text-2xl font-bold mt-6 mb-3">FOUNDER</h3>
+                    <p class="text-gray-300 text-center px-4">Building the next big thing</p>
                 </div>
 
                 <!-- Investor Planet -->
@@ -428,8 +557,8 @@ app.get('/', async (c) => {
                     <div class="planet planet-investor">
                         <span class="planet-badge">INVESTOR</span>
                     </div>
-                    <h3 class="text-xl font-bold mt-6 mb-2">INVESTOR</h3>
-                    <p class="text-gray-400 text-sm">Fueling stellar growth with capital</p>
+                    <h3 class="text-2xl font-bold mt-6 mb-3">INVESTOR</h3>
+                    <p class="text-gray-300 text-center px-4">Fueling stellar growth</p>
                 </div>
 
                 <!-- Scout Planet -->
@@ -437,8 +566,8 @@ app.get('/', async (c) => {
                     <div class="planet planet-scout">
                         <span class="planet-badge">SCOUT</span>
                     </div>
-                    <h3 class="text-xl font-bold mt-6 mb-2">SCOUT</h3>
-                    <p class="text-gray-400 text-sm">Finding hidden gems and opportunities</p>
+                    <h3 class="text-2xl font-bold mt-6 mb-3">SCOUT</h3>
+                    <p class="text-gray-300 text-center px-4">Finding hidden gems</p>
                 </div>
             </div>
 
@@ -449,8 +578,8 @@ app.get('/', async (c) => {
                     <div class="planet planet-partner">
                         <span class="planet-badge">PARTNER</span>
                     </div>
-                    <h3 class="text-xl font-bold mt-6 mb-2">PARTNER</h3>
-                    <p class="text-gray-400 text-sm">I want to partner/sponsor/collab with ASTAR*</p>
+                    <h3 class="text-2xl font-bold mt-6 mb-3">PARTNER</h3>
+                    <p class="text-gray-300 text-center px-4">Collaborate with ASTAR*</p>
                 </div>
 
                 <!-- Job Seeker Planet -->
@@ -459,8 +588,8 @@ app.get('/', async (c) => {
                         <div class="orbit-ring"></div>
                         <span class="planet-badge">JOB SEEKER</span>
                     </div>
-                    <h3 class="text-xl font-bold mt-6 mb-2">JOB SEEKER</h3>
-                    <p class="text-gray-400 text-sm">Looking for a job at a promising startup</p>
+                    <h3 class="text-2xl font-bold mt-6 mb-3">JOB SEEKER</h3>
+                    <p class="text-gray-300 text-center px-4">Join a promising startup</p>
                 </div>
 
                 <!-- Validator Planet -->
@@ -468,8 +597,8 @@ app.get('/', async (c) => {
                     <div class="planet planet-other">
                         <span class="planet-badge">VALIDATOR</span>
                     </div>
-                    <h3 class="text-xl font-bold mt-6 mb-2">VALIDATOR</h3>
-                    <p class="text-gray-400 text-sm">Validating and voting on promising projects</p>
+                    <h3 class="text-2xl font-bold mt-6 mb-3">VALIDATOR</h3>
+                    <p class="text-gray-300 text-center px-4">Validate and vote on startups</p>
                 </div>
             </div>
         </div>
@@ -1402,7 +1531,7 @@ app.get('/project/:id', async (c) => {
                     <div class="w-14 h-14 mb-6 rounded-2xl bg-pink-500/20 flex items-center justify-center group-hover:bg-pink-500/30 transition">
                         <i class="fas fa-robot text-pink-400 text-2xl"></i>
                     </div>
-                    <h3 class="font-display text-xl font-bold text-white mb-3">AI Marketing Agent</h3>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">ASTAR Agent</h3>
                     <p class="text-gray-400 leading-relaxed">Get personalized marketing strategies powered by AI</p>
                 </div>
                 
@@ -1897,7 +2026,7 @@ app.get('/project/:id', async (c) => {
 
 
 
-      // Check for product parameter and redirect to marketplace, and handle OAuth callback
+      // Check for product parameter and redirect to directory, and handle OAuth callback
       document.addEventListener('DOMContentLoaded', () => {
         const urlParams = new URLSearchParams(window.location.search);
         
@@ -2291,7 +2420,7 @@ app.get('/project/:id', async (c) => {
   `);
 });
 
-// Marketplace Page - ASTAR Hub Dashboard for Startups
+// Directory Page - ASTAR Hub Dashboard for Startups
 app.get('/marketplace', async (c) => {
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
   
@@ -2305,7 +2434,7 @@ app.get('/marketplace', async (c) => {
     const userAvatar = payload.avatar_url;
     const userRole = payload.role || 'founder';
     
-    const html = getMarketplacePage(userName, userAvatar, userRole);
+    const html = getDirectoryPage(userName, userAvatar, userRole);
     return c.html(html);
   } catch (error) {
     return c.redirect('/api/auth/google');
@@ -2320,7 +2449,7 @@ app.get('/leaderboard', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏆 Project Leaderboard - ValidAI Studio</title>
+    <title>🏆 Project Leaderboard - ASTAR*</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -2380,7 +2509,7 @@ app.get('/leaderboard', (c) => {
                 <div class="flex items-center">
                     <a href="/" class="text-2xl font-black text-gradient">
                         <i class="fas fa-rocket mr-2"></i>
-                        ValidAI Studio
+                        ASTAR*
                     </a>
                 </div>
                 

@@ -210,7 +210,7 @@ marketingAI.post('/social-strategy', async (c) => {
 });
 
 // ============================================
-// GOALS MANAGEMENT FOR MARKETING AGENT
+// GOALS MANAGEMENT FOR ASTAR AGENT
 // ============================================
 
 // POST /api/marketing-ai/create-goal - Crear goal desde el agente

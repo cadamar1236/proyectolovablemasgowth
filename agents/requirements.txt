@@ -8,8 +8,13 @@ twilio>=9.0.0
 fastapi>=0.109.0
 uvicorn>=0.27.0
 
+# Flask for legacy API endpoints
+flask>=3.0.0
+flask-cors>=4.0.0
+
 # HTTP client
 httpx>=0.26.0
+requests>=2.31.0
 
 # Environment variables
 python-dotenv>=1.0.0
@@ -27,5 +32,15 @@ pydantic>=2.5.0
 # Async support
 asyncio-throttle>=1.0.2
 
-# Apify client for LinkedIn scraping
+# Apify client for LinkedIn and web scraping
 apify-client>=1.0.0
+
+# fal.ai for AI image generation
+fal>=0.3.0
+
+# BeautifulSoup for HTML parsing
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# Additional utilities
+Pillow>=10.0.0

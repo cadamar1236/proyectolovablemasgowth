@@ -148,7 +148,7 @@ async function getStartupContext(db: any, userId: number) {
 }
 
 // Helper: Generate AI response using Groq or Cloudflare AI
-async function generateAIResponse(apiKey: string, systemPrompt: string, userMessage: string, context: any, cloudflareAI?: any) {
+async function generateAIResponse(apiKey: string, systemPrompt: string, userMessage: string, context: any, cloudflareAI?: any, chatHistory: any[] = []) {
   const MAX_RETRIES = 2;
   const TIMEOUT_MS = 25000; // 25 seconds timeout for mobile
   
@@ -164,6 +164,10 @@ async function generateAIResponse(apiKey: string, systemPrompt: string, userMess
       growth: context.metrics.growth
     }
   };
+
+  // Build conversation history for context (last 10 messages)
+  const recentHistory = chatHistory.slice(-10);
+  console.log('[AI] Using conversation history:', recentHistory.length, 'messages');
   
   // Try Cloudflare AI first if available
   if (cloudflareAI) {
@@ -171,6 +175,7 @@ async function generateAIResponse(apiKey: string, systemPrompt: string, userMess
       console.log('[AI] Using Cloudflare Workers AI');
       const messages = [
         { role: 'system', content: systemPrompt },
+        ...recentHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
         { role: 'user', content: `Contexto: ${JSON.stringify(simplifiedContext)}\n\nPregunta: ${userMessage}` }
       ];
       
@@ -206,6 +211,7 @@ async function generateAIResponse(apiKey: string, systemPrompt: string, userMess
             model: 'llama-3.1-70b-versatile',
             messages: [
               { role: 'system', content: systemPrompt },
+              ...recentHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
               { role: 'user', content: `Contexto: ${JSON.stringify(simplifiedContext)}\n\nPregunta: ${userMessage}` }
             ],
             max_tokens: 1500,
@@ -287,18 +293,89 @@ app.get('/history', jwtMiddleware, async (c) => {
 // Send message and get AI response
 app.post('/message', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
-  const { message } = await c.req.json();
+  const { message, useMetricsAgent } = await c.req.json();
 
   if (!message?.trim()) {
     return c.json({ error: 'Message is required' }, 400);
   }
 
   try {
+    // Si se solicita explícitamente el metrics agent, delegar a Railway
+    if (useMetricsAgent) {
+      console.log('[CHAT] Delegating to Metrics Agent on Railway...');
+      
+      // Guardar mensaje del usuario
+      await c.env.DB.prepare(`
+        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+        VALUES (?, 'user', ?, datetime('now'))
+      `).bind(user.userId, message).run();
+
+      try {
+        const railwayUrl = c.env.RAILWAY_API_URL || 'http://localhost:5000';
+        
+        // Llamar al metrics agent en Railway
+        const agentResponse = await fetch(`${railwayUrl}/api/agents/metrics/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id: user.userId,
+            message: message,
+            session_id: `chat_${user.userId}_${Date.now()}`
+          })
+        });
+
+        if (agentResponse.ok) {
+          const result = await agentResponse.json();
+          
+          if (result.success && result.response) {
+            // Guardar respuesta del agente
+            await c.env.DB.prepare(`
+              INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+              VALUES (?, 'assistant', ?, datetime('now'))
+            `).bind(user.userId, result.response).run();
+
+            return c.json({ message: result.response });
+          } else {
+            throw new Error(result.error || 'Agent returned no response');
+          }
+        } else {
+          throw new Error(`Railway API error: ${agentResponse.status}`);
+        }
+      } catch (metricsError) {
+        console.error('[CHAT] Error calling Railway metrics agent:', metricsError);
+        
+        const errorMsg = '⚠️ No pude conectar con el agente de métricas. Por favor intenta de nuevo.';
+        
+        await c.env.DB.prepare(`
+          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+          VALUES (?, 'assistant', ?, datetime('now'))
+        `).bind(user.userId, errorMsg).run();
+        
+        return c.json({ message: errorMsg });
+      }
+    }
+
+    // Flujo normal del chat agent
     // Save user message
     await c.env.DB.prepare(`
       INSERT INTO agent_chat_messages (user_id, role, content, created_at)
       VALUES (?, 'user', ?, datetime('now'))
     `).bind(user.userId, message).run();
+
+    // Retrieve chat history (last 50 messages)
+    const historyResult = await c.env.DB.prepare(`
+      SELECT role, content, created_at 
+      FROM agent_chat_messages 
+      WHERE user_id = ?
+      ORDER BY created_at DESC 
+      LIMIT 50
+    `).bind(user.userId).all();
+    
+    // Reverse to chronological order (oldest first)
+    const chatHistory = (historyResult.results || []).reverse();
+    console.log('[CHAT] Retrieved chat history:', chatHistory.length, 'messages');
 
     // Get startup context
     const context = await getStartupContext(c.env.DB, user.userId);
@@ -311,19 +388,34 @@ app.post('/message', jwtMiddleware, async (c) => {
 
     try {
       // Generate AI response with function calling capability
-      const systemPrompt = `Eres un asistente de marketing y growth para startups llamado "Marketing Agent". 
+      const systemPrompt = `Eres un asistente de marketing y growth para startups llamado "ASTAR Agent". 
 Tu rol es ayudar a los fundadores a entender y mejorar el crecimiento de su startup.
 
-IMPORTANTE: Detecta las intenciones del usuario para crear o editar goals.
+IMPORTANTE: Cuando el usuario pregunte por LEADERBOARDS, debes usar ACCIONES específicas.
 
-CAMPOS DE UN GOAL:
-1. Description (descripción del goal)
-2. Task (tarea específica)
-3. Priority (P0/P1/P2/P3)
-4. Cadence (One time / Recurrent)
-5. DRI (Responsable directo)
-6. Goal Status (To start / WIP / On Hold / Delayed / Blocked / Done)
-7. Week of (semana, opcional)
+ACCIONES DISPONIBLES:
+1. ACTION:ADD_METRIC|metric_name|value - Registrar métricas
+2. ACTION:UPDATE_GOAL|goal_id|value - Actualizar progreso de objetivo
+3. ACTION:FETCH_LEADERBOARD|global - Ver leaderboard de startups (proyectos y productos)
+4. ACTION:FETCH_LEADERBOARD|goals - Ver leaderboard de objetivos completados
+5. ACTION:FETCH_LEADERBOARD|competitions - Ver competiciones activas
+
+EJEMPLOS DE USO:
+
+Usuario: "quiero ver el leaderboard"
+Respuesta: ACTION:FETCH_LEADERBOARD|global
+
+Usuario: "cual es el ranking de startups"
+Respuesta: ACTION:FETCH_LEADERBOARD|global
+
+Usuario: "quien va primero en el leaderboard"
+Respuesta: ACTION:FETCH_LEADERBOARD|global
+
+Usuario: "leaderboard de objetivos"
+Respuesta: ACTION:FETCH_LEADERBOARD|goals
+
+Usuario: "ver competiciones"
+Respuesta: ACTION:FETCH_LEADERBOARD|competitions
 
 DETECCIÓN DE INTENCIONES:
 
@@ -336,26 +428,28 @@ Si dice: "editar goal", "modificar objetivo", "cambiar goal", "actualizar goal"
 → Pregunta cuál goal quiere editar (muestra lista con IDs)
 → Cuando elija, responde: "TRIGGER:EDIT_GOAL_FLOW|goal_id"
 
+**CONSULTAR LEADERBOARDS (MUY IMPORTANTE):**
+Si el usuario menciona: "leaderboard", "ranking", "posición", "quien va primero", "top", "clasificación"
+→ DEBES responder con: ACTION:FETCH_LEADERBOARD|global
+→ El sistema automáticamente mostrará los datos reales
+→ NO inventes datos, usa la acción y el sistema los traerá
+
 GOALS ACTUALES DEL USUARIO:
 ${context.goals.all.map((g: any, i: number) => `${i+1}. [ID: ${g.id}] ${g.task || g.description} - ${g.goal_status || 'To start'}`).join('\n')}
-
-OTRAS CAPACIDADES:
-1. REGISTRAR MÉTRICAS: "Tengo X usuarios" → ACTION:ADD_METRIC|users|X
-2. ACTUALIZAR PROGRESO: Menciona avance → ACTION:UPDATE_GOAL|goal_id|value
-3. ANALIZAR: Dar insights sobre progreso
 
 CONTEXTO:
 - Objetivos: ${context.goals.totalCount} (${context.goals.completedCount} completados)
 - Usuarios: ${context.metrics.current.users}
 - Revenue: $${context.metrics.current.revenue}
 
-REGLAS:
-- Si quiere crear goal → "TRIGGER:START_GOAL_FLOW"
-- Si quiere editar goal → primero muestra lista, luego "TRIGGER:EDIT_GOAL_FLOW|goal_id"
-- Sé proactivo y usa emojis moderadamente
-- Responde en español`;
+REGLAS CRÍTICAS:
+- Si pregunta por leaderboard/ranking → SIEMPRE usar ACTION:FETCH_LEADERBOARD|global
+- NO inventes información del leaderboard
+- Las acciones ACTION: deben estar al inicio de tu respuesta
+- Después de la acción, puedes añadir comentarios breves
+- Responde en español con emojis moderadamente`;
 
-      const aiResponse = await generateAIResponse(groqKey || '', systemPrompt, message, context, c.env.AI);
+      const aiResponse = await generateAIResponse(groqKey || '', systemPrompt, message, context, c.env.AI, chatHistory);
       assistantMessage = await processAIActions(c.env.DB, user.userId, aiResponse, context);
     } catch (error) {
       console.error('[CHAT] AI error:', error);
@@ -527,9 +621,139 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
         executionResults.push(`✅ Objetivo actualizado`);
         console.log('[ACTION] Goal updated:', goalId);
       }
+      else if (actionType === 'FETCH_LEADERBOARD') {
+        const [, leaderboardType] = parts;
+        console.log('[ACTION] Fetching leaderboard:', leaderboardType);
+        
+        if (leaderboardType === 'global') {
+          // Get global leaderboard (projects + products)
+          // First get projects
+          const projects = await db.prepare(`
+            SELECT 
+              p.id,
+              p.title,
+              p.description,
+              p.rating_average,
+              p.votes_count,
+              u.name as founder_name,
+              u.avatar_url as founder_avatar,
+              'project' as type
+            FROM projects p
+            JOIN users u ON p.user_id = u.id
+            ORDER BY p.rating_average DESC, p.votes_count DESC
+            LIMIT 10
+          `).all();
+          
+          // Then get products
+          const products = await db.prepare(`
+            SELECT 
+              bp.id,
+              bp.title,
+              bp.description,
+              COALESCE(bp.rating_average, 0) as rating_average,
+              COALESCE(bp.votes_count, 0) as votes_count,
+              u.name as founder_name,
+              u.avatar_url as founder_avatar,
+              'product' as type
+            FROM beta_products bp
+            JOIN users u ON bp.company_user_id = u.id
+            ORDER BY bp.rating_average DESC, bp.votes_count DESC
+            LIMIT 10
+          `).all();
+          
+          // Combine and sort
+          const allItems = [
+            ...(projects.results || []),
+            ...(products.results || [])
+          ].sort((a: any, b: any) => {
+            if (b.rating_average !== a.rating_average) {
+              return b.rating_average - a.rating_average;
+            }
+            return b.votes_count - a.votes_count;
+          }).slice(0, 10);
+          
+          if (allItems.length > 0) {
+            let result = '🏆 **LEADERBOARD GLOBAL** (Top startups):\n\n';
+            allItems.forEach((item: any, idx: number) => {
+              result += `${idx + 1}. **${item.title}** - ${item.founder_name}\n`;
+              result += `   ⭐ Rating: ${item.rating_average || 0} | 👥 Votos: ${item.votes_count || 0}\n`;
+              result += `   Tipo: ${item.type === 'project' ? '📊 Startup' : '🚀 Producto'}\n\n`;
+            });
+            executionResults.push(result);
+          } else {
+            executionResults.push('📊 No hay startups en el leaderboard todavía.');
+          }
+        }
+        else if (leaderboardType === 'goals') {
+          // Get goals leaderboard
+          const leaderboard = await db.prepare(`
+            SELECT 
+              u.id,
+              u.name,
+              u.avatar_url,
+              COUNT(CASE WHEN g.status = 'completed' THEN 1 END) as completed_goals,
+              COUNT(g.id) as total_goals,
+              CAST(COUNT(CASE WHEN g.status = 'completed' THEN 1 END) AS REAL) * 10 as score
+            FROM users u
+            LEFT JOIN goals g ON u.id = g.user_id
+            GROUP BY u.id, u.name, u.avatar_url
+            HAVING COUNT(g.id) > 0
+            ORDER BY score DESC, completed_goals DESC
+            LIMIT 10
+          `).all();
+          
+          const founders = leaderboard.results || [];
+          if (founders.length > 0) {
+            let result = '🎯 **LEADERBOARD DE OBJETIVOS** (Top founders):\n\n';
+            founders.forEach((founder: any, idx: number) => {
+              result += `${idx + 1}. **${founder.name}**\n`;
+              result += `   ✅ Completados: ${founder.completed_goals} / ${founder.total_goals}\n`;
+              result += `   🏅 Score: ${founder.score}\n\n`;
+            });
+            executionResults.push(result);
+          } else {
+            executionResults.push('🎯 No hay objetivos completados todavía.');
+          }
+        }
+        else if (leaderboardType === 'competitions') {
+          // Get active competitions
+          const competitions = await db.prepare(`
+            SELECT 
+              c.id,
+              c.title,
+              c.description,
+              c.prize_amount,
+              c.event_date,
+              c.status,
+              COUNT(DISTINCT cp.id) as participants_count
+            FROM competitions c
+            LEFT JOIN competition_participants cp ON c.id = cp.competition_id
+            WHERE c.status = 'active'
+            GROUP BY c.id, c.title, c.description, c.prize_amount, c.event_date, c.status
+            ORDER BY c.event_date DESC
+            LIMIT 5
+          `).all();
+          
+          const comps = competitions.results || [];
+          if (comps.length > 0) {
+            let result = '🏅 **COMPETICIONES ACTIVAS:**\n\n';
+            comps.forEach((comp: any) => {
+              result += `**${comp.title}**\n`;
+              result += `💰 Premio: $${comp.prize_amount}\n`;
+              result += `👥 Participantes: ${comp.participants_count}\n`;
+              result += `📅 Fecha: ${comp.event_date}\n\n`;
+            });
+            result += '\n💡 Para ver el ranking de una competición específica, visita /competitions';
+            executionResults.push(result);
+          } else {
+            executionResults.push('🏅 No hay competiciones activas en este momento.');
+          }
+        }
+      }
     } catch (error) {
-      console.error('[ACTION-ERROR]', actionType, error);
-      executionResults.push(`❌ Error ejecutando: ${actionType}`);
+      console.error('[ACTION-ERROR]', actionType, 'Error details:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      executionResults.push(`❌ Error ejecutando ${actionType}: ${errorMessage}`);
     }
     
     // Remove action command from response
@@ -608,7 +832,7 @@ function generateFallbackResponse(message: string, context: any): string {
   }
   
   // Default response
-  return `👋 ¡Hola! Soy tu Marketing Agent.\n\n` +
+  return `👋 ¡Hola! Soy tu ASTAR Agent.\n\n` +
     `Puedo ayudarte con:\n` +
     `• 📊 Analizar tus objetivos\n` +
     `• 📈 Revisar tus métricas de crecimiento\n` +
@@ -880,6 +1104,170 @@ app.get('/startup-summary', jwtMiddleware, async (c) => {
   } catch (error) {
     console.error('Error getting startup summary:', error);
     return c.json({ error: 'Failed to get startup summary' }, 500);
+  }
+});
+
+// Get global leaderboard (projects AND products ranking by votes and rating)
+app.get('/leaderboard/global', jwtMiddleware, async (c) => {
+  try {
+    const limit = parseInt(c.req.query('limit') || '10');
+    
+    // Get projects
+    const projects = await c.env.DB.prepare(`
+      SELECT 
+        p.id,
+        p.title,
+        p.description,
+        p.rating_average,
+        p.votes_count,
+        u.name as founder_name,
+        u.avatar_url as founder_avatar,
+        'project' as type
+      FROM projects p
+      JOIN users u ON p.user_id = u.id
+      ORDER BY p.rating_average DESC, p.votes_count DESC
+      LIMIT ?
+    `).bind(limit).all();
+    
+    // Get products
+    const products = await c.env.DB.prepare(`
+      SELECT 
+        bp.id,
+        bp.title,
+        bp.description,
+        COALESCE(bp.rating_average, 0) as rating_average,
+        COALESCE(bp.votes_count, 0) as votes_count,
+        u.name as founder_name,
+        u.avatar_url as founder_avatar,
+        'product' as type
+      FROM beta_products bp
+      JOIN users u ON bp.company_user_id = u.id
+      ORDER BY bp.rating_average DESC, bp.votes_count DESC
+      LIMIT ?
+    `).bind(limit).all();
+    
+    // Combine and sort
+    const allItems = [
+      ...(projects.results || []),
+      ...(products.results || [])
+    ].sort((a: any, b: any) => {
+      if (b.rating_average !== a.rating_average) {
+        return b.rating_average - a.rating_average;
+      }
+      return b.votes_count - a.votes_count;
+    }).slice(0, limit);
+
+    return c.json({ 
+      leaderboard: allItems,
+      type: 'global_combined'
+    });
+  } catch (error) {
+    console.error('Error getting global leaderboard:', error);
+    return c.json({ error: 'Failed to get global leaderboard' }, 500);
+  }
+});
+
+// Get goals leaderboard (founders by completed goals)
+app.get('/leaderboard/goals', jwtMiddleware, async (c) => {
+  try {
+    const limit = parseInt(c.req.query('limit') || '10');
+    
+    const leaderboard = await c.env.DB.prepare(`
+      SELECT 
+        u.id,
+        u.name,
+        u.avatar_url,
+        COUNT(CASE WHEN g.status = 'completed' THEN 1 END) as completed_goals,
+        COUNT(g.id) as total_goals,
+        CAST(COUNT(CASE WHEN g.status = 'completed' THEN 1 END) AS REAL) * 10 as score
+      FROM users u
+      LEFT JOIN goals g ON u.id = g.user_id
+      GROUP BY u.id, u.name, u.avatar_url
+      HAVING COUNT(g.id) > 0
+      ORDER BY score DESC, completed_goals DESC
+      LIMIT ?
+    `).bind(limit).all();
+
+    return c.json({ 
+      leaderboard: leaderboard.results || [],
+      type: 'goals_leaderboard'
+    });
+  } catch (error) {
+    console.error('Error getting goals leaderboard:', error);
+    return c.json({ error: 'Failed to get goals leaderboard' }, 500);
+  }
+});
+
+// Get competitions leaderboard
+app.get('/leaderboard/competitions', jwtMiddleware, async (c) => {
+  try {
+    const competitions = await c.env.DB.prepare(`
+      SELECT 
+        c.id,
+        c.title,
+        c.description,
+        c.prize_amount,
+        c.event_date,
+        c.status,
+        COUNT(DISTINCT cp.id) as participants_count
+      FROM competitions c
+      LEFT JOIN competition_participants cp ON c.id = cp.competition_id
+      WHERE c.status = 'active'
+      GROUP BY c.id, c.title, c.description, c.prize_amount, c.event_date, c.status
+      ORDER BY c.event_date DESC
+      LIMIT 5
+    `).all();
+
+    return c.json({ 
+      competitions: competitions.results || [],
+      type: 'active_competitions'
+    });
+  } catch (error) {
+    console.error('Error getting competitions list:', error);
+    return c.json({ error: 'Failed to get competitions' }, 500);
+  }
+});
+
+// Get specific competition leaderboard
+app.get('/leaderboard/competitions/:id', jwtMiddleware, async (c) => {
+  try {
+    const competitionId = c.req.param('id');
+    
+    const participants = await c.env.DB.prepare(`
+      SELECT 
+        cp.id,
+        cp.startup_name,
+        cp.current_rank,
+        cp.total_score,
+        cp.vote_score,
+        cp.growth_score,
+        u.name as founder_name,
+        u.avatar_url as founder_avatar,
+        COALESCE(p.title, bp.title) as project_title,
+        CASE WHEN p.id IS NOT NULL THEN 'project' ELSE 'product' END as type
+      FROM competition_participants cp
+      JOIN users u ON cp.user_id = u.id
+      LEFT JOIN projects p ON cp.project_id = p.id
+      LEFT JOIN beta_products bp ON cp.project_id = bp.id
+      WHERE cp.competition_id = ?
+      ORDER BY cp.current_rank ASC, cp.total_score DESC
+      LIMIT 20
+    `).bind(competitionId).all();
+
+    const competition = await c.env.DB.prepare(`
+      SELECT id, title, description, prize_amount
+      FROM competitions
+      WHERE id = ?
+    `).bind(competitionId).first();
+
+    return c.json({ 
+      competition,
+      leaderboard: participants.results || [],
+      type: 'competition_leaderboard'
+    });
+  } catch (error) {
+    console.error('Error getting competition leaderboard:', error);
+    return c.json({ error: 'Failed to get competition leaderboard' }, 500);
   }
 });
 
