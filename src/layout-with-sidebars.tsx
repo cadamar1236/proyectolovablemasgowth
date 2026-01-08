@@ -542,43 +542,55 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         }
 
         async function generateMarketingPlan() {
-            addMessageToChat('user', 'Genera un plan de marketing para los próximos 30 días');
+            const websiteUrl = prompt('¿Cuál es tu sitio web? (para analizar tu marca)', '');
+            if (!websiteUrl) return;
+            
+            addMessageToChat('user', `🎨 Generar análisis de marca y plan de marketing para ${websiteUrl}`);
             document.getElementById('chat-loading').classList.remove('hidden');
             
             try {
-                const response = await axios.post('/api/chat-agent/marketing-plan', {
-                    timeframe: '30 días'
+                const response = await axios.post('/api/chat-agent/message', {
+                    message: `Analiza la identidad de marca de ${websiteUrl} y genera un plan de marketing detallado con estrategias de contenido, colores, tono y mensajes clave. Sé específico y creativo.`,
+                    useBrandAgent: true,
+                    websiteUrl: websiteUrl
                 }, {
                     withCredentials: true
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', response.data.plan || 'Plan generado.');
+                addMessageToChat('assistant', response.data.message || 'Plan generado.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('Error generating plan:', error);
-                addMessageToChat('assistant', 'Error al generar plan de marketing. Por favor intenta de nuevo.');
+                addMessageToChat('assistant', '⚠️ No pude generar el plan de marketing. Por favor intenta de nuevo.');
             }
         }
 
         async function generateContentIdeas() {
-            addMessageToChat('user', 'Dame 10 ideas de contenido para redes sociales');
+            const websiteUrl = prompt('¿Cuál es tu sitio web? (para entender tu marca)', '');
+            if (!websiteUrl) return;
+            
+            const platform = prompt('¿Para qué plataforma? (Instagram, LinkedIn, Twitter, TikTok, Blog)', 'Instagram');
+            if (!platform) return;
+            
+            addMessageToChat('user', `🎬 Generar ideas de contenido para ${platform}`);
             document.getElementById('chat-loading').classList.remove('hidden');
             
             try {
-                const response = await axios.post('/api/chat-agent/content-ideas', {
-                    platform: 'redes sociales',
-                    quantity: 10
+                const response = await axios.post('/api/chat-agent/message', {
+                    message: `Basado en la marca de ${websiteUrl}, genera 10 ideas creativas de contenido para ${platform}. Incluye títulos llamativos, formatos sugeridos y por qué funcionaría cada idea.`,
+                    useBrandAgent: true,
+                    websiteUrl: websiteUrl
                 }, {
                     withCredentials: true
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', response.data.ideas || 'Ideas generadas.');
+                addMessageToChat('assistant', response.data.message || 'Ideas generadas.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('Error generating content ideas:', error);
-                addMessageToChat('assistant', 'Error al analizar competencia. Por favor intenta de nuevo.');
+                addMessageToChat('assistant', '⚠️ Error al generar ideas. Por favor intenta de nuevo.');
             }
         }
 
