@@ -378,17 +378,40 @@ def generate_marketing_image(
     
     enhanced_prompt = f"{prompt}, {style_suffix}{color_suffix}"
     
+    # Traducir prompt a inglés si parece estar en español
+    # Los modelos de imagen funcionan mejor con prompts en inglés
+    translation_hints = {
+        "profesional": "professional",
+        "creativo": "creative",
+        "minimalista": "minimalist",
+        "moderno": "modern",
+        "elegante": "elegant",
+        "startup": "startup",
+        "tecnología": "technology",
+        "negocio": "business",
+        "marca": "brand",
+        "marketing": "marketing",
+        "redes sociales": "social media",
+        "publicidad": "advertising",
+        "banner": "banner",
+        "imagen": "image",
+        "diseño": "design"
+    }
+    
+    for es, en in translation_hints.items():
+        enhanced_prompt = enhanced_prompt.replace(es, en)
+    
     try:
         # Usar fal.ai para generar la imagen
-        # Modelo recomendado: fal-ai/flux/schnell (rápido) o fal-ai/flux/dev (calidad)
+        # Modelo: fal-ai/gpt-image-1.5 (GPT Image - mejor comprensión de prompts)
         result = fal_client.subscribe(
-            "fal-ai/flux/schnell",
+            "fal-ai/gpt-image-1",
             arguments={
                 "prompt": enhanced_prompt,
                 "image_size": dim,
-                "num_inference_steps": 4,
                 "num_images": 1,
-                "enable_safety_checker": True
+                "output_format": "png",
+                "quality": "high"
             }
         )
         

@@ -294,6 +294,7 @@ class BrandGenerateImagesRequest(BaseModel):
     user_id: int
     cloudflare_api_url: str = "https://webapp-46s.pages.dev"
     image_types: Optional[List[str]] = ["banner", "post", "story"]
+    custom_prompt: Optional[str] = None  # Allow custom prompts from chat
 
 @app.post("/api/agents/brand/generate-images")
 async def generate_brand_images(request: BrandGenerateImagesRequest):
@@ -306,13 +307,33 @@ async def generate_brand_images(request: BrandGenerateImagesRequest):
         import httpx
         import re
         
-        if not request.website_url:
-            raise HTTPException(status_code=400, detail="website_url is required")
+        if not request.website_url and not request.custom_prompt:
+            raise HTTPException(status_code=400, detail="website_url or custom_prompt is required")
         
         brand_team = BrandMarketingTeam()
         
-        # Solicitar generación de imágenes
-        message = f"Genera imágenes de marketing profesionales para {request.website_url}. Incluye banners, posts para redes sociales y stories. Usa fal.ai para generar las imágenes."
+        # Usar custom_prompt si está disponible, sino generar uno basado en la URL
+        if request.custom_prompt:
+            # El usuario pidió algo específico en el chat
+            message = f"""Genera imágenes de marketing basándote en esta solicitud del usuario:
+
+"{request.custom_prompt}"
+
+Contexto: El usuario tiene el sitio web {request.website_url if request.website_url != 'general' else 'una startup'}.
+
+Instrucciones:
+1. Analiza lo que el usuario quiere específicamente
+2. Si pide imagen para Instagram, usa formato cuadrado (1024x1024)
+3. Si pide para LinkedIn, usa formato horizontal profesional
+4. Si pide banner, usa 1536x640
+5. Si pide story, usa formato vertical
+6. El prompt para la imagen debe ser en inglés para mejor calidad
+7. Usa fal.ai con el modelo gpt-image-1 para generar las imágenes
+
+Genera las imágenes ahora."""
+        else:
+            # Solicitud genérica de marketing plan
+            message = f"Genera imágenes de marketing profesionales para {request.website_url}. Incluye banners, posts para redes sociales y stories. Usa fal.ai para generar las imágenes."
         
         result = brand_team.chat(
             message=message,
