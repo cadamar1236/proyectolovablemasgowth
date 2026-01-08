@@ -293,26 +293,76 @@ app.get('/history', jwtMiddleware, async (c) => {
 // Send message and get AI response
 app.post('/message', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
-  const { message, useMetricsAgent } = await c.req.json();
+  const { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage } = await c.req.json();
 
   if (!message?.trim()) {
     return c.json({ error: 'Message is required' }, 400);
   }
 
   try {
-    // Si se solicita explícitamente el metrics agent, delegar a Railway
+    // Guardar mensaje del usuario
+    await c.env.DB.prepare(`
+      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+      VALUES (?, 'user', ?, datetime('now'))
+    `).bind(user.userId, message).run();
+
+    const railwayUrl = c.env.RAILWAY_API_URL || 'http://localhost:5000';
+
+    // Si se solicita el brand marketing agent
+    if (useBrandAgent && websiteUrl) {
+      console.log('[CHAT] Delegating to Brand Marketing Agent on Railway...');
+      
+      try {
+        // Llamar al brand agent en Railway
+        const agentResponse = await fetch(`${railwayUrl}/api/agents/brand/analyze`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            website_url: websiteUrl,
+            custom_prompt: message
+          })
+        });
+
+        if (agentResponse.ok) {
+          const result = await agentResponse.json();
+          
+          if (result.success && result.response) {
+            // Formatear respuesta bonita
+            const formattedResponse = `🎨 **ANÁLISIS DE MARCA**\n\n${result.response}\n\n---\n*Análisis generado por ASTAR* Brand Marketing Agent 🚀*`;
+            
+            await c.env.DB.prepare(`
+              INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+              VALUES (?, 'assistant', ?, datetime('now'))
+            `).bind(user.userId, formattedResponse).run();
+
+            return c.json({ message: formattedResponse });
+          } else {
+            throw new Error(result.error || 'Agent returned no response');
+          }
+        } else {
+          throw new Error(`Railway API error: ${agentResponse.status}`);
+        }
+      } catch (brandError) {
+        console.error('[CHAT] Error calling Railway brand agent:', brandError);
+        
+        const errorMsg = '⚠️ No pude conectar con el agente de marketing. Por favor verifica que la URL del sitio web sea correcta e intenta de nuevo.';
+        
+        await c.env.DB.prepare(`
+          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+          VALUES (?, 'assistant', ?, datetime('now'))
+        `).bind(user.userId, errorMsg).run();
+        
+        return c.json({ message: errorMsg });
+      }
+    }
+
+    // Si se solicita el metrics agent
     if (useMetricsAgent) {
       console.log('[CHAT] Delegating to Metrics Agent on Railway...');
       
-      // Guardar mensaje del usuario
-      await c.env.DB.prepare(`
-        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-        VALUES (?, 'user', ?, datetime('now'))
-      `).bind(user.userId, message).run();
-
       try {
-        const railwayUrl = c.env.RAILWAY_API_URL || 'http://localhost:5000';
-        
         // Llamar al metrics agent en Railway
         const agentResponse = await fetch(`${railwayUrl}/api/agents/metrics/chat`, {
           method: 'POST',
@@ -322,7 +372,9 @@ app.post('/message', jwtMiddleware, async (c) => {
           body: JSON.stringify({
             user_id: user.userId,
             message: message,
-            session_id: `chat_${user.userId}_${Date.now()}`
+            session_id: `chat_${user.userId}_${Date.now()}`,
+            industry: industry || 'SaaS',
+            stage: stage || 'seed'
           })
         });
 
@@ -330,13 +382,15 @@ app.post('/message', jwtMiddleware, async (c) => {
           const result = await agentResponse.json();
           
           if (result.success && result.response) {
-            // Guardar respuesta del agente
+            // Formatear respuesta bonita con emojis
+            const formattedResponse = `📊 **ANÁLISIS DE MÉTRICAS**\n\n${result.response}\n\n---\n*Análisis generado por ASTAR* Metrics Agent 📈*`;
+            
             await c.env.DB.prepare(`
               INSERT INTO agent_chat_messages (user_id, role, content, created_at)
               VALUES (?, 'assistant', ?, datetime('now'))
-            `).bind(user.userId, result.response).run();
+            `).bind(user.userId, formattedResponse).run();
 
-            return c.json({ message: result.response });
+            return c.json({ message: formattedResponse });
           } else {
             throw new Error(result.error || 'Agent returned no response');
           }
@@ -388,34 +442,47 @@ app.post('/message', jwtMiddleware, async (c) => {
 
     try {
       // Generate AI response with function calling capability
-      const systemPrompt = `Eres un asistente de marketing y growth para startups llamado "ASTAR Agent". 
-Tu rol es ayudar a los fundadores a entender y mejorar el crecimiento de su startup.
+      const systemPrompt = `Eres ASTAR* Agent 🚀, un asistente de growth inteligente y carismático para startups.
 
-IMPORTANTE: Cuando el usuario pregunte por LEADERBOARDS, debes usar ACCIONES específicas.
+Tu personalidad es entusiasta, directa y motivadora. Usas emojis de forma estratégica y estructuras tus respuestas con formato markdown para que sean fáciles de leer.
+
+ESTILO DE RESPUESTA:
+- Usa **negritas** para resaltar puntos clave
+- Usa emojis relevantes (📊 📈 💡 🎯 ✨ 🚀)
+- Organiza con bullet points o listas numeradas
+- Añade secciones con ### títulos cuando sea apropiado
+- Sé conciso pero completo
+- Termina con una pregunta o call-to-action cuando sea apropiado
+
+FORMATO EJEMPLO:
+### 📊 Análisis de tus Métricas
+
+Aquí está lo que he encontrado:
+
+**Estado Actual:**
+- ✅ Objetivo 1: En progreso (75%)
+- 🎯 Objetivo 2: Pendiente
+
+**Recomendaciones:**
+1. Enfócate en...
+2. Te sugiero...
+
+💡 **Próximo paso:** [acción específica]
+
+---
 
 ACCIONES DISPONIBLES:
 1. ACTION:ADD_METRIC|metric_name|value - Registrar métricas
 2. ACTION:UPDATE_GOAL|goal_id|value - Actualizar progreso de objetivo
-3. ACTION:FETCH_LEADERBOARD|global - Ver leaderboard de startups (proyectos y productos)
-4. ACTION:FETCH_LEADERBOARD|goals - Ver leaderboard de objetivos completados
-5. ACTION:FETCH_LEADERBOARD|competitions - Ver competiciones activas
-
-EJEMPLOS DE USO:
-
-Usuario: "quiero ver el leaderboard"
-Respuesta: ACTION:FETCH_LEADERBOARD|global
-
-Usuario: "cual es el ranking de startups"
-Respuesta: ACTION:FETCH_LEADERBOARD|global
-
-Usuario: "quien va primero en el leaderboard"
-Respuesta: ACTION:FETCH_LEADERBOARD|global
-
-Usuario: "leaderboard de objetivos"
-Respuesta: ACTION:FETCH_LEADERBOARD|goals
-
-Usuario: "ver competiciones"
-Respuesta: ACTION:FETCH_LEADERBOARD|competitions
+3. ACTION:UPDATE_GOAL_STATUS|goal_id|status - Cambiar estado (active, completed, in_progress)
+4. ACTION:UPDATE_GOAL_DESCRIPTION|goal_id|new_description - Cambiar descripción
+5. ACTION:UPDATE_GOAL_DEADLINE|goal_id|new_deadline - Cambiar fecha límite (YYYY-MM-DD)
+6. ACTION:UPDATE_GOAL_CATEGORY|goal_id|new_category - Cambiar categoría/importancia
+7. ACTION:COMPLETE_GOAL|goal_id - Marcar objetivo como completado
+8. ACTION:DELETE_GOAL|goal_id - Eliminar objetivo
+9. ACTION:FETCH_LEADERBOARD|global - Ver leaderboard de startups
+10. ACTION:FETCH_LEADERBOARD|goals - Ver leaderboard de objetivos
+11. ACTION:FETCH_LEADERBOARD|competitions - Ver competiciones activas
 
 DETECCIÓN DE INTENCIONES:
 
@@ -423,31 +490,76 @@ DETECCIÓN DE INTENCIONES:
 Si dice: "crear goal", "añadir goal", "nuevo objetivo"
 → Responde: "TRIGGER:START_GOAL_FLOW"
 
-**EDITAR GOAL:**
-Si dice: "editar goal", "modificar objetivo", "cambiar goal", "actualizar goal"
-→ Pregunta cuál goal quiere editar (muestra lista con IDs)
-→ Cuando elija, responde: "TRIGGER:EDIT_GOAL_FLOW|goal_id"
+**EDITAR/VER GOALS:**
+Si dice: "editar goal", "modificar objetivo", "ver mis objetivos", "lista de goals"
+→ Muestra lista formateada:
+🎯 **Tus Objetivos:**
 
-**CONSULTAR LEADERBOARDS (MUY IMPORTANTE):**
-Si el usuario menciona: "leaderboard", "ranking", "posición", "quien va primero", "top", "clasificación"
-→ DEBES responder con: ACTION:FETCH_LEADERBOARD|global
-→ El sistema automáticamente mostrará los datos reales
-→ NO inventes datos, usa la acción y el sistema los traerá
+${context.goals.all.map((g: any, i: number) => `${i+1}. **[ID: ${g.id}]** ${g.description || g.task}
+   • Estado: ${g.status === 'completed' ? '✅ Completado' : g.status === 'in_progress' ? '🔄 En Progreso' : '⏳ Pendiente'}
+   • Progreso: ${g.current_value || 0}/${g.target_value || 100}
+   • Categoría: ${g.category || 'general'}`).join('\n\n')}
 
-GOALS ACTUALES DEL USUARIO:
-${context.goals.all.map((g: any, i: number) => `${i+1}. [ID: ${g.id}] ${g.task || g.description} - ${g.goal_status || 'To start'}`).join('\n')}
+Dime el ID del objetivo que quieres modificar y qué quieres cambiar.
 
-CONTEXTO:
-- Objetivos: ${context.goals.totalCount} (${context.goals.completedCount} completados)
+**MARCAR COMO COMPLETADO:**
+Si dice: "completar objetivo [ID]", "marcar como hecho [ID]", "terminar goal [ID]"
+→ Responde: "ACTION:COMPLETE_GOAL|[ID]"
+
+**CAMBIAR DESCRIPCIÓN:**
+Si dice: "cambiar descripción del objetivo [ID] a [texto]"
+→ Responde: "ACTION:UPDATE_GOAL_DESCRIPTION|[ID]|[texto]"
+
+**CAMBIAR ESTADO:**
+Si dice: "cambiar estado del objetivo [ID] a [estado]"
+→ Responde: "ACTION:UPDATE_GOAL_STATUS|[ID]|[estado]"
+Estados válidos: active, in_progress, completed
+
+**CAMBIAR CATEGORÍA/IMPORTANCIA:**
+Si dice: "cambiar importancia del objetivo [ID] a [categoría]"
+→ Responde: "ACTION:UPDATE_GOAL_CATEGORY|[ID]|[categoría]"
+Categorías: high, medium, low
+
+**CAMBIAR DEADLINE:**
+Si dice: "cambiar fecha límite del objetivo [ID] a [fecha]"
+→ Responde: "ACTION:UPDATE_GOAL_DEADLINE|[ID]|[YYYY-MM-DD]"
+
+**ACTUALIZAR PROGRESO:**
+Si dice: "actualizar progreso del objetivo [ID] a [valor]"
+→ Responde: "ACTION:UPDATE_GOAL|[ID]|[valor]"
+
+**ELIMINAR GOAL:**
+Si dice: "eliminar objetivo [ID]", "borrar goal [ID]"
+→ Responde: "ACTION:DELETE_GOAL|[ID]"
+
+**CONSULTAR LEADERBOARDS:**
+Si menciona: "leaderboard", "ranking", "posición"
+→ Responde: ACTION:FETCH_LEADERBOARD|global
+
+**ANÁLISIS DE MÉTRICAS:**
+Menciona el botón "📊 Analizar Objetivos" para análisis con Metrics Agent.
+
+**PLAN DE MARKETING:**
+Menciona el botón "🎨 Plan de Marketing" para Brand Marketing Agent.
+
+CONTEXTO DEL USUARIO:
+
+📋 **Objetivos:**
+${context.goals.all.map((g: any, i: number) => `${i+1}. [ID: ${g.id}] ${g.task || g.description} - ${g.status || 'active'} - ${g.current_value || 0}/${g.target_value || 100}`).join('\n')}
+
+📊 **Métricas Actuales:**
 - Usuarios: ${context.metrics.current.users}
 - Revenue: $${context.metrics.current.revenue}
+- Total de objetivos: ${context.goals.totalCount}
+- Completados: ${context.goals.completedCount} (${context.goals.completionRate}%)
 
-REGLAS CRÍTICAS:
-- Si pregunta por leaderboard/ranking → SIEMPRE usar ACTION:FETCH_LEADERBOARD|global
-- NO inventes información del leaderboard
-- Las acciones ACTION: deben estar al inicio de tu respuesta
-- Después de la acción, puedes añadir comentarios breves
-- Responde en español con emojis moderadamente`;
+REGLAS:
+- Responde en español 🇪🇸
+- Sé motivador y positivo ✨
+- Estructura tus respuestas con markdown
+- Usa emojis moderadamente pero estratégicamente
+- Verifica que el ID del objetivo existe antes de ejecutar acciones
+- Las acciones ACTION: deben ir al inicio de la respuesta`;
 
       const aiResponse = await generateAIResponse(groqKey || '', systemPrompt, message, context, c.env.AI, chatHistory);
       assistantMessage = await processAIActions(c.env.DB, user.userId, aiResponse, context);
@@ -620,6 +732,91 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
         
         executionResults.push(`✅ Objetivo actualizado`);
         console.log('[ACTION] Goal updated:', goalId);
+      }
+      else if (actionType === 'UPDATE_GOAL_STATUS') {
+        const [, goalId, status] = parts;
+        const validStatuses = ['active', 'completed', 'in_progress'];
+        
+        if (!validStatuses.includes(status)) {
+          executionResults.push(`❌ Estado inválido. Usa: active, completed, in_progress`);
+        } else {
+          await db.prepare(`
+            UPDATE goals 
+            SET status = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?
+          `).bind(status, parseInt(goalId), userId).run();
+          
+          const statusEmoji = status === 'completed' ? '✅' : status === 'in_progress' ? '🔄' : '⏳';
+          executionResults.push(`${statusEmoji} Estado del objetivo actualizado a: **${status}**`);
+          console.log('[ACTION] Goal status updated:', goalId, status);
+        }
+      }
+      else if (actionType === 'UPDATE_GOAL_DESCRIPTION') {
+        const [, goalId, ...descParts] = parts;
+        const newDescription = descParts.join('|');
+        
+        await db.prepare(`
+          UPDATE goals 
+          SET description = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND user_id = ?
+        `).bind(newDescription, parseInt(goalId), userId).run();
+        
+        executionResults.push(`📝 Descripción actualizada: "${newDescription}"`);
+        console.log('[ACTION] Goal description updated:', goalId);
+      }
+      else if (actionType === 'UPDATE_GOAL_DEADLINE') {
+        const [, goalId, deadline] = parts;
+        
+        await db.prepare(`
+          UPDATE goals 
+          SET deadline = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND user_id = ?
+        `).bind(deadline, parseInt(goalId), userId).run();
+        
+        executionResults.push(`📅 Fecha límite actualizada: ${deadline}`);
+        console.log('[ACTION] Goal deadline updated:', goalId, deadline);
+      }
+      else if (actionType === 'UPDATE_GOAL_CATEGORY') {
+        const [, goalId, category] = parts;
+        
+        await db.prepare(`
+          UPDATE goals 
+          SET category = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND user_id = ?
+        `).bind(category, parseInt(goalId), userId).run();
+        
+        const categoryEmoji = category === 'high' ? '🔥' : category === 'medium' ? '⚡' : '📌';
+        executionResults.push(`${categoryEmoji} Categoría actualizada: **${category}**`);
+        console.log('[ACTION] Goal category updated:', goalId, category);
+      }
+      else if (actionType === 'COMPLETE_GOAL') {
+        const [, goalId] = parts;
+        
+        await db.prepare(`
+          UPDATE goals 
+          SET status = 'completed',
+              current_value = target_value,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND user_id = ?
+        `).bind(parseInt(goalId), userId).run();
+        
+        executionResults.push(`🎉 ¡Objetivo completado! ¡Felicidades!`);
+        console.log('[ACTION] Goal completed:', goalId);
+      }
+      else if (actionType === 'DELETE_GOAL') {
+        const [, goalId] = parts;
+        
+        await db.prepare(`
+          DELETE FROM goals 
+          WHERE id = ? AND user_id = ?
+        `).bind(parseInt(goalId), userId).run();
+        
+        executionResults.push(`🗑️ Objetivo eliminado`);
+        console.log('[ACTION] Goal deleted:', goalId);
       }
       else if (actionType === 'FETCH_LEADERBOARD') {
         const [, leaderboardType] = parts;

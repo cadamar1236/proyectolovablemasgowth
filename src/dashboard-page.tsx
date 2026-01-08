@@ -365,29 +365,34 @@ app.get('/', async (c) => {
       async function generateMarketingPlan() {
         if (state.isLoading) return;
 
-        const timeframe = prompt('¿Para cuánto tiempo quieres el plan? (ej: 30 días, 1 mes, 3 meses)', '30 días');
-        if (!timeframe) return;
+        const websiteUrl = prompt('¿Cuál es tu sitio web? (para analizar tu marca)', '');
+        if (!websiteUrl) return;
 
         state.isLoading = true;
         
         state.messages.push({
           id: Date.now().toString(),
           role: 'user',
-          content: \`📋 Generar plan de marketing para \${timeframe}\`,
+          content: \`🎨 Generar análisis de marca y plan de marketing para \${websiteUrl}\`,
           timestamp: new Date()
         });
         
         render();
 
         try {
-          const response = await axios.post('/api/chat-agent/marketing-plan', {
-            timeframe
+          // Usar el brand marketing agent de Railway
+          const response = await axios.post('/api/chat-agent/message', {
+            message: \`Analiza la identidad de marca de \${websiteUrl} y genera un plan de marketing detallado con estrategias de contenido, colores, tono y mensajes clave. Sé específico y creativo.\`,
+            useBrandAgent: true,
+            websiteUrl: websiteUrl
+          }, {
+            withCredentials: true
           });
 
           state.messages.push({
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: response.data.plan,
+            content: response.data.message,
             timestamp: new Date()
           });
         } catch (error) {
@@ -395,7 +400,7 @@ app.get('/', async (c) => {
           state.messages.push({
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: 'Lo siento, ocurrió un error al generar el plan.',
+            content: '⚠️ No pude generar el plan de marketing. Por favor intenta de nuevo.',
             timestamp: new Date()
           });
         } finally {
@@ -408,32 +413,37 @@ app.get('/', async (c) => {
       async function generateContentIdeas() {
         if (state.isLoading) return;
 
-        const platform = prompt('¿Para qué plataforma? (Instagram, LinkedIn, Twitter, TikTok, Facebook)', 'Instagram');
-        if (!platform) return;
+        const websiteUrl = prompt('¿Cuál es tu sitio web? (para entender tu marca)', '');
+        if (!websiteUrl) return;
 
-        const quantity = prompt('¿Cuántas ideas quieres?', '10');
+        const platform = prompt('¿Para qué plataforma? (Instagram, LinkedIn, Twitter, TikTok, Blog)', 'Instagram');
+        if (!platform) return;
 
         state.isLoading = true;
         
         state.messages.push({
           id: Date.now().toString(),
           role: 'user',
-          content: \`💡 Generar \${quantity} ideas de contenido para \${platform}\`,
+          content: \`🎬 Generar ideas de contenido para \${platform}\`,
           timestamp: new Date()
         });
         
         render();
 
         try {
-          const response = await axios.post('/api/chat-agent/content-ideas', {
-            platform,
-            quantity: parseInt(quantity)
+          // Usar el brand marketing agent para generar ideas de contenido
+          const response = await axios.post('/api/chat-agent/message', {
+            message: \`Basándote en la identidad de marca de \${websiteUrl}, genera 10 ideas creativas de contenido para \${platform}. Incluye títulos atractivos, descripciones, hashtags relevantes y el mejor momento para publicar. Sé específico y creativo.\`,
+            useBrandAgent: true,
+            websiteUrl: websiteUrl
+          }, {
+            withCredentials: true
           });
 
           state.messages.push({
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: response.data.ideas,
+            content: response.data.message,
             timestamp: new Date()
           });
         } catch (error) {
@@ -441,7 +451,7 @@ app.get('/', async (c) => {
           state.messages.push({
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: 'Lo siento, ocurrió un error al generar ideas.',
+            content: '⚠️ No pude generar las ideas de contenido. Por favor intenta de nuevo.',
             timestamp: new Date()
           });
         } finally {
@@ -454,27 +464,30 @@ app.get('/', async (c) => {
       async function analyzeCompetition() {
         if (state.isLoading) return;
 
-        const industry = prompt('¿En qué industria estás?', 'Marketing Digital');
+        const industry = prompt('¿En qué industria estás? (SaaS, fintech, ecommerce, etc.)', 'SaaS');
         if (!industry) return;
 
-        const competitorsStr = prompt('¿Cuáles son tus principales competidores? (separados por comas)', '');
-        const competitors = competitorsStr ? competitorsStr.split(',').map(c => c.trim()) : [];
+        const stage = prompt('¿En qué etapa está tu startup? (seed, series_a, series_b)', 'seed');
+        if (!stage) return;
 
         state.isLoading = true;
         
         state.messages.push({
           id: Date.now().toString(),
           role: 'user',
-          content: \`🏆 Analizar competencia en \${industry}\${competitors.length > 0 ? \`: \${competitors.join(', ')}\` : ''}\`,
+          content: \`📊 Comparar mis métricas con benchmarks de \${industry} (\${stage})\`,
           timestamp: new Date()
         });
         
         render();
 
         try {
-          const response = await axios.post('/api/chat-agent/competition-analysis', {
-            industry,
-            competitors
+          // Usar el metrics agent para comparar con benchmarks de la industria
+          const response = await axios.post('/api/chat-agent/message', {
+            message: \`Compara mis métricas actuales con los benchmarks de la industria \${industry} en etapa \${stage}. Dame un análisis detallado de qué métricas están por encima o debajo del promedio, y recomendaciones específicas para mejorar. Incluye gráficos y porcentajes.\`,
+            useMetricsAgent: true,
+            industry: industry,
+            stage: stage
           }, {
             withCredentials: true
           });
@@ -482,7 +495,7 @@ app.get('/', async (c) => {
           state.messages.push({
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: response.data.analysis,
+            content: response.data.message,
             timestamp: new Date()
           });
         } catch (error) {
@@ -490,7 +503,7 @@ app.get('/', async (c) => {
           state.messages.push({
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: 'Lo siento, ocurrió un error al analizar la competencia.',
+            content: '⚠️ No pude analizar la competencia. Por favor intenta de nuevo.',
             timestamp: new Date()
           });
         } finally {

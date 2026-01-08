@@ -517,7 +517,8 @@ def analyze_brand_identity():
     """
     POST /api/agents/brand/analyze
     Body: {
-        "website_url": "string"
+        "website_url": "string",
+        "custom_prompt": "string (optional)"
     }
     """
     try:
@@ -525,6 +526,7 @@ def analyze_brand_identity():
         
         data = request.json
         website_url = data.get('website_url', '')
+        custom_prompt = data.get('custom_prompt', '')
         
         if not website_url:
             return jsonify({
@@ -533,13 +535,29 @@ def analyze_brand_identity():
             }), 400
         
         brand_team = BrandMarketingTeam()
-        result = brand_team.analyze_full_brand(website_url)
         
-        return jsonify({
-            "success": True,
-            "brand_analysis": result,
-            "timestamp": datetime.now().isoformat()
-        })
+        # Si hay un custom_prompt, usar el método de chat
+        if custom_prompt:
+            result = brand_team.chat(
+                message=f"{custom_prompt}\n\nWebsite URL: {website_url}",
+                session_id=f"brand_analysis_{datetime.now().timestamp()}"
+            )
+            
+            return jsonify({
+                "success": True,
+                "response": result.get('response', 'No response generated'),
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            # Análisis estándar de marca
+            result = brand_team.analyze_full_brand(website_url)
+            
+            return jsonify({
+                "success": True,
+                "brand_analysis": result,
+                "response": f"Análisis de marca completado para {website_url}",
+                "timestamp": datetime.now().isoformat()
+            })
     except Exception as e:
         return jsonify({
             "success": False,
