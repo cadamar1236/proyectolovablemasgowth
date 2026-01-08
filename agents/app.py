@@ -240,13 +240,71 @@ async def generate_message(request: GenerateMessageRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Brand Marketing Agent Endpoint
+class BrandAnalysisRequest(BaseModel):
+    website_url: str
+    custom_prompt: Optional[str] = ""
+
+@app.post("/api/agents/brand/analyze")
+async def analyze_brand_identity(request: BrandAnalysisRequest):
+    """
+    Analiza la identidad de marca usando BrandMarketingTeam
+    """
+    try:
+        from brand_marketing_agent import BrandMarketingTeam
+        from datetime import datetime
+        
+        if not request.website_url:
+            raise HTTPException(status_code=400, detail="website_url is required")
+        
+        brand_team = BrandMarketingTeam()
+        
+        # Si hay un custom_prompt, usar el método de chat
+        if request.custom_prompt:
+            result = brand_team.chat(
+                message=f"{request.custom_prompt}\n\nWebsite URL: {request.website_url}",
+                session_id=f"brand_analysis_{datetime.now().timestamp()}"
+            )
+            
+            # Asegurar que siempre retornamos un dict válido
+            if isinstance(result, dict):
+                response_text = result.get('response', result.get('content', 'No response generated'))
+            else:
+                response_text = str(result)
+            
+            return {
+                "success": True,
+                "response": response_text,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            # Análisis estándar de marca
+            result = brand_team.analyze_full_brand(request.website_url)
+            
+            # Convertir result a string si es necesario
+            if isinstance(result, dict):
+                response_text = result.get('response', result.get('content', f"Análisis de marca completado para {request.website_url}"))
+            else:
+                response_text = str(result)
+            
+            return {
+                "success": True,
+                "response": response_text,
+                "timestamp": datetime.now().isoformat()
+            }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in brand analysis: {error_details}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
     return {
         "error": "Endpoint not found",
         "message": "The requested endpoint does not exist",
-        "available_endpoints": ["/api/search", "/api/analyze", "/api/generate-message"]
+        "available_endpoints": ["/api/search", "/api/analyze", "/api/generate-message", "/api/agents/brand/analyze"]
     }
 
 @app.exception_handler(500)
