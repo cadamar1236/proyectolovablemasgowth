@@ -259,39 +259,29 @@ async def analyze_brand_identity(request: BrandAnalysisRequest):
         
         brand_team = BrandMarketingTeam()
         
-        # Si hay un custom_prompt, usar el método de chat
+        # Construir mensaje para el análisis
         if request.custom_prompt:
-            result = brand_team.chat(
-                message=f"{request.custom_prompt}\n\nWebsite URL: {request.website_url}",
-                session_id=f"brand_analysis_{datetime.now().timestamp()}"
-            )
-            
-            # Asegurar que siempre retornamos un dict válido
-            if isinstance(result, dict):
-                response_text = result.get('response', result.get('content', 'No response generated'))
-            else:
-                response_text = str(result)
-            
-            return {
-                "success": True,
-                "response": response_text,
-                "timestamp": datetime.now().isoformat()
-            }
+            message = f"{request.custom_prompt}\n\nWebsite URL: {request.website_url}"
         else:
-            # Análisis estándar de marca
-            result = brand_team.analyze_full_brand(request.website_url)
-            
-            # Convertir result a string si es necesario
-            if isinstance(result, dict):
-                response_text = result.get('response', result.get('content', f"Análisis de marca completado para {request.website_url}"))
-            else:
-                response_text = str(result)
-            
-            return {
-                "success": True,
-                "response": response_text,
-                "timestamp": datetime.now().isoformat()
-            }
+            message = f"Analiza la marca del sitio web {request.website_url} y genera un plan de marketing completo. Incluye análisis de colores, tipografía, estilo visual, y proporciona prompts para generar imágenes de marketing profesionales."
+        
+        # Usar el método chat para el análisis
+        result = brand_team.chat(
+            message=message,
+            session_id=f"brand_analysis_{datetime.now().timestamp()}"
+        )
+        
+        # Asegurar que siempre retornamos un dict válido
+        if isinstance(result, dict):
+            response_text = result.get('response', result.get('content', 'No response generated'))
+        else:
+            response_text = str(result)
+        
+        return {
+            "success": True,
+            "response": response_text,
+            "timestamp": datetime.now().isoformat()
+        }
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()

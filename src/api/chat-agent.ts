@@ -322,7 +322,13 @@ app.post('/message', jwtMiddleware, async (c) => {
     `).bind(user.userId, message).run();
     console.log('[CHAT] User message saved successfully');
 
-    const railwayUrl = c.env.RAILWAY_API_URL || 'http://localhost:5000';
+    let railwayUrl = c.env.RAILWAY_API_URL || 'http://localhost:5000';
+    
+    // Asegurar que la URL tenga protocolo
+    if (railwayUrl && !railwayUrl.startsWith('http://') && !railwayUrl.startsWith('https://')) {
+      railwayUrl = 'https://' + railwayUrl;
+    }
+    
     console.log('[CHAT] Railway URL configured as:', railwayUrl);
     console.log('[CHAT] Environment check - RAILWAY_API_URL exists:', !!c.env.RAILWAY_API_URL);
 

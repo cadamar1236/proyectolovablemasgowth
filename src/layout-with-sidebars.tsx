@@ -5,7 +5,7 @@
 
 export interface LayoutProps {
   content: string;
-  currentPage: 'dashboard' | 'directory' | 'leaderboard' | 'planner' | 'inbox' | 'notifications' | 'competitions';
+  currentPage: 'dashboard' | 'directory' | 'leaderboard' | 'planner' | 'inbox' | 'ai-cmo' | 'notifications' | 'competitions';
   userName: string;
   userAvatar?: string;
   pageTitle: string;
@@ -200,6 +200,11 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 <a href="#" onclick="switchTab('inbox'); return false;" class="nav-item sidebar-nav-inbox flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
                     <i class="fas fa-inbox mr-3 text-lg w-5"></i>
                     <span class="font-semibold">Inbox</span>
+                </a>
+
+                <a href="#" onclick="switchTab('ai-cmo'); return false;" class="nav-item sidebar-nav-ai-cmo flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">
+                    <i class="fas fa-magic mr-3 text-lg w-5"></i>
+                    <span class="font-semibold">AI CMO</span>
                 </a>
 
                 <a href="/leaderboard" class="nav-item ${currentPage === 'leaderboard' ? 'active' : ''} flex items-center px-4 py-3 text-gray-300 hover:text-white rounded-lg mb-2">

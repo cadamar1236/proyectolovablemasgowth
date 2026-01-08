@@ -36,6 +36,8 @@ import marketingAI from './api/marketing-ai';
 import competitions from './api/competitions';
 import admin from './api/admin';
 import metricsData from './api/metrics-data';
+import aiCMO from './api/ai-cmo';
+import { renderAICMOPage } from './ai-cmo-page';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -66,6 +68,7 @@ app.route('/api/marketing-ai', marketingAI);
 app.route('/api/competitions', competitions);
 app.route('/api/admin', admin);
 app.route('/api/metrics-data', metricsData);
+app.route('/api/ai-cmo', aiCMO);
 
 // Page Routes - Onboarding for new users
 app.get('/onboarding', async (c) => {
