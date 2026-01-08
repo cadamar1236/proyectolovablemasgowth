@@ -307,10 +307,26 @@ app.post('/message', jwtMiddleware, async (c) => {
     `).bind(user.userId, message).run();
 
     const railwayUrl = c.env.RAILWAY_API_URL || 'http://localhost:5000';
+    console.log('[CHAT] Railway URL configured as:', railwayUrl);
 
     // Si se solicita el brand marketing agent
     if (useBrandAgent && websiteUrl) {
       console.log('[CHAT] Delegating to Brand Marketing Agent on Railway...');
+      console.log('[CHAT] Website URL:', websiteUrl);
+      console.log('[CHAT] Target URL:', `${railwayUrl}/api/agents/brand/analyze`);
+      
+      // Verificar si Railway está configurado
+      if (railwayUrl.includes('your-railway-app') || railwayUrl === 'http://localhost:5000') {
+        console.error('[CHAT] Railway URL not configured! Using placeholder.');
+        const errorMsg = '⚠️ **Railway no está configurado**\n\nPara usar el agente de marketing, necesitas:\n1. Ir a Cloudflare Dashboard\n2. Configurar `RAILWAY_API_URL` en Variables de Entorno\n3. Ver `CONFIGURAR_RAILWAY_URL.md` para instrucciones\n\n💡 Mientras tanto, usa el botón "💬 Chat" para preguntas generales.';
+        
+        await c.env.DB.prepare(`
+          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+          VALUES (?, 'assistant', ?, datetime('now'))
+        `).bind(user.userId, errorMsg).run();
+        
+        return c.json({ message: errorMsg });
+      }
       
       try {
         // Llamar al brand agent en Railway
@@ -325,8 +341,11 @@ app.post('/message', jwtMiddleware, async (c) => {
           })
         });
 
+        console.log('[CHAT] Railway response status:', agentResponse.status);
+
         if (agentResponse.ok) {
           const result = await agentResponse.json();
+          console.log('[CHAT] Railway response:', result);
           
           if (result.success && result.response) {
             // Formatear respuesta bonita
@@ -342,12 +361,14 @@ app.post('/message', jwtMiddleware, async (c) => {
             throw new Error(result.error || 'Agent returned no response');
           }
         } else {
-          throw new Error(`Railway API error: ${agentResponse.status}`);
+          const errorText = await agentResponse.text();
+          console.error('[CHAT] Railway API error response:', errorText);
+          throw new Error(`Railway API error: ${agentResponse.status} - ${errorText}`);
         }
       } catch (brandError) {
         console.error('[CHAT] Error calling Railway brand agent:', brandError);
         
-        const errorMsg = '⚠️ No pude conectar con el agente de marketing. Por favor verifica que la URL del sitio web sea correcta e intenta de nuevo.';
+        const errorMsg = `⚠️ **Error conectando con Railway**\n\n**Detalles técnicos:**\n${brandError instanceof Error ? brandError.message : String(brandError)}\n\n**Posibles causas:**\n1. Railway no está corriendo\n2. La URL está mal configurada\n3. El endpoint no existe\n\n💡 **Solución:** Verifica \`CONFIGURAR_RAILWAY_URL.md\``;
         
         await c.env.DB.prepare(`
           INSERT INTO agent_chat_messages (user_id, role, content, created_at)
@@ -361,6 +382,20 @@ app.post('/message', jwtMiddleware, async (c) => {
     // Si se solicita el metrics agent
     if (useMetricsAgent) {
       console.log('[CHAT] Delegating to Metrics Agent on Railway...');
+      console.log('[CHAT] Target URL:', `${railwayUrl}/api/agents/metrics/chat`);
+      
+      // Verificar si Railway está configurado
+      if (railwayUrl.includes('your-railway-app') || railwayUrl === 'http://localhost:5000') {
+        console.error('[CHAT] Railway URL not configured!');
+        const errorMsg = '⚠️ **Railway no está configurado**\n\nPara usar el agente de métricas, configura `RAILWAY_API_URL` en Cloudflare.\n\nVer `CONFIGURAR_RAILWAY_URL.md` para instrucciones.';
+        
+        await c.env.DB.prepare(`
+          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+          VALUES (?, 'assistant', ?, datetime('now'))
+        `).bind(user.userId, errorMsg).run();
+        
+        return c.json({ message: errorMsg });
+      }
       
       try {
         // Llamar al metrics agent en Railway
@@ -378,8 +413,11 @@ app.post('/message', jwtMiddleware, async (c) => {
           })
         });
 
+        console.log('[CHAT] Metrics agent response status:', agentResponse.status);
+
         if (agentResponse.ok) {
           const result = await agentResponse.json();
+          console.log('[CHAT] Metrics agent response:', result);
           
           if (result.success && result.response) {
             // Formatear respuesta bonita con emojis
@@ -395,12 +433,14 @@ app.post('/message', jwtMiddleware, async (c) => {
             throw new Error(result.error || 'Agent returned no response');
           }
         } else {
-          throw new Error(`Railway API error: ${agentResponse.status}`);
+          const errorText = await agentResponse.text();
+          console.error('[CHAT] Metrics API error response:', errorText);
+          throw new Error(`Railway API error: ${agentResponse.status} - ${errorText}`);
         }
       } catch (metricsError) {
         console.error('[CHAT] Error calling Railway metrics agent:', metricsError);
         
-        const errorMsg = '⚠️ No pude conectar con el agente de métricas. Por favor intenta de nuevo.';
+        const errorMsg = `⚠️ **Error conectando con Metrics Agent**\n\n**Detalles:**\n${metricsError instanceof Error ? metricsError.message : String(metricsError)}\n\n💡 Verifica \`CONFIGURAR_RAILWAY_URL.md\``;
         
         await c.env.DB.prepare(`
           INSERT INTO agent_chat_messages (user_id, role, content, created_at)
@@ -502,35 +542,17 @@ ${context.goals.all.map((g: any, i: number) => `${i+1}. **[ID: ${g.id}]** ${g.de
 
 Dime el ID del objetivo que quieres modificar y qué quieres cambiar.
 
-**MARCAR COMO COMPLETADO:**
-Si dice: "completar objetivo [ID]", "marcar como hecho [ID]", "terminar goal [ID]"
-→ Responde: "ACTION:COMPLETE_GOAL|[ID]"
+⚡ **EDICIÓN RÁPIDA DE GOALS:**
+REGLA: Cuando el usuario pida editar/completar/eliminar un goal, ejecuta la acción INMEDIATAMENTE y responde SOLO con un emoji. NO des explicaciones.
 
-**CAMBIAR DESCRIPCIÓN:**
-Si dice: "cambiar descripción del objetivo [ID] a [texto]"
-→ Responde: "ACTION:UPDATE_GOAL_DESCRIPTION|[ID]|[texto]"
-
-**CAMBIAR ESTADO:**
-Si dice: "cambiar estado del objetivo [ID] a [estado]"
-→ Responde: "ACTION:UPDATE_GOAL_STATUS|[ID]|[estado]"
-Estados válidos: active, in_progress, completed
-
-**CAMBIAR CATEGORÍA/IMPORTANCIA:**
-Si dice: "cambiar importancia del objetivo [ID] a [categoría]"
-→ Responde: "ACTION:UPDATE_GOAL_CATEGORY|[ID]|[categoría]"
-Categorías: high, medium, low
-
-**CAMBIAR DEADLINE:**
-Si dice: "cambiar fecha límite del objetivo [ID] a [fecha]"
-→ Responde: "ACTION:UPDATE_GOAL_DEADLINE|[ID]|[YYYY-MM-DD]"
-
-**ACTUALIZAR PROGRESO:**
-Si dice: "actualizar progreso del objetivo [ID] a [valor]"
-→ Responde: "ACTION:UPDATE_GOAL|[ID]|[valor]"
-
-**ELIMINAR GOAL:**
-Si dice: "eliminar objetivo [ID]", "borrar goal [ID]"
-→ Responde: "ACTION:DELETE_GOAL|[ID]"
+Ejemplos:
+- "completar objetivo 5" → ACTION:COMPLETE_GOAL|5 → Responde solo: "🎉"
+- "cambiar descripción del 3 a nueva desc" → ACTION:UPDATE_GOAL_DESCRIPTION|3|nueva desc → Solo: "📝"  
+- "poner el 2 en progreso" → ACTION:UPDATE_GOAL_STATUS|2|in_progress → Solo: "🔄"
+- "eliminar goal 7" → ACTION:DELETE_GOAL|7 → Solo: "🗑️"
+- "cambiar deadline del 4 a 2026-02-15" → ACTION:UPDATE_GOAL_DEADLINE|4|2026-02-15 → Solo: "📅"
+- "cambiar categoría del 6 a high" → ACTION:UPDATE_GOAL_CATEGORY|6|high → Solo: "🔥"
+- "actualizar progreso del 1 a 75" → ACTION:UPDATE_GOAL|1|75 → Solo: "✅"
 
 **CONSULTAR LEADERBOARDS:**
 Si menciona: "leaderboard", "ranking", "posición"
@@ -748,7 +770,7 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           `).bind(status, parseInt(goalId), userId).run();
           
           const statusEmoji = status === 'completed' ? '✅' : status === 'in_progress' ? '🔄' : '⏳';
-          executionResults.push(`${statusEmoji} Estado del objetivo actualizado a: **${status}**`);
+          executionResults.push(`${statusEmoji}`);
           console.log('[ACTION] Goal status updated:', goalId, status);
         }
       }
@@ -763,7 +785,7 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           WHERE id = ? AND user_id = ?
         `).bind(newDescription, parseInt(goalId), userId).run();
         
-        executionResults.push(`📝 Descripción actualizada: "${newDescription}"`);
+        executionResults.push(`📝`);
         console.log('[ACTION] Goal description updated:', goalId);
       }
       else if (actionType === 'UPDATE_GOAL_DEADLINE') {
@@ -776,7 +798,7 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           WHERE id = ? AND user_id = ?
         `).bind(deadline, parseInt(goalId), userId).run();
         
-        executionResults.push(`📅 Fecha límite actualizada: ${deadline}`);
+        executionResults.push(`📅`);
         console.log('[ACTION] Goal deadline updated:', goalId, deadline);
       }
       else if (actionType === 'UPDATE_GOAL_CATEGORY') {
@@ -790,7 +812,7 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
         `).bind(category, parseInt(goalId), userId).run();
         
         const categoryEmoji = category === 'high' ? '🔥' : category === 'medium' ? '⚡' : '📌';
-        executionResults.push(`${categoryEmoji} Categoría actualizada: **${category}**`);
+        executionResults.push(`${categoryEmoji}`);
         console.log('[ACTION] Goal category updated:', goalId, category);
       }
       else if (actionType === 'COMPLETE_GOAL') {
@@ -804,7 +826,7 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           WHERE id = ? AND user_id = ?
         `).bind(parseInt(goalId), userId).run();
         
-        executionResults.push(`🎉 ¡Objetivo completado! ¡Felicidades!`);
+        executionResults.push(`🎉`);
         console.log('[ACTION] Goal completed:', goalId);
       }
       else if (actionType === 'DELETE_GOAL') {
@@ -815,7 +837,7 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           WHERE id = ? AND user_id = ?
         `).bind(parseInt(goalId), userId).run();
         
-        executionResults.push(`🗑️ Objetivo eliminado`);
+        executionResults.push(`🗑️`);
         console.log('[ACTION] Goal deleted:', goalId);
       }
       else if (actionType === 'FETCH_LEADERBOARD') {
