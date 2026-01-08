@@ -298,13 +298,143 @@ async def analyze_brand_identity(request: BrandAnalysisRequest):
         print(f"Error in brand analysis: {error_details}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Metrics Agent Endpoints
+class MetricsChatRequest(BaseModel):
+    message: str
+    user_id: Optional[int] = None
+    context: Optional[Dict[str, Any]] = {}
+
+class MetricsAnalyzeRequest(BaseModel):
+    user_id: int
+    query: str
+
+class MetricsCompareRequest(BaseModel):
+    user_id: int
+    competitor_ids: List[int]
+
+class MetricsReportRequest(BaseModel):
+    user_id: int
+    report_type: str  # weekly, investor, etc.
+
+@app.post("/api/agents/metrics/chat")
+async def metrics_chat(request: MetricsChatRequest):
+    """
+    Chat con el Metrics Agent
+    """
+    try:
+        from metrics_agent import MetricsAgent
+        
+        metrics_agent = MetricsAgent(user_id=request.user_id)
+        result = metrics_agent.analyze(
+            query=request.message,
+            context=request.context
+        )
+        
+        return {
+            "success": True,
+            "response": result,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in metrics chat: {error_details}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/agents/metrics/analyze")
+async def metrics_analyze(request: MetricsAnalyzeRequest):
+    """
+    Análisis de métricas para un usuario
+    """
+    try:
+        from metrics_agent import MetricsAgent
+        
+        metrics_agent = MetricsAgent(user_id=request.user_id)
+        result = metrics_agent.analyze(request.query)
+        
+        return {
+            "success": True,
+            "analysis": result,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in metrics analysis: {error_details}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/agents/metrics/report")
+async def metrics_report(request: MetricsReportRequest):
+    """
+    Genera un reporte de métricas
+    """
+    try:
+        from metrics_agent import MetricsAgent
+        
+        metrics_agent = MetricsAgent(user_id=request.user_id)
+        
+        # Obtener métricas actuales (esto lo haría mediante tools)
+        metrics_data = {}  # En realidad debería obtener datos reales
+        
+        if request.report_type == "weekly":
+            result = metrics_agent.get_weekly_report(metrics_data)
+        elif request.report_type == "investor":
+            result = metrics_agent.get_investor_metrics_summary(metrics_data)
+        else:
+            result = metrics_agent.analyze(f"Genera un reporte tipo {request.report_type}")
+        
+        return {
+            "success": True,
+            "report": result,
+            "report_type": request.report_type,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in metrics report: {error_details}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/agents/metrics/compare")
+async def metrics_compare(request: MetricsCompareRequest):
+    """
+    Compara métricas con competidores
+    """
+    try:
+        from metrics_agent import MetricsAgent
+        
+        metrics_agent = MetricsAgent(user_id=request.user_id)
+        result = metrics_agent.analyze(
+            f"Compara mis métricas con los competidores: {request.competitor_ids}"
+        )
+        
+        return {
+            "success": True,
+            "comparison": result,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in metrics comparison: {error_details}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
     return {
         "error": "Endpoint not found",
         "message": "The requested endpoint does not exist",
-        "available_endpoints": ["/api/search", "/api/analyze", "/api/generate-message", "/api/agents/brand/analyze"]
+        "available_endpoints": [
+            "/api/search", 
+            "/api/analyze", 
+            "/api/generate-message", 
+            "/api/agents/brand/analyze",
+            "/api/agents/metrics/chat",
+            "/api/agents/metrics/analyze",
+            "/api/agents/metrics/report",
+            "/api/agents/metrics/compare"
+        ]
     }
 
 @app.exception_handler(500)
