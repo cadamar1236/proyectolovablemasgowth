@@ -299,78 +299,122 @@ class BrandGenerateImagesRequest(BaseModel):
 @app.post("/api/agents/brand/generate-images")
 async def generate_brand_images(request: BrandGenerateImagesRequest):
     """
-    Genera imágenes de marketing y las guarda en Cloudflare D1
+    Genera imágenes de marketing DIRECTAMENTE con fal.ai y las guarda en Cloudflare D1
     """
     try:
-        from brand_marketing_agent import BrandMarketingTeam
+        import fal_client
         from datetime import datetime
         import httpx
-        import re
+        import os
+        
+        # Verificar que FAL_KEY está configurado
+        fal_key = os.getenv("FAL_KEY")
+        if not fal_key:
+            raise HTTPException(status_code=500, detail="FAL_KEY not configured")
+        
+        os.environ["FAL_KEY"] = fal_key
         
         if not request.website_url and not request.custom_prompt:
             raise HTTPException(status_code=400, detail="website_url or custom_prompt is required")
         
-        brand_team = BrandMarketingTeam()
+        # Determinar qué tipo de imágenes generar basado en el prompt
+        custom_prompt = request.custom_prompt or ""
+        prompt_lower = custom_prompt.lower()
         
-        # Usar custom_prompt si está disponible, sino generar uno basado en la URL
-        if request.custom_prompt:
-            # El usuario pidió algo específico en el chat
-            message = f"""Genera imágenes de marketing basándote en esta solicitud del usuario:
-
-"{request.custom_prompt}"
-
-Contexto: El usuario tiene el sitio web {request.website_url if request.website_url != 'general' else 'una startup'}.
-
-Instrucciones:
-1. Analiza lo que el usuario quiere específicamente
-2. Si pide imagen para Instagram, usa formato cuadrado (1024x1024)
-3. Si pide para LinkedIn, usa formato horizontal profesional
-4. Si pide banner, usa 1536x640
-5. Si pide story, usa formato vertical
-6. El prompt para la imagen debe ser en inglés para mejor calidad
-7. Usa fal.ai con el modelo gpt-image-1.5 para generar las imágenes
-
-Genera las imágenes ahora."""
+        # Detectar formato deseado
+        if "instagram" in prompt_lower or "cuadrad" in prompt_lower or "square" in prompt_lower:
+            image_size = "1024x1024"
+            image_type = "post"
+        elif "story" in prompt_lower or "vertical" in prompt_lower or "stories" in prompt_lower:
+            image_size = "1024x1536"
+            image_type = "story"
+        elif "banner" in prompt_lower or "horizontal" in prompt_lower or "linkedin" in prompt_lower or "twitter" in prompt_lower:
+            image_size = "1536x1024"
+            image_type = "banner"
         else:
-            # Solicitud genérica de marketing plan
-            message = f"Genera imágenes de marketing profesionales para {request.website_url}. Incluye banners, posts para redes sociales y stories. Usa fal.ai para generar las imágenes."
+            # Default: cuadrado para redes sociales
+            image_size = "1024x1024"
+            image_type = "post"
         
-        result = brand_team.chat(
-            message=message,
-            session_id=f"image_gen_{datetime.now().timestamp()}"
+        # Construir prompt para fal.ai (en inglés para mejor calidad)
+        if custom_prompt:
+            # Traducir/mejorar el prompt del usuario
+            base_prompt = custom_prompt
+            # Añadir modificadores de calidad
+            enhanced_prompt = f"{base_prompt}, professional marketing image, high quality, 4k, modern design, clean layout, vibrant colors"
+        else:
+            enhanced_prompt = f"Professional marketing image for {request.website_url}, modern startup aesthetic, clean design, high quality, 4k"
+        
+        # Traducir palabras comunes español->inglés para mejor resultado
+        translations = {
+            "genera": "generate",
+            "imagen": "image",
+            "para mi startup": "for my startup",
+            "redes sociales": "social media",
+            "profesional": "professional",
+            "moderno": "modern",
+            "tecnología": "technology",
+            "competencia": "competition",
+            "startups": "startups",
+            "innovación": "innovation"
+        }
+        for es, en in translations.items():
+            enhanced_prompt = enhanced_prompt.replace(es, en)
+        
+        print(f"[FAL] Generating image with GPT-Image-1.5...")
+        print(f"[FAL] Prompt: {enhanced_prompt[:200]}...")
+        print(f"[FAL] Size: {image_size}")
+        
+        # Llamar directamente a fal.ai
+        result = fal_client.subscribe(
+            "fal-ai/gpt-image-1.5",
+            arguments={
+                "prompt": enhanced_prompt,
+                "image_size": image_size,
+                "num_images": 1,
+                "quality": "high",
+                "output_format": "png"
+            }
         )
         
-        # Extraer URLs de imágenes del resultado
-        if isinstance(result, dict):
-            response_text = result.get('response', result.get('content', ''))
-        else:
-            response_text = str(result)
+        print(f"[FAL] Result: {result}")
         
-        # Buscar URLs de imágenes en el texto (URLs de fal.ai o similares)
-        image_url_pattern = r'https?://[^\s<>"]+?\.(?:png|jpg|jpeg|gif|webp)'
-        image_urls = re.findall(image_url_pattern, response_text)
+        # Extraer URLs de imágenes
+        image_urls = []
+        if result and 'images' in result:
+            for img in result['images']:
+                if 'url' in img:
+                    image_urls.append(img['url'])
+        
+        if not image_urls:
+            return {
+                "success": False,
+                "error": "No images generated",
+                "response": "No se pudieron generar imágenes. Por favor intenta de nuevo.",
+                "images_generated": 0,
+                "images_saved": 0,
+                "saved_images": []
+            }
         
         # Guardar cada imagen en Cloudflare D1
         saved_images = []
         async with httpx.AsyncClient(timeout=30.0) as client:
             for idx, image_url in enumerate(image_urls):
                 try:
-                    # Extraer tipo de imagen del contexto
-                    image_type = "general"
-                    if idx < len(request.image_types):
-                        image_type = request.image_types[idx]
-                    
                     # Guardar en Cloudflare
                     save_response = await client.post(
                         f"{request.cloudflare_api_url}/api/ai-cmo/images/from-agent",
                         json={
                             "user_id": request.user_id,
                             "image_url": image_url,
-                            "prompt": f"Generated for {request.website_url}",
+                            "prompt": enhanced_prompt[:500],
                             "image_type": image_type,
                             "metadata": {
                                 "website": request.website_url,
-                                "generated_at": datetime.now().isoformat()
+                                "original_prompt": custom_prompt,
+                                "generated_at": datetime.now().isoformat(),
+                                "model": "gpt-image-1.5",
+                                "size": image_size
                             }
                         },
                         headers={
@@ -385,9 +429,26 @@ Genera las imágenes ahora."""
                             "url": image_url,
                             "type": image_type
                         })
+                        print(f"[FAL] Image saved to Cloudflare: {image_url[:50]}...")
                 except Exception as img_error:
-                    print(f"Error saving image {image_url}: {img_error}")
-                    continue
+                    print(f"[FAL] Error saving image {image_url}: {img_error}")
+                    # Aún así incluir la imagen aunque no se haya guardado en D1
+                    saved_images.append({
+                        "image_id": None,
+                        "url": image_url,
+                        "type": image_type
+                    })
+        
+        response_text = f"""✅ **¡Imagen generada exitosamente!**
+
+🖼️ **URL:** {image_urls[0]}
+
+📊 **Detalles:**
+- Tipo: {image_type}
+- Tamaño: {image_size}
+- Modelo: GPT-Image-1.5
+
+💡 Puedes ver y aprobar la imagen en la sección **AI CMO**."""
         
         return {
             "success": True,
@@ -395,12 +456,13 @@ Genera las imágenes ahora."""
             "images_generated": len(image_urls),
             "images_saved": len(saved_images),
             "saved_images": saved_images,
+            "image_urls": image_urls,
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Error generating images: {error_details}")
+        print(f"[FAL] Error generating images: {error_details}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Metrics Agent Endpoints
