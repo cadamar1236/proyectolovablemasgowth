@@ -351,15 +351,28 @@ def generate_marketing_image(
         return "Error: FAL_KEY no está configurado. Añade FAL_KEY a las variables de entorno."
     
     # Configurar dimensiones según aspect ratio
+    # GPT-Image-1.5 solo acepta: 1024x1024, 1536x1024, 1024x1536
     dimensions = {
-        "landscape": {"width": 1344, "height": 768},  # 16:9 aproximado
-        "portrait": {"width": 768, "height": 1344},
+        "landscape": {"width": 1536, "height": 1024},  # horizontal
+        "portrait": {"width": 1024, "height": 1536},   # vertical
         "square": {"width": 1024, "height": 1024},
-        "banner": {"width": 1536, "height": 640},
-        "story": {"width": 768, "height": 1344}
+        "banner": {"width": 1536, "height": 1024},     # horizontal para banners
+        "story": {"width": 1024, "height": 1536},      # vertical para stories
+        "post": {"width": 1024, "height": 1024}        # cuadrado para posts
+    }
+    
+    # Mapping para GPT-Image-1.5 (solo acepta estos valores exactos)
+    size_mapping = {
+        "landscape": "1536x1024",
+        "portrait": "1024x1536",
+        "square": "1024x1024",
+        "banner": "1536x1024",
+        "story": "1024x1536",
+        "post": "1024x1024"
     }
     
     dim = dimensions.get(aspect_ratio, dimensions["landscape"])
+    image_size_enum = size_mapping.get(aspect_ratio, "1024x1024")
     
     # Mejorar el prompt con estilos
     style_modifiers = {
@@ -404,16 +417,23 @@ def generate_marketing_image(
     try:
         # Usar fal.ai para generar la imagen
         # Modelo: fal-ai/gpt-image-1.5 (GPT Image 1.5 - mejor comprensión de prompts)
+        # Solo acepta image_size: 1024x1024, 1536x1024, 1024x1536
+        print(f"[FAL] Generando imagen con GPT-Image-1.5...")
+        print(f"[FAL] Prompt: {enhanced_prompt[:100]}...")
+        print(f"[FAL] Size: {image_size_enum}")
+        
         result = fal_client.subscribe(
             "fal-ai/gpt-image-1.5",
             arguments={
                 "prompt": enhanced_prompt,
-                "image_size": dim,
+                "image_size": image_size_enum,
                 "num_images": 1,
-                "output_format": "png",
-                "quality": "high"
+                "quality": "high",
+                "output_format": "png"
             }
         )
+        
+        print(f"[FAL] Resultado: {result}")
         
         if result and 'images' in result and len(result['images']) > 0:
             image_url = result['images'][0].get('url', '')
@@ -493,17 +513,21 @@ def generate_social_media_pack(
     
     for fmt in formats:
         try:
+            # Usar GPT-Image-1.5 para mejor calidad
+            # Solo acepta: 1024x1024, 1536x1024, 1024x1536
+            size_mapping = {
+                "square": "1024x1024",
+                "banner": "1536x1024",  # horizontal
+                "story": "1024x1536"    # vertical
+            }
+            
             result = fal_client.subscribe(
-                "fal-ai/flux/schnell",
+                "fal-ai/gpt-image-1.5",
                 arguments={
-                    "prompt": f"{fmt['prompt']}, {style} style, high quality, 4k",
-                    "image_size": {
-                        "square": {"width": 1024, "height": 1024},
-                        "banner": {"width": 1536, "height": 640},
-                        "story": {"width": 768, "height": 1344}
-                    }[fmt["aspect_ratio"]],
-                    "num_inference_steps": 4,
-                    "num_images": 1
+                    "prompt": f"{fmt['prompt']}, {style} style, high quality, 4k, professional marketing image",
+                    "image_size": size_mapping.get(fmt["aspect_ratio"], "1024x1024"),
+                    "num_images": 1,
+                    "quality": "high"
                 }
             )
             
