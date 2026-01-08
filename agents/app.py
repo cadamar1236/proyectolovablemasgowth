@@ -328,7 +328,7 @@ Instrucciones:
 4. Si pide banner, usa 1536x640
 5. Si pide story, usa formato vertical
 6. El prompt para la imagen debe ser en inglés para mejor calidad
-7. Usa fal.ai con el modelo gpt-image-1 para generar las imágenes
+7. Usa fal.ai con el modelo gpt-image-1.5 para generar las imágenes
 
 Genera las imágenes ahora."""
         else:

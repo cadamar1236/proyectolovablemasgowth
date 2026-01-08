@@ -403,9 +403,9 @@ def generate_marketing_image(
     
     try:
         # Usar fal.ai para generar la imagen
-        # Modelo: fal-ai/gpt-image-1.5 (GPT Image - mejor comprensión de prompts)
+        # Modelo: fal-ai/gpt-image-1.5 (GPT Image 1.5 - mejor comprensión de prompts)
         result = fal_client.subscribe(
-            "fal-ai/gpt-image-1",
+            "fal-ai/gpt-image-1.5",
             arguments={
                 "prompt": enhanced_prompt,
                 "image_size": dim,
