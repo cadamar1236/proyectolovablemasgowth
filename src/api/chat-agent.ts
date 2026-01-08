@@ -318,12 +318,16 @@ app.post('/message', jwtMiddleware, async (c) => {
       // Verificar si Railway está configurado
       if (railwayUrl.includes('your-railway-app') || railwayUrl === 'http://localhost:5000') {
         console.error('[CHAT] Railway URL not configured! Using placeholder.');
-        const errorMsg = '⚠️ **Railway no está configurado**\n\nPara usar el agente de marketing, necesitas:\n1. Ir a Cloudflare Dashboard\n2. Configurar `RAILWAY_API_URL` en Variables de Entorno\n3. Ver `CONFIGURAR_RAILWAY_URL.md` para instrucciones\n\n💡 Mientras tanto, usa el botón "💬 Chat" para preguntas generales.';
+        const errorMsg = '⚠️ **Railway no está configurado**\n\nConfigura `RAILWAY_API_URL` en Cloudflare Dashboard > Settings > Environment Variables.\n\n💡 Mientras tanto, usa el chat normal para preguntas.';
         
-        await c.env.DB.prepare(`
-          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-          VALUES (?, 'assistant', ?, datetime('now'))
-        `).bind(user.userId, errorMsg).run();
+        try {
+          await c.env.DB.prepare(`
+            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+            VALUES (?, 'assistant', ?, datetime('now'))
+          `).bind(user.userId, errorMsg).run();
+        } catch (dbError) {
+          console.error('[CHAT] DB error saving message:', dbError);
+        }
         
         return c.json({ message: errorMsg });
       }
@@ -368,12 +372,16 @@ app.post('/message', jwtMiddleware, async (c) => {
       } catch (brandError) {
         console.error('[CHAT] Error calling Railway brand agent:', brandError);
         
-        const errorMsg = `⚠️ **Error conectando con Railway**\n\n**Detalles técnicos:**\n${brandError instanceof Error ? brandError.message : String(brandError)}\n\n**Posibles causas:**\n1. Railway no está corriendo\n2. La URL está mal configurada\n3. El endpoint no existe\n\n💡 **Solución:** Verifica \`CONFIGURAR_RAILWAY_URL.md\``;
+        const errorMsg = `⚠️ **Error conectando con Railway**\n\n${brandError instanceof Error ? brandError.message : String(brandError)}\n\n**Verifica:**\n- Railway está corriendo\n- RAILWAY_API_URL configurado correctamente\n- Endpoint /api/agents/brand/analyze existe`;
         
-        await c.env.DB.prepare(`
-          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-          VALUES (?, 'assistant', ?, datetime('now'))
-        `).bind(user.userId, errorMsg).run();
+        try {
+          await c.env.DB.prepare(`
+            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+            VALUES (?, 'assistant', ?, datetime('now'))
+          `).bind(user.userId, errorMsg).run();
+        } catch (dbError) {
+          console.error('[CHAT] DB error:', dbError);
+        }
         
         return c.json({ message: errorMsg });
       }
@@ -387,12 +395,16 @@ app.post('/message', jwtMiddleware, async (c) => {
       // Verificar si Railway está configurado
       if (railwayUrl.includes('your-railway-app') || railwayUrl === 'http://localhost:5000') {
         console.error('[CHAT] Railway URL not configured!');
-        const errorMsg = '⚠️ **Railway no está configurado**\n\nPara usar el agente de métricas, configura `RAILWAY_API_URL` en Cloudflare.\n\nVer `CONFIGURAR_RAILWAY_URL.md` para instrucciones.';
+        const errorMsg = '⚠️ **Railway no está configurado**\n\nConfigura `RAILWAY_API_URL` en Cloudflare Dashboard.';
         
-        await c.env.DB.prepare(`
-          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-          VALUES (?, 'assistant', ?, datetime('now'))
-        `).bind(user.userId, errorMsg).run();
+        try {
+          await c.env.DB.prepare(`
+            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+            VALUES (?, 'assistant', ?, datetime('now'))
+          `).bind(user.userId, errorMsg).run();
+        } catch (dbError) {
+          console.error('[CHAT] DB error:', dbError);
+        }
         
         return c.json({ message: errorMsg });
       }
@@ -440,23 +452,23 @@ app.post('/message', jwtMiddleware, async (c) => {
       } catch (metricsError) {
         console.error('[CHAT] Error calling Railway metrics agent:', metricsError);
         
-        const errorMsg = `⚠️ **Error conectando con Metrics Agent**\n\n**Detalles:**\n${metricsError instanceof Error ? metricsError.message : String(metricsError)}\n\n💡 Verifica \`CONFIGURAR_RAILWAY_URL.md\``;
+        const errorMsg = `⚠️ **Error conectando con Metrics Agent**\n\n${metricsError instanceof Error ? metricsError.message : String(metricsError)}\n\nVerifica Railway y RAILWAY_API_URL`;
         
-        await c.env.DB.prepare(`
-          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-          VALUES (?, 'assistant', ?, datetime('now'))
-        `).bind(user.userId, errorMsg).run();
+        try {
+          await c.env.DB.prepare(`
+            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+            VALUES (?, 'assistant', ?, datetime('now'))
+          `).bind(user.userId, errorMsg).run();
+        } catch (dbError) {
+          console.error('[CHAT] DB error:', dbError);
+        }
         
         return c.json({ message: errorMsg });
       }
     }
 
-    // Flujo normal del chat agent
-    // Save user message
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'user', ?, datetime('now'))
-    `).bind(user.userId, message).run();
+    // Flujo normal del chat agent (solo si no se usó Railway agents)
+    // Get chat history
 
     // Retrieve chat history (last 50 messages)
     const historyResult = await c.env.DB.prepare(`
