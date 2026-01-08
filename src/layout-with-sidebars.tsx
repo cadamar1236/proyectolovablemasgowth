@@ -545,12 +545,12 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             const websiteUrl = prompt('¿Cuál es tu sitio web? (para analizar tu marca)', '');
             if (!websiteUrl) return;
             
-            addMessageToChat('user', `🎨 Generar análisis de marca y plan de marketing para ${websiteUrl}`);
+            addMessageToChat('user', 'Generar análisis de marca y plan de marketing para ' + websiteUrl);
             document.getElementById('chat-loading').classList.remove('hidden');
             
             try {
                 const response = await axios.post('/api/chat-agent/message', {
-                    message: `Analiza la identidad de marca de ${websiteUrl} y genera un plan de marketing detallado con estrategias de contenido, colores, tono y mensajes clave. Sé específico y creativo.`,
+                    message: 'Analiza la identidad de marca de ' + websiteUrl + ' y genera un plan de marketing detallado con estrategias de contenido, colores, tono y mensajes clave. Se especifico y creativo.',
                     useBrandAgent: true,
                     websiteUrl: websiteUrl
                 }, {
@@ -562,7 +562,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('Error generating plan:', error);
-                addMessageToChat('assistant', '⚠️ No pude generar el plan de marketing. Por favor intenta de nuevo.');
+                addMessageToChat('assistant', 'No pude generar el plan de marketing. Por favor intenta de nuevo.');
             }
         }
 
@@ -573,12 +573,12 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             const platform = prompt('¿Para qué plataforma? (Instagram, LinkedIn, Twitter, TikTok, Blog)', 'Instagram');
             if (!platform) return;
             
-            addMessageToChat('user', `🎬 Generar ideas de contenido para ${platform}`);
+            addMessageToChat('user', 'Generar ideas de contenido para ' + platform);
             document.getElementById('chat-loading').classList.remove('hidden');
             
             try {
                 const response = await axios.post('/api/chat-agent/message', {
-                    message: `Basado en la marca de ${websiteUrl}, genera 10 ideas creativas de contenido para ${platform}. Incluye títulos llamativos, formatos sugeridos y por qué funcionaría cada idea.`,
+                    message: 'Basado en la marca de ' + websiteUrl + ', genera 10 ideas creativas de contenido para ' + platform + '. Incluye titulos llamativos, formatos sugeridos y por que funcionaria cada idea.',
                     useBrandAgent: true,
                     websiteUrl: websiteUrl
                 }, {
@@ -590,7 +590,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('Error generating content ideas:', error);
-                addMessageToChat('assistant', '⚠️ Error al generar ideas. Por favor intenta de nuevo.');
+                addMessageToChat('assistant', 'Error al generar ideas. Por favor intenta de nuevo.');
             }
         }
 
