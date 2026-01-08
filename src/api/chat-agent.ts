@@ -292,22 +292,39 @@ app.get('/history', jwtMiddleware, async (c) => {
 
 // Send message and get AI response
 app.post('/message', jwtMiddleware, async (c) => {
+  console.log('[CHAT] === NEW MESSAGE REQUEST ===');
   const user = c.get('user') as AuthContext;
-  const { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage } = await c.req.json();
+  console.log('[CHAT] User ID:', user.userId);
+  
+  let requestBody;
+  try {
+    requestBody = await c.req.json();
+    console.log('[CHAT] Request body:', JSON.stringify(requestBody));
+  } catch (jsonError) {
+    console.error('[CHAT] Failed to parse JSON:', jsonError);
+    return c.json({ error: 'Invalid JSON' }, 400);
+  }
+  
+  const { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage } = requestBody;
+  console.log('[CHAT] Flags:', { useMetricsAgent, useBrandAgent, websiteUrl, industry, stage });
 
   if (!message?.trim()) {
+    console.error('[CHAT] No message provided');
     return c.json({ error: 'Message is required' }, 400);
   }
 
   try {
+    console.log('[CHAT] Saving user message to DB...');
     // Guardar mensaje del usuario
     await c.env.DB.prepare(`
       INSERT INTO agent_chat_messages (user_id, role, content, created_at)
       VALUES (?, 'user', ?, datetime('now'))
     `).bind(user.userId, message).run();
+    console.log('[CHAT] User message saved successfully');
 
     const railwayUrl = c.env.RAILWAY_API_URL || 'http://localhost:5000';
     console.log('[CHAT] Railway URL configured as:', railwayUrl);
+    console.log('[CHAT] Environment check - RAILWAY_API_URL exists:', !!c.env.RAILWAY_API_URL);
 
     // Si se solicita el brand marketing agent
     if (useBrandAgent && websiteUrl) {
@@ -611,9 +628,13 @@ REGLAS:
     return c.json({ message: assistantMessage });
 
   } catch (error) {
-    console.error('[CHAT] Error processing message:', error);
+    console.error('[CHAT] ===== ERROR PROCESSING MESSAGE =====');
+    console.error('[CHAT] Error type:', typeof error);
+    console.error('[CHAT] Error:', error);
     console.error('[CHAT] Error stack:', error instanceof Error ? error.stack : 'No stack');
     console.error('[CHAT] Error name:', error instanceof Error ? error.name : 'Unknown');
+    console.error('[CHAT] Error message:', error instanceof Error ? error.message : String(error));
+    console.error('[CHAT] ===== END ERROR =====');
     
     // Determine error type for better user messaging
     let userMessage = 'Lo siento, ocurrió un error. Por favor intenta de nuevo.';
@@ -1134,178 +1155,6 @@ Responde en español, sé específico y usa los datos proporcionados.`;
       error: 'Failed to analyze goals',
       details: error instanceof Error ? error.message : String(error)
     }, 500);
-  }
-});
-
-// Generate marketing plan
-app.post('/marketing-plan', jwtMiddleware, async (c) => {
-  const user = c.get('user') as AuthContext;
-  const body = await c.req.json().catch(() => ({}));
-  const { timeframe } = body;
-
-  try {
-    const context = await getStartupContext(c.env.DB, user.userId);
-    const apiKey = c.env.GROQ_API_KEY || c.env.OPENAI_API_KEY;
-
-    let plan: string;
-
-    if (!apiKey) {
-      plan = `🎯 **Plan de Marketing - ${timeframe || '30 días'}**\n\n` +
-        `Basado en tus métricas actuales (${context.metrics.current.users} usuarios):\n\n` +
-        `**Semana 1-2: Fundamentos**\n` +
-        `• Optimizar landing page\n` +
-        `• Crear 3 piezas de contenido de valor\n\n` +
-        `**Semana 3-4: Crecimiento**\n` +
-        `• Lanzar campaña de referidos\n` +
-        `• Activar presencia en redes sociales\n\n` +
-        `💡 Registra más métricas para un plan más personalizado.`;
-    } else {
-      const systemPrompt = `Eres un estratega de marketing para startups. Genera un plan de marketing detallado para ${timeframe || '30 días'}.
-
-El plan debe incluir:
-1. Objetivos específicos y medibles
-2. Estrategias semana por semana
-3. Canales recomendados
-4. Métricas a trackear
-5. Quick wins para resultados inmediatos
-
-Basa el plan en los datos reales de la startup. Responde en español.`;
-
-      plan = await generateAIResponse(apiKey, systemPrompt, `Genera un plan de marketing para ${timeframe}`, context);
-    }
-
-    // Save to chat history
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'user', ?, datetime('now'))
-    `).bind(user.userId, `Genera un plan de marketing para ${timeframe || '30 días'}`).run();
-
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'assistant', ?, datetime('now'))
-    `).bind(user.userId, plan).run();
-
-    return c.json({ plan });
-  } catch (error) {
-    console.error('Error generating marketing plan:', error);
-    return c.json({ error: 'Failed to generate marketing plan' }, 500);
-  }
-});
-
-// Generate content ideas
-app.post('/content-ideas', jwtMiddleware, async (c) => {
-  const user = c.get('user') as AuthContext;
-  const body = await c.req.json().catch(() => ({}));
-  const { platform, quantity } = body;
-
-  try {
-    const context = await getStartupContext(c.env.DB, user.userId);
-    const apiKey = c.env.GROQ_API_KEY || c.env.OPENAI_API_KEY;
-
-    let ideas: string;
-
-    if (!apiKey) {
-      ideas = `💡 **Ideas de Contenido para ${platform || 'Redes Sociales'}**\n\n` +
-        `1. Behind the scenes de tu startup\n` +
-        `2. Caso de éxito de un usuario\n` +
-        `3. Tips relacionados con tu industria\n` +
-        `4. Tu historia como fundador\n` +
-        `5. Lecciones aprendidas\n` +
-        `6. Comparativa con alternativas\n` +
-        `7. Tutorial de tu producto\n` +
-        `8. Preguntas frecuentes respondidas\n` +
-        `9. Tendencias del mercado\n` +
-        `10. Celebración de milestone\n\n` +
-        `💡 Configura la API de Groq para ideas más personalizadas.`;
-    } else {
-      const systemPrompt = `Eres un experto en content marketing. Genera ${quantity || 10} ideas de contenido para ${platform || 'redes sociales'}.
-
-Para cada idea incluye:
-- Título/Hook llamativo
-- Formato sugerido (post, video, carrusel, etc.)
-- Por qué funcionará
-
-Basa las ideas en el contexto de la startup. Responde en español.`;
-
-      ideas = await generateAIResponse(apiKey, systemPrompt, `Dame ${quantity || 10} ideas de contenido`, context);
-    }
-
-    // Save to chat history
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'user', ?, datetime('now'))
-    `).bind(user.userId, `Dame ${quantity || 10} ideas de contenido para ${platform || 'redes sociales'}`).run();
-
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'assistant', ?, datetime('now'))
-    `).bind(user.userId, ideas).run();
-
-    return c.json({ ideas });
-  } catch (error) {
-    console.error('Error generating content ideas:', error);
-    return c.json({ error: 'Failed to generate content ideas' }, 500);
-  }
-});
-
-// Analyze competition
-app.post('/competition-analysis', jwtMiddleware, async (c) => {
-  const user = c.get('user') as AuthContext;
-  const body = await c.req.json().catch(() => ({}));
-  const { competitors, industry } = body;
-
-  try {
-    const context = await getStartupContext(c.env.DB, user.userId);
-    const apiKey = c.env.GROQ_API_KEY || c.env.OPENAI_API_KEY;
-
-    let analysis: string;
-
-    if (!apiKey) {
-      analysis = `🎯 **Análisis Competitivo**\n\n` +
-        `Para un análisis detallado de tu competencia, necesito:\n\n` +
-        `1. **Nombres de competidores**: Menciónalos en tu mensaje\n` +
-        `2. **Tu industria**: Describe tu mercado\n\n` +
-        `**Framework de análisis que uso:**\n` +
-        `• Posicionamiento en el mercado\n` +
-        `• Propuesta de valor única\n` +
-        `• Estrategias de pricing\n` +
-        `• Canales de adquisición\n` +
-        `• Fortalezas y debilidades\n\n` +
-        `💡 Configura la API de Groq para un análisis más profundo.`;
-    } else {
-      const systemPrompt = `Eres un analista de mercado experto. Realiza un análisis competitivo considerando:
-
-1. Posicionamiento de mercado
-2. Propuestas de valor comparadas
-3. Estrategias de pricing
-4. Canales de marketing utilizados
-5. Oportunidades de diferenciación
-6. Amenazas a considerar
-7. Recomendaciones estratégicas
-
-${competitors?.length ? `Competidores mencionados: ${competitors.join(', ')}` : 'El usuario no mencionó competidores específicos, da recomendaciones generales.'}
-${industry ? `Industria: ${industry}` : ''}
-
-Responde en español con análisis accionable.`;
-
-      analysis = await generateAIResponse(apiKey, systemPrompt, 'Analiza mi competencia', context);
-    }
-
-    // Save to chat history
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'user', ?, datetime('now'))
-    `).bind(user.userId, 'Analiza la competencia en mi industria').run();
-
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'assistant', ?, datetime('now'))
-    `).bind(user.userId, analysis).run();
-
-    return c.json({ analysis });
-  } catch (error) {
-    console.error('Error analyzing competition:', error);
-    return c.json({ error: 'Failed to analyze competition' }, 500);
   }
 });
 
