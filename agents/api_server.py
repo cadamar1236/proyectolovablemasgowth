@@ -543,22 +543,36 @@ def analyze_brand_identity():
                 session_id=f"brand_analysis_{datetime.now().timestamp()}"
             )
             
+            # Asegurar que siempre retornamos un jsonify
+            if isinstance(result, dict):
+                response_text = result.get('response', result.get('content', 'No response generated'))
+            else:
+                response_text = str(result)
+            
             return jsonify({
                 "success": True,
-                "response": result.get('response', 'No response generated'),
+                "response": response_text,
                 "timestamp": datetime.now().isoformat()
             })
         else:
             # Análisis estándar de marca
             result = brand_team.analyze_full_brand(website_url)
             
+            # Convertir result a string si es necesario
+            if isinstance(result, dict):
+                response_text = result.get('response', result.get('content', f"Análisis de marca completado para {website_url}"))
+            else:
+                response_text = str(result)
+            
             return jsonify({
                 "success": True,
-                "brand_analysis": result,
-                "response": f"Análisis de marca completado para {website_url}",
+                "response": response_text,
                 "timestamp": datetime.now().isoformat()
             })
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in brand analysis: {error_details}")
         return jsonify({
             "success": False,
             "error": str(e)
