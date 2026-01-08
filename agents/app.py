@@ -299,13 +299,17 @@ class BrandGenerateImagesRequest(BaseModel):
 @app.post("/api/agents/brand/generate-images")
 async def generate_brand_images(request: BrandGenerateImagesRequest):
     """
-    Genera imágenes de marketing DIRECTAMENTE con fal.ai y las guarda en Cloudflare D1
+    Genera imágenes de marketing INTELIGENTES:
+    1. Obtiene contexto de la startup (scraping o DB)
+    2. Usa IA para crear prompt específico
+    3. Genera imagen con fal.ai GPT-Image-1.5
     """
     try:
         import fal_client
         from datetime import datetime
         import httpx
         import os
+        import openai
         
         # Verificar que FAL_KEY está configurado
         fal_key = os.getenv("FAL_KEY")
@@ -314,58 +318,140 @@ async def generate_brand_images(request: BrandGenerateImagesRequest):
         
         os.environ["FAL_KEY"] = fal_key
         
+        openai_key = os.getenv("OPENAI_API_KEY")
+        
         if not request.website_url and not request.custom_prompt:
             raise HTTPException(status_code=400, detail="website_url or custom_prompt is required")
         
-        # Determinar qué tipo de imágenes generar basado en el prompt
+        # ============ PASO 1: OBTENER CONTEXTO DE LA STARTUP ============
+        startup_context = ""
+        brand_colors = "#6366f1"  # Default purple
+        
+        # Intentar obtener contexto de Cloudflare (datos del usuario)
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # Obtener producto/startup del usuario
+                user_data_response = await client.get(
+                    f"{request.cloudflare_api_url}/api/beta-users/{request.user_id}",
+                    headers={"Content-Type": "application/json"}
+                )
+                if user_data_response.status_code == 200:
+                    user_data = user_data_response.json()
+                    if user_data:
+                        startup_context = f"""
+Startup Info:
+- Name: {user_data.get('company_name', user_data.get('name', 'Startup'))}
+- Description: {user_data.get('product_description', user_data.get('description', ''))}
+- Industry: {user_data.get('industry', 'Technology')}
+- Stage: {user_data.get('stage', 'Early stage')}
+- Website: {request.website_url}
+"""
+                        print(f"[BRAND] Got user context from DB")
+        except Exception as ctx_error:
+            print(f"[BRAND] Could not get user context: {ctx_error}")
+        
+        # Si tenemos URL pero no contexto, hacer scraping básico
+        if request.website_url and request.website_url != 'general' and not startup_context:
+            try:
+                from brand_marketing_agent import scrape_startup_website
+                scrape_result = scrape_startup_website(request.website_url)
+                if scrape_result and not scrape_result.startswith("Error"):
+                    startup_context = f"Website Analysis:\n{scrape_result[:1500]}"
+                    print(f"[BRAND] Got context from scraping")
+            except Exception as scrape_error:
+                print(f"[BRAND] Scraping failed: {scrape_error}")
+        
+        # ============ PASO 2: USAR IA PARA CREAR PROMPT DE IMAGEN ============
         custom_prompt = request.custom_prompt or ""
         prompt_lower = custom_prompt.lower()
         
         # Detectar formato deseado
-        if "instagram" in prompt_lower or "cuadrad" in prompt_lower or "square" in prompt_lower:
+        if "instagram" in prompt_lower or "cuadrad" in prompt_lower or "square" in prompt_lower or "post" in prompt_lower:
             image_size = "1024x1024"
             image_type = "post"
+            format_hint = "square format for Instagram/social media post"
         elif "story" in prompt_lower or "vertical" in prompt_lower or "stories" in prompt_lower:
             image_size = "1024x1536"
             image_type = "story"
-        elif "banner" in prompt_lower or "horizontal" in prompt_lower or "linkedin" in prompt_lower or "twitter" in prompt_lower:
+            format_hint = "vertical format for Instagram/TikTok story"
+        elif "banner" in prompt_lower or "horizontal" in prompt_lower or "linkedin" in prompt_lower or "twitter" in prompt_lower or "header" in prompt_lower:
             image_size = "1536x1024"
             image_type = "banner"
+            format_hint = "horizontal banner format for LinkedIn/Twitter header"
         else:
-            # Default: cuadrado para redes sociales
             image_size = "1024x1024"
             image_type = "post"
+            format_hint = "square format for general social media"
         
-        # Construir prompt para fal.ai (en inglés para mejor calidad)
-        if custom_prompt:
-            # Traducir/mejorar el prompt del usuario
-            base_prompt = custom_prompt
-            # Añadir modificadores de calidad
-            enhanced_prompt = f"{base_prompt}, professional marketing image, high quality, 4k, modern design, clean layout, vibrant colors"
+        # Crear prompt inteligente con OpenAI
+        if openai_key and (startup_context or custom_prompt):
+            try:
+                client = openai.OpenAI(api_key=openai_key)
+                
+                system_prompt = """You are an expert marketing designer. Create a detailed image generation prompt in English for a professional marketing image.
+
+The prompt should:
+1. Be specific and descriptive (50-100 words)
+2. Include visual elements, colors, composition
+3. Match the startup's brand and industry
+4. Be suitable for the specified format
+5. NOT include any text/typography in the image (just visual elements)
+6. Focus on abstract/conceptual imagery that represents the brand
+
+Output ONLY the image prompt, nothing else."""
+
+                user_message = f"""Create an image prompt for this startup:
+
+{startup_context if startup_context else f"A tech startup with website {request.website_url}"}
+
+User's request: {custom_prompt if custom_prompt else "Generate a professional marketing image"}
+
+Format: {format_hint}
+
+Generate a detailed, creative prompt for the image:"""
+
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message}
+                    ],
+                    max_tokens=200,
+                    temperature=0.7
+                )
+                
+                enhanced_prompt = response.choices[0].message.content.strip()
+                print(f"[BRAND] AI-generated prompt: {enhanced_prompt[:200]}...")
+                
+            except Exception as ai_error:
+                print(f"[BRAND] AI prompt generation failed: {ai_error}")
+                # Fallback a prompt básico
+                enhanced_prompt = f"Professional marketing image for a modern tech startup, clean design, gradient colors, abstract geometric shapes, high quality, 4k, {format_hint}"
         else:
-            enhanced_prompt = f"Professional marketing image for {request.website_url}, modern startup aesthetic, clean design, high quality, 4k"
+            # Sin OpenAI, crear prompt básico pero mejorado
+            if custom_prompt:
+                # Traducir y mejorar el prompt del usuario
+                enhanced_prompt = custom_prompt
+                translations = {
+                    "genera una imagen": "create a professional image",
+                    "para mi startup": "for a modern tech startup",
+                    "de tecnología": "technology company",
+                    "redes sociales": "social media marketing",
+                    "profesional": "professional, high quality",
+                    "moderno": "modern, sleek design",
+                    "innovación": "innovation, cutting-edge",
+                    "competencia": "competition, dynamic"
+                }
+                for es, en in translations.items():
+                    enhanced_prompt = enhanced_prompt.lower().replace(es, en)
+                enhanced_prompt += ", clean layout, vibrant colors, 4k quality, professional marketing"
+            else:
+                enhanced_prompt = f"Professional marketing image for a modern tech startup, abstract design, gradient colors from purple to blue, geometric shapes, clean minimalist style, high quality, 4k, {format_hint}"
         
-        # Traducir palabras comunes español->inglés para mejor resultado
-        translations = {
-            "genera": "generate",
-            "imagen": "image",
-            "para mi startup": "for my startup",
-            "redes sociales": "social media",
-            "profesional": "professional",
-            "moderno": "modern",
-            "tecnología": "technology",
-            "competencia": "competition",
-            "startups": "startups",
-            "innovación": "innovation"
-        }
-        for es, en in translations.items():
-            enhanced_prompt = enhanced_prompt.replace(es, en)
-        
-        print(f"[FAL] Generating image with GPT-Image-1.5...")
-        print(f"[FAL] Prompt: {enhanced_prompt[:200]}...")
+        print(f"[FAL] Final prompt: {enhanced_prompt[:300]}...")
         print(f"[FAL] Size: {image_size}")
         
-        # Llamar directamente a fal.ai
+        # ============ PASO 3: GENERAR IMAGEN CON FAL.AI ============
         result = fal_client.subscribe(
             "fal-ai/gpt-image-1.5",
             arguments={
@@ -377,7 +463,7 @@ async def generate_brand_images(request: BrandGenerateImagesRequest):
             }
         )
         
-        print(f"[FAL] Result: {result}")
+        print(f"[FAL] Result received")
         
         # Extraer URLs de imágenes
         image_urls = []
@@ -396,12 +482,11 @@ async def generate_brand_images(request: BrandGenerateImagesRequest):
                 "saved_images": []
             }
         
-        # Guardar cada imagen en Cloudflare D1
+        # ============ PASO 4: GUARDAR EN CLOUDFLARE ============
         saved_images = []
         async with httpx.AsyncClient(timeout=30.0) as client:
             for idx, image_url in enumerate(image_urls):
                 try:
-                    # Guardar en Cloudflare
                     save_response = await client.post(
                         f"{request.cloudflare_api_url}/api/ai-cmo/images/from-agent",
                         json={
@@ -412,14 +497,13 @@ async def generate_brand_images(request: BrandGenerateImagesRequest):
                             "metadata": {
                                 "website": request.website_url,
                                 "original_prompt": custom_prompt,
+                                "startup_context": startup_context[:500] if startup_context else None,
                                 "generated_at": datetime.now().isoformat(),
                                 "model": "gpt-image-1.5",
                                 "size": image_size
                             }
                         },
-                        headers={
-                            "Content-Type": "application/json"
-                        }
+                        headers={"Content-Type": "application/json"}
                     )
                     
                     if save_response.status_code == 200:
