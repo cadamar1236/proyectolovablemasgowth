@@ -605,8 +605,7 @@ class BrandMarketingAgent:
                 "Responde en español y sé proactivo sugiriendo mejoras.",
                 "Siempre proporciona URLs directas de las imágenes generadas."
             ],
-            markdown=True,
-            add_history_to_messages=True
+            markdown=True
         )
     
     def analyze_and_generate(self, website_url: str, content_types: List[str] = None) -> str:

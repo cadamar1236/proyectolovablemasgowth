@@ -1068,7 +1068,6 @@ class MetricsAgent:
                 "Siempre incluye próximos pasos concretos al final de cada análisis."
             ],
             markdown=True,
-            add_history_to_messages=True,
             add_datetime_to_instructions=True
         )
     
