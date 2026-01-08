@@ -201,4 +201,39 @@ app.post('/images', async (c) => {
   }
 });
 
+// Public endpoint for Railway agent to store images (includes user_id in body)
+app.post('/images/from-agent', async (c) => {
+  try {
+    const { user_id, image_url, prompt, image_type, metadata } = await c.req.json();
+
+    if (!user_id || !image_url) {
+      return c.json({ error: 'user_id and image_url are required' }, 400);
+    }
+
+    const db = c.env.DB;
+    const imageId = crypto.randomUUID();
+
+    await db.prepare(`
+      INSERT INTO ai_generated_images (
+        id, user_id, image_url, prompt, status, image_type, metadata, created_at
+      ) VALUES (?, ?, ?, ?, 'pending', ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      imageId,
+      user_id,
+      image_url,
+      prompt || '',
+      image_type || 'general',
+      metadata ? JSON.stringify(metadata) : null
+    ).run();
+
+    return c.json({ 
+      success: true,
+      imageId
+    });
+  } catch (error) {
+    console.error('Error storing AI image from agent:', error);
+    return c.json({ error: 'Failed to store image' }, 500);
+  }
+});
+
 export default app;

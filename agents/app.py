@@ -288,6 +288,100 @@ async def analyze_brand_identity(request: BrandAnalysisRequest):
         print(f"Error in brand analysis: {error_details}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Brand Marketing - Generate and Store Images
+class BrandGenerateImagesRequest(BaseModel):
+    website_url: str
+    user_id: int
+    cloudflare_api_url: str = "https://webapp-46s.pages.dev"
+    image_types: Optional[List[str]] = ["banner", "post", "story"]
+
+@app.post("/api/agents/brand/generate-images")
+async def generate_brand_images(request: BrandGenerateImagesRequest):
+    """
+    Genera imágenes de marketing y las guarda en Cloudflare D1
+    """
+    try:
+        from brand_marketing_agent import BrandMarketingTeam
+        from datetime import datetime
+        import httpx
+        import re
+        
+        if not request.website_url:
+            raise HTTPException(status_code=400, detail="website_url is required")
+        
+        brand_team = BrandMarketingTeam()
+        
+        # Solicitar generación de imágenes
+        message = f"Genera imágenes de marketing profesionales para {request.website_url}. Incluye banners, posts para redes sociales y stories. Usa fal.ai para generar las imágenes."
+        
+        result = brand_team.chat(
+            message=message,
+            session_id=f"image_gen_{datetime.now().timestamp()}"
+        )
+        
+        # Extraer URLs de imágenes del resultado
+        if isinstance(result, dict):
+            response_text = result.get('response', result.get('content', ''))
+        else:
+            response_text = str(result)
+        
+        # Buscar URLs de imágenes en el texto (URLs de fal.ai o similares)
+        image_url_pattern = r'https?://[^\s<>"]+?\.(?:png|jpg|jpeg|gif|webp)'
+        image_urls = re.findall(image_url_pattern, response_text)
+        
+        # Guardar cada imagen en Cloudflare D1
+        saved_images = []
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for idx, image_url in enumerate(image_urls):
+                try:
+                    # Extraer tipo de imagen del contexto
+                    image_type = "general"
+                    if idx < len(request.image_types):
+                        image_type = request.image_types[idx]
+                    
+                    # Guardar en Cloudflare
+                    save_response = await client.post(
+                        f"{request.cloudflare_api_url}/api/ai-cmo/images/from-agent",
+                        json={
+                            "user_id": request.user_id,
+                            "image_url": image_url,
+                            "prompt": f"Generated for {request.website_url}",
+                            "image_type": image_type,
+                            "metadata": {
+                                "website": request.website_url,
+                                "generated_at": datetime.now().isoformat()
+                            }
+                        },
+                        headers={
+                            "Content-Type": "application/json"
+                        }
+                    )
+                    
+                    if save_response.status_code == 200:
+                        save_data = save_response.json()
+                        saved_images.append({
+                            "image_id": save_data.get("imageId"),
+                            "url": image_url,
+                            "type": image_type
+                        })
+                except Exception as img_error:
+                    print(f"Error saving image {image_url}: {img_error}")
+                    continue
+        
+        return {
+            "success": True,
+            "response": response_text,
+            "images_generated": len(image_urls),
+            "images_saved": len(saved_images),
+            "saved_images": saved_images,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error generating images: {error_details}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Metrics Agent Endpoints
 class MetricsChatRequest(BaseModel):
     message: str
