@@ -2151,6 +2151,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         document.body.appendChild(successModal);
       }
       
+      // Hacer la función disponible globalmente
+      window.showAstarSuccessAndOpenChat = showAstarSuccessAndOpenChat;
+      
       window.openAstarChat = function() {
         // Close modal
         var modal = document.getElementById('astar-success-modal');
@@ -2191,13 +2194,6 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         if (modal) modal.remove();
       };
       
-      function escapeHtml(text) {
-        if (!text) return '';
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-      }
-      
       // Load notifications after page loads
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', loadAstarNotifications);
@@ -2205,6 +2201,15 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         setTimeout(loadAstarNotifications, 500);
       }
     })();
+    
+    // Función de utilidad global
+    function escapeHtml(text) {
+      if (!text) return '';
+      var div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    window.escapeHtml = escapeHtml;
     </script>
 </body>
 </html>
