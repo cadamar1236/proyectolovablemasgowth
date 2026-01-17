@@ -11,6 +11,96 @@ const dashboard = new Hono<{ Bindings: Bindings; Variables: AuthContext }>();
 // Get user's goals
 dashboard.get('/goals', requireAuth, async (c) => {
   const userId = c.get('userId');
+  const userRole = c.get('role');
+  
+  try {
+    // Si es admin, devolver todos los goals de todos los usuarios
+    if (userRole === 'admin') {
+      const { results } = await c.env.DB.prepare(`
+        SELECT g.id, g.user_id, g.description, g.status, g.target_value, g.current_value, 
+               g.deadline, g.category, g.task, g.priority, g.priority_label, g.cadence, g.dri, 
+               g.goal_status, g.day_mon, g.day_tue, g.day_wed, g.day_thu, g.day_fri, g.day_sat, g.day_sun,
+               g.week_1, g.week_2, g.week_3, g.week_4, g.week_5,
+               g.week_of, g.order_index, g.created_at, g.updated_at,
+               u.name as user_name, u.email as user_email
+        FROM goals g
+        LEFT JOIN users u ON g.user_id = u.id
+        ORDER BY g.created_at DESC
+      `).all();
+
+      return c.json({ goals: results || [], isAdmin: true });
+    }
+    
+    // Check if user is part of a team
+    const teamMembership = await c.env.DB.prepare(`
+      SELECT team_id
+      FROM startup_team_members
+      WHERE user_id = ?
+      ORDER BY is_creator DESC, joined_at ASC
+      LIMIT 1
+    `).bind(userId).first();
+
+    let results;
+    if (teamMembership && teamMembership.team_id) {
+      // Get goals for all team members
+      results = await c.env.DB.prepare(`
+        SELECT 
+          g.id, g.user_id, g.description, g.status, g.target_value, g.current_value, 
+          g.deadline, g.category, g.task, g.priority, g.priority_label, g.cadence, g.dri, 
+          g.goal_status, g.day_mon, g.day_tue, g.day_wed, g.day_thu, g.day_fri, g.day_sat, g.day_sun,
+          g.week_1, g.week_2, g.week_3, g.week_4, g.week_5,
+          g.scheduled_dates,
+          g.week_of, g.order_index, g.created_at, g.updated_at,
+          u.name as creator_name,
+          u.avatar_url as creator_avatar
+        FROM goals g
+        INNER JOIN startup_team_members stm ON g.user_id = stm.user_id
+        LEFT JOIN users u ON g.user_id = u.id
+        WHERE stm.team_id = ?
+        ORDER BY g.order_index ASC, g.priority ASC, g.created_at DESC
+      `).bind(teamMembership.team_id).all();
+    } else {
+      // Fallback to user's own goals if not in a team
+      results = await c.env.DB.prepare(`
+        SELECT id, user_id, description, status, target_value, current_value, 
+               deadline, category, task, priority, priority_label, cadence, dri, 
+               goal_status, day_mon, day_tue, day_wed, day_thu, day_fri, day_sat, day_sun,
+               scheduled_dates,
+               week_of, order_index, created_at, updated_at
+        FROM goals 
+        WHERE user_id = ? 
+        ORDER BY order_index ASC, priority ASC, created_at DESC
+      `).bind(userId).all();
+    }
+
+    return c.json({ goals: results.results || [] });
+  } catch (error) {
+    console.error('Error fetching goals:', error);
+    return c.json({ goals: [] });
+  }
+});
+
+// Get goals for a specific user (admin only)
+dashboard.get('/goals/user/:userId', requireAuth, async (c) => {
+  const requestUserId = c.get('userId');
+  const userRole = c.get('role');
+  const targetUserId = c.req.param('userId');
+  
+  console.log('Goals/user endpoint - requestUserId:', requestUserId, 'userRole:', userRole, 'targetUserId:', targetUserId);
+  
+  // Check if user is admin by querying database
+  let isAdmin = false;
+  if (requestUserId) {
+    const user = await c.env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(requestUserId).first();
+    isAdmin = user?.role === 'admin';
+    console.log('User from DB:', user, 'isAdmin:', isAdmin);
+  }
+  
+  // Only admins can view other users' goals, or users can view their own
+  if (!isAdmin && requestUserId !== parseInt(targetUserId)) {
+    console.log('Access denied - not admin and not own user');
+    return c.json({ error: 'Unauthorized', details: { isAdmin, requestUserId, targetUserId } }, 403);
+  }
   
   try {
     const { results } = await c.env.DB.prepare(`
@@ -21,12 +111,13 @@ dashboard.get('/goals', requireAuth, async (c) => {
       FROM goals 
       WHERE user_id = ? 
       ORDER BY order_index ASC, priority ASC, created_at DESC
-    `).bind(userId).all();
+    `).bind(targetUserId).all();
 
+    console.log('Found', results?.length || 0, 'goals for user', targetUserId);
     return c.json({ goals: results || [] });
   } catch (error) {
-    console.error('Error fetching goals:', error);
-    return c.json({ goals: [] });
+    console.error('Error fetching user goals:', error);
+    return c.json({ goals: [], error: error.message }, 500);
   }
 });
 
@@ -91,7 +182,16 @@ dashboard.post('/goals', requireAuth, async (c) => {
 dashboard.put('/goals/:id', requireAuth, async (c) => {
   const userId = c.get('userId');
   const goalId = c.req.param('id');
-  const body = await c.req.json();
+  
+  let body;
+  try {
+    body = await c.req.json();
+    console.log('[GOAL UPDATE] goalId:', goalId, 'userId:', userId, 'body:', JSON.stringify(body));
+  } catch (parseError: any) {
+    console.error('[GOAL UPDATE] Failed to parse body:', parseError?.message);
+    return c.json({ error: 'Invalid request body' }, 400);
+  }
+  
   const { 
     status, 
     current_value, 
@@ -110,6 +210,12 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
     day_fri,
     day_sat,
     day_sun,
+    week_1,
+    week_2,
+    week_3,
+    week_4,
+    week_5,
+    scheduled_dates,
     week_of,
     order_index,
     category
@@ -188,6 +294,40 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
       updates.push('day_sun = ?');
       values.push(day_sun);
     }
+    if (week_1 !== undefined) {
+      updates.push('week_1 = ?');
+      values.push(week_1);
+    }
+    if (week_2 !== undefined) {
+      updates.push('week_2 = ?');
+      values.push(week_2);
+    }
+    if (week_3 !== undefined) {
+      updates.push('week_3 = ?');
+      values.push(week_3);
+    }
+    if (week_4 !== undefined) {
+      updates.push('week_4 = ?');
+      values.push(week_4);
+    }
+    if (week_5 !== undefined) {
+      updates.push('week_5 = ?');
+      values.push(week_5);
+    }
+    if (scheduled_dates !== undefined) {
+      updates.push('scheduled_dates = ?');
+      // Ensure it's always a JSON string
+      let datesStr: string;
+      if (typeof scheduled_dates === 'string') {
+        datesStr = scheduled_dates;
+      } else if (Array.isArray(scheduled_dates)) {
+        datesStr = JSON.stringify(scheduled_dates);
+      } else {
+        datesStr = '[]';
+      }
+      values.push(datesStr);
+      console.log('[GOAL UPDATE] Setting scheduled_dates to:', datesStr);
+    }
     if (week_of !== undefined) {
       updates.push('week_of = ?');
       values.push(week_of);
@@ -206,18 +346,36 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP');
-    values.push(goalId, userId);
-
-    await c.env.DB.prepare(`
+    
+    // Build the complete UPDATE query
+    const updateQuery = `
       UPDATE goals 
       SET ${updates.join(', ')}
-      WHERE id = ? AND user_id = ?
-    `).bind(...values).run();
-
-    return c.json({ success: true });
-  } catch (error) {
-    console.error('Error updating goal:', error);
-    return c.json({ error: 'Failed to update goal' }, 500);
+      WHERE id = ?
+    `;
+    
+    // All values: first the field values, then the goalId for WHERE clause
+    const allValues = [...values, goalId];
+    
+    console.log('[GOAL UPDATE] Query:', updateQuery);
+    console.log('[GOAL UPDATE] Values:', JSON.stringify(allValues));
+    
+    try {
+      const result = await c.env.DB.prepare(updateQuery).bind(...allValues).run();
+      console.log('[GOAL UPDATE] Success! Rows affected:', result.meta?.changes);
+      
+      if (result.meta?.changes === 0) {
+        return c.json({ error: 'Goal not found or no permission to update' }, 404);
+      }
+      
+      return c.json({ success: true, rowsAffected: result.meta?.changes });
+    } catch (dbError: any) {
+      console.error('[GOAL UPDATE] Database error:', dbError?.message, dbError);
+      return c.json({ error: 'Database error', details: dbError?.message }, 500);
+    }
+  } catch (error: any) {
+    console.error('Error updating goal:', error?.message || error, 'Stack:', error?.stack);
+    return c.json({ error: 'Failed to update goal', details: error?.message }, 500);
   }
 });
 
@@ -317,13 +475,38 @@ dashboard.get('/metrics-history', requireAuth, async (c) => {
   const userId = c.get('userId');
 
   try {
-    const { results } = await c.env.DB.prepare(`
-      SELECT id, metric_name, metric_value, recorded_date, created_at
-      FROM user_metrics 
-      WHERE user_id = ? 
-      ORDER BY recorded_date DESC, created_at DESC
-      LIMIT 100
-    `).bind(userId).all();
+    // Check if user is part of a team
+    const teamMembership = await c.env.DB.prepare(`
+      SELECT team_id
+      FROM startup_team_members
+      WHERE user_id = ?
+      ORDER BY is_creator DESC, joined_at ASC
+      LIMIT 1
+    `).bind(userId).first();
+
+    let results;
+    if (teamMembership && teamMembership.team_id) {
+      // Get metrics for all team members
+      const metricsResult = await c.env.DB.prepare(`
+        SELECT um.id, um.metric_name, um.metric_value, um.recorded_date, um.created_at
+        FROM user_metrics um
+        INNER JOIN startup_team_members stm ON um.user_id = stm.user_id
+        WHERE stm.team_id = ?
+        ORDER BY um.recorded_date DESC, um.created_at DESC
+        LIMIT 100
+      `).bind(teamMembership.team_id).all();
+      results = metricsResult.results;
+    } else {
+      // Fallback to user's own metrics
+      const metricsResult = await c.env.DB.prepare(`
+        SELECT id, metric_name, metric_value, recorded_date, created_at
+        FROM user_metrics 
+        WHERE user_id = ? 
+        ORDER BY recorded_date DESC, created_at DESC
+        LIMIT 100
+      `).bind(userId).all();
+      results = metricsResult.results;
+    }
 
     return c.json({ metricsHistory: results || [] });
   } catch (error) {
@@ -467,14 +650,38 @@ dashboard.get('/summary', requireAuth, async (c) => {
       if (g.status === 'completed') goalStats.completed += g.count;
     });
 
-    // Get latest metrics
-    const { results: latestMetrics } = await c.env.DB.prepare(`
-      SELECT metric_name, metric_value 
-      FROM user_metrics 
-      WHERE user_id = ? 
-      ORDER BY recorded_date DESC, created_at DESC
-      LIMIT 10
-    `).bind(userId).all();
+    // Check if user is part of a team for metrics
+    const teamMembership = await c.env.DB.prepare(`
+      SELECT team_id
+      FROM startup_team_members
+      WHERE user_id = ?
+      ORDER BY is_creator DESC, joined_at ASC
+      LIMIT 1
+    `).bind(userId).first();
+
+    let latestMetrics;
+    if (teamMembership && teamMembership.team_id) {
+      // Get metrics for all team members
+      const metricsResult = await c.env.DB.prepare(`
+        SELECT um.metric_name, um.metric_value
+        FROM user_metrics um
+        INNER JOIN startup_team_members stm ON um.user_id = stm.user_id
+        WHERE stm.team_id = ?
+        ORDER BY um.recorded_date DESC, um.created_at DESC
+        LIMIT 10
+      `).bind(teamMembership.team_id).all();
+      latestMetrics = metricsResult.results;
+    } else {
+      // Fallback to user's own metrics
+      const metricsResult = await c.env.DB.prepare(`
+        SELECT metric_name, metric_value 
+        FROM user_metrics 
+        WHERE user_id = ? 
+        ORDER BY recorded_date DESC, created_at DESC
+        LIMIT 10
+      `).bind(userId).all();
+      latestMetrics = metricsResult.results;
+    }
 
     const metrics: any = {};
     latestMetrics?.forEach((m: any) => {
@@ -591,9 +798,33 @@ dashboard.get('/my-stats', requireAuth, async (c) => {
     const totalGoals = goals?.length || 0;
     const completedGoals = goals?.filter((g: any) => g.status === 'completed').length || 0;
 
-    const { results: metrics } = await c.env.DB.prepare(
-      'SELECT metric_name, metric_value FROM user_metrics WHERE user_id = ? ORDER BY recorded_date DESC'
-    ).bind(userId).all();
+    // Check if user is part of a team for metrics
+    const teamMembership = await c.env.DB.prepare(`
+      SELECT team_id
+      FROM startup_team_members
+      WHERE user_id = ?
+      ORDER BY is_creator DESC, joined_at ASC
+      LIMIT 1
+    `).bind(userId).first();
+
+    let metrics;
+    if (teamMembership && teamMembership.team_id) {
+      // Get metrics for all team members
+      const metricsResult = await c.env.DB.prepare(`
+        SELECT um.metric_name, um.metric_value
+        FROM user_metrics um
+        INNER JOIN startup_team_members stm ON um.user_id = stm.user_id
+        WHERE stm.team_id = ?
+        ORDER BY um.recorded_date DESC
+      `).bind(teamMembership.team_id).all();
+      metrics = metricsResult.results;
+    } else {
+      // Fallback to user's own metrics
+      const metricsResult = await c.env.DB.prepare(
+        'SELECT metric_name, metric_value FROM user_metrics WHERE user_id = ? ORDER BY recorded_date DESC'
+      ).bind(userId).all();
+      metrics = metricsResult.results;
+    }
 
     const latestUsers = metrics?.find((m: any) => m.metric_name === 'users')?.metric_value || 0;
     const latestRevenue = metrics?.find((m: any) => m.metric_name === 'revenue')?.metric_value || 0;

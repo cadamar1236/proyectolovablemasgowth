@@ -77,12 +77,50 @@ auth.post('/register', async (c) => {
       `).bind(userId, 'New Validator', '[]').run();
     }
     
+    // Check for pending team invitations
+    const pendingInvitations = await c.env.DB.prepare(`
+      SELECT ti.*, st.name as team_name
+      FROM team_invitations ti
+      JOIN startup_teams st ON ti.team_id = st.id
+      WHERE ti.email = ? AND ti.status = 'pending'
+    `).bind(email.toLowerCase()).all();
+    
+    let finalRole = role;
+    
+    if (pendingInvitations.results && pendingInvitations.results.length > 0) {
+      // Process each pending invitation
+      for (const invitation of pendingInvitations.results as any[]) {
+        // Add user to the team
+        await c.env.DB.prepare(`
+          INSERT INTO startup_team_members (team_id, user_id, role, is_creator)
+          VALUES (?, ?, ?, 0)
+        `).bind(invitation.team_id, userId, invitation.role).run();
+        
+        // Update invitation status
+        await c.env.DB.prepare(`
+          UPDATE team_invitations
+          SET status = 'accepted'
+          WHERE id = ?
+        `).bind(invitation.id).run();
+        
+        // If invitation role is founder, update user's role
+        if (invitation.role === 'founder') {
+          finalRole = 'founder';
+          await c.env.DB.prepare(`
+            UPDATE users SET role = 'founder' WHERE id = ?
+          `).bind(userId).run();
+        }
+      }
+      
+      console.log(`User ${email} accepted ${pendingInvitations.results.length} team invitation(s)`);
+    }
+    
     // Generate JWT token
     const token = await sign(
       {
         userId,
         email,
-        role,
+        role: finalRole,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
       c.env.JWT_SECRET || JWT_SECRET
@@ -95,7 +133,7 @@ auth.post('/register', async (c) => {
         id: userId,
         email,
         name,
-        role
+        role: finalRole
       }
     });
     
@@ -531,6 +569,42 @@ auth.get('/google/callback', async (c) => {
           INSERT INTO validators (user_id, title, expertise)
           VALUES (?, ?, ?)
         `).bind(userId, 'New Validator', '[]').run();
+      }
+      
+      // Check for pending team invitations
+      const pendingInvitations = await c.env.DB.prepare(`
+        SELECT ti.*, st.name as team_name
+        FROM team_invitations ti
+        JOIN startup_teams st ON ti.team_id = st.id
+        WHERE ti.email = ? AND ti.status = 'pending'
+      `).bind(userData.email.toLowerCase()).all();
+      
+      if (pendingInvitations.results && pendingInvitations.results.length > 0) {
+        // Process each pending invitation
+        for (const invitation of pendingInvitations.results as any[]) {
+          // Add user to the team
+          await c.env.DB.prepare(`
+            INSERT INTO startup_team_members (team_id, user_id, role, is_creator)
+            VALUES (?, ?, ?, 0)
+          `).bind(invitation.team_id, userId, invitation.role).run();
+          
+          // Update invitation status
+          await c.env.DB.prepare(`
+            UPDATE team_invitations
+            SET status = 'accepted'
+            WHERE id = ?
+          `).bind(invitation.id).run();
+          
+          // If invitation role is founder, update user's role
+          if (invitation.role === 'founder') {
+            userRole = 'founder';
+            await c.env.DB.prepare(`
+              UPDATE users SET role = 'founder' WHERE id = ?
+            `).bind(userId).run();
+          }
+        }
+        
+        console.log(`[GOOGLE-CALLBACK] User ${userData.email} accepted ${pendingInvitations.results.length} team invitation(s)`);
       }
       
       // Mark that this is a new user who needs onboarding

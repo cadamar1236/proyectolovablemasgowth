@@ -191,6 +191,10 @@ app.get('/', async (c) => {
           totalGoals: 0,
           overallCompletion: 0
         },
+        astarPendingMessages: [],
+        showAstarNotification: false,
+        astarResponse: '',
+        respondingToMessageId: null,
         chatExpanded: false,
         isLoading: false,
         inputMessage: ''
@@ -219,6 +223,52 @@ app.get('/', async (c) => {
           render();
         } catch (error) {
           console.error('Error loading chat:', error);
+        }
+      }
+
+      async function loadAstarPendingMessages() {
+        try {
+          console.log('[ASTAR] Loading pending messages...');
+          const response = await axios.get('/api/astar-messages/pending', {
+            withCredentials: true
+          });
+          console.log('[ASTAR] Response:', response.data);
+          state.astarPendingMessages = response.data.pending || [];
+          state.showAstarNotification = state.astarPendingMessages.length > 0;
+          console.log('[ASTAR] Pending messages:', state.astarPendingMessages.length);
+          render();
+        } catch (error) {
+          console.error('[ASTAR] Error loading messages:', error);
+        }
+      }
+
+      async function submitAstarResponse(messageId) {
+        if (!state.astarResponse.trim()) return;
+        
+        try {
+          state.isLoading = true;
+          render();
+          
+          const response = await axios.post('/api/astar-messages/respond', {
+            sent_message_id: messageId,
+            response_text: state.astarResponse
+          }, {
+            withCredentials: true
+          });
+
+          if (response.status === 200) {
+            state.astarResponse = '';
+            state.respondingToMessageId = null;
+            await loadAstarPendingMessages();
+            await loadGoals();
+            alert('¡Respuesta enviada! 🎉');
+          }
+        } catch (error) {
+          console.error('Error submitting ASTAR response:', error);
+          alert('Error al enviar respuesta');
+        } finally {
+          state.isLoading = false;
+          render();
         }
       }
 
@@ -705,7 +755,60 @@ app.get('/', async (c) => {
       }
       
       function getDashboardHTML(goals, metrics) {
-        return '<div class="mb-6">' +
+        console.log('[ASTAR] getDashboardHTML called', {
+          showNotification: state.showAstarNotification,
+          messagesCount: state.astarPendingMessages.length
+        });
+        
+        // ASTAR Notification Banner
+        const astarNotificationHTML = state.showAstarNotification && state.astarPendingMessages.length > 0 ? 
+          '<div class="mb-6 bg-gradient-to-r from-purple-900 to-indigo-900 rounded-xl shadow-2xl p-6 border-2 border-purple-500">' +
+            '<div class="flex items-center justify-between mb-4">' +
+              '<div class="flex items-center space-x-3">' +
+                '<span class="text-3xl">🌟</span>' +
+                '<h2 class="text-white text-xl font-bold">ASTAR te pregunta...</h2>' +
+                '<span class="bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-bold">' +
+                  state.astarPendingMessages.length + ' mensaje' + (state.astarPendingMessages.length > 1 ? 's' : '') +
+                '</span>' +
+              '</div>' +
+              '<button onclick="window.state.showAstarNotification = false; updateMainContent()" class="text-gray-300 hover:text-white text-xl">✕</button>' +
+            '</div>' +
+            state.astarPendingMessages.map(msg => 
+              '<div class="bg-gray-900 bg-opacity-50 rounded-lg p-4 mb-4 border-l-4 border-purple-500">' +
+                '<div class="text-white mb-3">' +
+                  '<div class="text-lg font-bold mb-2">' + msg.subject + '</div>' +
+                  '<div class="text-sm text-gray-300 mb-3">' +
+                    new Date(msg.sent_at).toLocaleDateString('es-ES', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) +
+                  '</div>' +
+                  '<div class="text-base text-gray-200 mb-4">' + msg.response_prompt + '</div>' +
+                '</div>' +
+                '<textarea ' +
+                  'id="astar-response-' + msg.sent_message_id + '" ' +
+                  'placeholder="Escribe tu respuesta aquí..." ' +
+                  'class="w-full min-h-[100px] p-3 rounded-lg border border-gray-600 bg-gray-800 text-white text-sm resize-vertical mb-3" ' +
+                  'onfocus="window.state.respondingToMessageId = ' + msg.sent_message_id + '; window.state.astarResponse = this.value" ' +
+                  'oninput="window.state.astarResponse = this.value"' +
+                '></textarea>' +
+                '<button ' +
+                  'onclick="submitAstarResponse(' + msg.sent_message_id + ')" ' +
+                  'class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-bold text-sm transition shadow-lg"' +
+                '>' +
+                  '📤 Enviar Respuesta' +
+                '</button>' +
+              '</div>'
+            ).join('') +
+          '</div>' 
+          : '';
+        
+        return astarNotificationHTML +
+        '<div class="mb-6">' +
           '<h2 class="text-2xl font-bold text-gray-900">Welcome back! 👋</h2>' +
           '<p class="text-gray-500">Manage your startup growth and connect with validators</p>' +
         '</div>' +
@@ -1061,6 +1164,10 @@ app.get('/', async (c) => {
 
       window.sendMessage = sendMessage;
 
+      window.state = state;
+
+      window.submitAstarResponse = submitAstarResponse;
+
       window.clearChat = async () => {
         if (confirm('¿Limpiar el historial del chat?')) {
           try {
@@ -1251,6 +1358,7 @@ app.get('/', async (c) => {
       // Initialize
       loadGoals();
       loadChatHistory();
+      loadAstarPendingMessages();
 
       // Handle hash changes
       window.addEventListener('hashchange', () => {

@@ -4,6 +4,11 @@
  */
 
 export function renderAICMOPage(user: any) {
+  // Make it globally available
+  if (typeof window !== 'undefined') {
+    (window as any).renderAICMOPage = renderAICMOPage;
+  }
+  
   return `
     <div class="ai-cmo-page p-6">
       <!-- Header -->
@@ -153,66 +158,60 @@ export function renderAICMOPage(user: any) {
     </style>
 
     <script>
-      // AI CMO Page Logic
-      (function() {
-        let currentSection = 'pending';
-        let generatedImages = [];
-
-        // Load images on page load
-        loadAICMOImages();
-
-        window.showAICMOSection = function(section) {
-          currentSection = section;
+      // AI CMO Page Logic - Make functions global immediately
+      window.showAICMOSection = function(section) {
+        const currentSection = section;
+        
+        // Update tabs
+        ['pending', 'approved', 'rejected', 'history'].forEach(function(s) {
+          const btn = document.getElementById('ai-cmo-' + s + '-btn');
+          const content = document.getElementById('ai-cmo-' + s + '-content');
           
-          // Update tabs
-          ['pending', 'approved', 'rejected', 'history'].forEach(s => {
-            const btn = document.getElementById(\`ai-cmo-\${s}-btn\`);
-            const content = document.getElementById(\`ai-cmo-\${s}-content\`);
-            
-            if (s === section) {
-              btn?.classList.remove('text-gray-500', 'border-transparent');
-              btn?.classList.add('text-primary', 'border-primary', 'bg-primary/5');
-              content?.classList.remove('hidden');
-            } else {
-              btn?.classList.remove('text-primary', 'border-primary', 'bg-primary/5');
-              btn?.classList.add('text-gray-500', 'border-transparent');
-              content?.classList.add('hidden');
+          if (s === section) {
+            if (btn) {
+              btn.classList.remove('text-gray-500', 'border-transparent');
+              btn.classList.add('text-primary', 'border-primary', 'bg-primary/5');
+            }
+            if (content) content.classList.remove('hidden');
+          } else {
+            if (btn) {
+              btn.classList.remove('text-primary', 'border-primary', 'bg-primary/5');
+              btn.classList.add('text-gray-500', 'border-transparent');
+            }
+            if (content) content.classList.add('hidden');
+          }
+        });
+
+        window.loadAICMOImages(section);
+      };
+
+      window.loadAICMOImages = async function(section) {
+        section = section || 'pending';
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/);
+          const authToken = token ? token[1] : localStorage.getItem('authToken');
+          
+          const response = await fetch('/api/ai-cmo/images', {
+            headers: {
+              'Authorization': 'Bearer ' + authToken
             }
           });
 
-          loadAICMOImages();
-        };
+          if (!response.ok) throw new Error('Failed to load images');
 
-        async function loadAICMOImages() {
-          try {
-            const response = await fetch('/api/ai-cmo/images', {
-              headers: {
-                'Authorization': \`Bearer \${localStorage.getItem('token')}\`
-              }
-            });
+          const data = await response.json();
+          const images = data.images || [];
 
-            if (!response.ok) throw new Error('Failed to load images');
-
-            const data = await response.json();
-            generatedImages = data.images || [];
-
-            renderImages();
-          } catch (error) {
-            console.error('Error loading AI CMO images:', error);
-            showEmptyState();
-          }
-        }
-
-        function renderImages() {
-          const filtered = generatedImages.filter(img => {
-            if (currentSection === 'pending') return img.status === 'pending';
-            if (currentSection === 'approved') return img.status === 'approved';
-            if (currentSection === 'rejected') return img.status === 'rejected';
+          // Filter by section
+          const filtered = images.filter(function(img) {
+            if (section === 'pending') return img.status === 'pending';
+            if (section === 'approved') return img.status === 'approved';
+            if (section === 'rejected') return img.status === 'rejected';
             return true; // history shows all
           });
 
-          const gridId = currentSection === 'history' ? 'history-list' : \`\${currentSection}-images-grid\`;
-          const emptyId = \`\${currentSection}-empty\`;
+          const gridId = section === 'history' ? 'history-list' : section + '-images-grid';
+          const emptyId = section + '-empty';
           const grid = document.getElementById(gridId);
           const empty = document.getElementById(emptyId);
 
@@ -221,154 +220,127 @@ export function renderAICMOPage(user: any) {
           if (filtered.length === 0) {
             grid.innerHTML = '';
             grid.classList.add('hidden');
-            empty?.classList.remove('hidden');
+            if (empty) empty.classList.remove('hidden');
             return;
           }
 
           grid.classList.remove('hidden');
-          empty?.classList.add('hidden');
+          if (empty) empty.classList.add('hidden');
 
-          if (currentSection === 'history') {
-            grid.innerHTML = filtered.map(img => renderHistoryItem(img)).join('');
+          if (section === 'history') {
+            grid.innerHTML = filtered.map(function(img) {
+              var statusColors = {
+                pending: 'text-yellow-600 bg-yellow-50',
+                approved: 'text-green-600 bg-green-50',
+                rejected: 'text-red-600 bg-red-50'
+              };
+              var statusText = img.status === 'pending' ? 'Pendiente' : img.status === 'approved' ? 'Aprobada' : 'Rechazada';
+              return '<div class="bg-white rounded-lg p-4 flex gap-4 shadow-sm">' +
+                '<img src="' + img.image_url + '" alt="Generated" class="w-24 h-24 rounded object-cover" onerror="this.src=\\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 fill=%22%23999%22 text-anchor=%22middle%22 dy=%22.3em%22>No img</text></svg>\\'" />' +
+                '<div class="flex-1">' +
+                '<p class="text-sm text-gray-800 mb-1">' + (img.prompt || 'Sin prompt') + '</p>' +
+                '<span class="inline-block px-2 py-1 text-xs font-semibold rounded ' + (statusColors[img.status] || 'text-gray-600 bg-gray-50') + '">' + statusText + '</span>' +
+                '<p class="text-xs text-gray-400 mt-2">' + new Date(img.created_at).toLocaleDateString() + '</p>' +
+                '</div></div>';
+            }).join('');
           } else {
-            grid.innerHTML = filtered.map(img => renderImageCard(img)).join('');
+            grid.innerHTML = filtered.map(function(img) {
+              var actions = '';
+              if (img.status === 'pending') {
+                actions = '<button onclick="approveImage(\\'' + img.id + '\\')" class="btn-approve"><i class="fas fa-check mr-1"></i> Aprobar</button>' +
+                          '<button onclick="rejectImage(\\'' + img.id + '\\')" class="btn-reject"><i class="fas fa-times mr-1"></i> Rechazar</button>';
+              } else if (img.status === 'approved') {
+                actions = '<button onclick="downloadImage(\\'' + img.image_url + '\\', \\'' + img.id + '\\')" class="btn-download"><i class="fas fa-download mr-1"></i> Descargar</button>';
+              } else if (img.status === 'rejected') {
+                actions = '<button onclick="regenerateImage(\\'' + img.id + '\\')" class="btn-regenerate"><i class="fas fa-redo mr-1"></i> Regenerar</button>';
+              }
+              return '<div class="image-card">' +
+                '<img src="' + img.image_url + '" alt="' + (img.prompt || 'Generated image') + '" onerror="this.src=\\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 fill=%22%23999%22 text-anchor=%22middle%22 dy=%22.3em%22>No img</text></svg>\\'" />' +
+                '<div class="image-card-actions">' + actions + '</div>' +
+                '<div class="px-4 pb-4">' +
+                '<p class="text-sm text-gray-600 line-clamp-2">' + (img.prompt || 'Sin prompt') + '</p>' +
+                '<p class="text-xs text-gray-400 mt-2">' + new Date(img.created_at).toLocaleDateString() + '</p>' +
+                '</div></div>';
+            }).join('');
           }
+        } catch (error) {
+          console.error('Error loading AI CMO images:', error);
         }
+      };
 
-        function renderImageCard(image) {
-          return \`
-            <div class="image-card">
-              <img src="\${image.url}" alt="\${image.prompt || 'Generated image'}" />
-              <div class="image-card-actions">
-                \${image.status === 'pending' ? \`
-                  <button onclick="approveImage('\${image.id}')" class="btn-approve">
-                    <i class="fas fa-check mr-1"></i> Aprobar
-                  </button>
-                  <button onclick="rejectImage('\${image.id}')" class="btn-reject">
-                    <i class="fas fa-times mr-1"></i> Rechazar
-                  </button>
-                \` : ''}
-                \${image.status === 'approved' ? \`
-                  <button onclick="downloadImage('\${image.url}', '\${image.id}')" class="btn-download">
-                    <i class="fas fa-download mr-1"></i> Descargar
-                  </button>
-                \` : ''}
-                \${image.status === 'rejected' ? \`
-                  <button onclick="regenerateImage('\${image.id}')" class="btn-regenerate">
-                    <i class="fas fa-redo mr-1"></i> Regenerar
-                  </button>
-                \` : ''}
-              </div>
-              <div class="px-4 pb-4">
-                <p class="text-sm text-gray-600 line-clamp-2">\${image.prompt || 'Sin prompt'}</p>
-                <p class="text-xs text-gray-400 mt-2">\${new Date(image.created_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          \`;
-        }
-
-        function renderHistoryItem(image) {
-          const statusColors = {
-            pending: 'text-yellow-600 bg-yellow-50',
-            approved: 'text-green-600 bg-green-50',
-            rejected: 'text-red-600 bg-red-50'
-          };
-
-          return \`
-            <div class="bg-white rounded-lg p-4 flex gap-4 shadow-sm">
-              <img src="\${image.url}" alt="Generated" class="w-24 h-24 rounded object-cover" />
-              <div class="flex-1">
-                <p class="text-sm text-gray-800 mb-1">\${image.prompt || 'Sin prompt'}</p>
-                <span class="inline-block px-2 py-1 text-xs font-semibold rounded \${statusColors[image.status] || 'text-gray-600 bg-gray-50'}">
-                  \${image.status === 'pending' ? 'Pendiente' : image.status === 'approved' ? 'Aprobada' : 'Rechazada'}
-                </span>
-                <p class="text-xs text-gray-400 mt-2">\${new Date(image.created_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          \`;
-        }
-
-        function showEmptyState() {
-          const emptyId = \`\${currentSection}-empty\`;
-          const gridId = currentSection === 'history' ? 'history-list' : \`\${currentSection}-images-grid\`;
+      window.approveImage = async function(imageId) {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/);
+          const authToken = token ? token[1] : localStorage.getItem('authToken');
           
-          document.getElementById(gridId)?.classList.add('hidden');
-          document.getElementById(emptyId)?.classList.remove('hidden');
+          const response = await fetch('/api/ai-cmo/images/' + imageId + '/approve', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+          });
+          if (!response.ok) throw new Error('Failed');
+          window.loadAICMOImages('pending');
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al aprobar la imagen');
         }
+      };
 
-        window.approveImage = async function(imageId) {
-          try {
-            const response = await fetch(\`/api/ai-cmo/images/\${imageId}/approve\`, {
-              method: 'POST',
-              headers: {
-                'Authorization': \`Bearer \${localStorage.getItem('token')}\`
-              }
-            });
+      window.rejectImage = async function(imageId) {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/);
+          const authToken = token ? token[1] : localStorage.getItem('authToken');
+          
+          const response = await fetch('/api/ai-cmo/images/' + imageId + '/reject', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+          });
+          if (!response.ok) throw new Error('Failed');
+          window.loadAICMOImages('pending');
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al rechazar la imagen');
+        }
+      };
 
-            if (!response.ok) throw new Error('Failed to approve image');
+      window.downloadImage = async function(imageUrl, imageId) {
+        try {
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'marketing-image-' + imageId + '.png';
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al descargar la imagen');
+        }
+      };
 
-            await loadAICMOImages();
-          } catch (error) {
-            console.error('Error approving image:', error);
-            alert('Error al aprobar la imagen');
-          }
-        };
+      window.regenerateImage = async function(imageId) {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/);
+          const authToken = token ? token[1] : localStorage.getItem('authToken');
+          
+          const response = await fetch('/api/ai-cmo/images/' + imageId + '/regenerate', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+          });
+          if (!response.ok) throw new Error('Failed');
+          window.loadAICMOImages('pending');
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error al regenerar la imagen');
+        }
+      };
 
-        window.rejectImage = async function(imageId) {
-          try {
-            const response = await fetch(\`/api/ai-cmo/images/\${imageId}/reject\`, {
-              method: 'POST',
-              headers: {
-                'Authorization': \`Bearer \${localStorage.getItem('token')}\`
-              }
-            });
-
-            if (!response.ok) throw new Error('Failed to reject image');
-
-            await loadAICMOImages();
-          } catch (error) {
-            console.error('Error rejecting image:', error);
-            alert('Error al rechazar la imagen');
-          }
-        };
-
-        window.downloadImage = async function(imageUrl, imageId) {
-          try {
-            const response = await fetch(imageUrl);
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = \`marketing-image-\${imageId}.png\`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-          } catch (error) {
-            console.error('Error downloading image:', error);
-            alert('Error al descargar la imagen');
-          }
-        };
-
-        window.regenerateImage = async function(imageId) {
-          try {
-            const response = await fetch(\`/api/ai-cmo/images/\${imageId}/regenerate\`, {
-              method: 'POST',
-              headers: {
-                'Authorization': \`Bearer \${localStorage.getItem('token')}\`
-              }
-            });
-
-            if (!response.ok) throw new Error('Failed to regenerate image');
-
-            await loadAICMOImages();
-            showAICMOSection('pending');
-          } catch (error) {
-            console.error('Error regenerating image:', error);
-            alert('Error al regenerar la imagen');
-          }
-        };
-      })();
+      // Auto-load images when page loads
+      if (document.getElementById('pending-images-grid')) {
+        window.loadAICMOImages('pending');
+      }
     </script>
   `;
 }

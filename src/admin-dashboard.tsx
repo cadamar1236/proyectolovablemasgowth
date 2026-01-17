@@ -61,19 +61,22 @@ export function getAdminDashboard(props: AdminDashboardProps): string {
 
       <!-- Main Content Tabs -->
       <div class="bg-white rounded-lg shadow-lg mb-6">
-        <div class="border-b border-gray-200">
-          <nav class="flex space-x-8 px-6" aria-label="Tabs">
-            <button onclick="showAdminTab('statistics')" id="statistics-tab" class="admin-tab py-4 px-1 border-b-2 font-medium text-sm border-primary text-primary">
-              <i class="fas fa-chart-bar mr-2"></i>Statistics
+        <div class="border-b border-gray-200 overflow-x-auto">
+          <nav class="flex space-x-2 md:space-x-8 px-3 md:px-6 min-w-max" aria-label="Tabs">
+            <button onclick="showAdminTab('statistics')" id="statistics-tab" class="admin-tab py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs md:text-sm border-primary text-primary whitespace-nowrap">
+              <i class="fas fa-chart-bar mr-1 md:mr-2"></i><span class="hidden sm:inline">Statistics</span><span class="sm:hidden">Stats</span>
             </button>
-            <button onclick="showAdminTab('competitions')" id="competitions-tab" class="admin-tab py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700">
-              <i class="fas fa-trophy mr-2"></i>Manage Competitions
+            <button onclick="showAdminTab('startups')" id="startups-tab" class="admin-tab py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs md:text-sm border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+              <i class="fas fa-rocket mr-1 md:mr-2"></i>Startups
             </button>
-            <button onclick="showAdminTab('users')" id="users-tab" class="admin-tab py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700">
-              <i class="fas fa-users mr-2"></i>Users
+            <button onclick="showAdminTab('competitions')" id="competitions-tab" class="admin-tab py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs md:text-sm border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+              <i class="fas fa-trophy mr-1 md:mr-2"></i><span class="hidden sm:inline">Competitions</span><span class="sm:hidden">Comp</span>
             </button>
-            <button onclick="showAdminTab('reports')" id="reports-tab" class="admin-tab py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700">
-              <i class="fas fa-file-alt mr-2"></i>Reports
+            <button onclick="showAdminTab('users')" id="users-tab" class="admin-tab py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs md:text-sm border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+              <i class="fas fa-users mr-1 md:mr-2"></i>Users
+            </button>
+            <button onclick="showAdminTab('reports')" id="reports-tab" class="admin-tab py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs md:text-sm border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+              <i class="fas fa-file-alt mr-1 md:mr-2"></i>Reports
             </button>
           </nav>
         </div>
@@ -99,6 +102,45 @@ export function getAdminDashboard(props: AdminDashboardProps): string {
             <h3 class="font-semibold mb-3">Recent Activity</h3>
             <div id="recent-activity" class="space-y-2">
               <p class="text-gray-500 text-center py-4">Loading activity...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Startups Tab (NEW) -->
+        <div id="startups-content" class="admin-tab-content p-3 md:p-6 hidden">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6 mb-4 md:mb-6">
+            <h2 class="text-lg md:text-xl font-bold">Startups Dashboard</h2>
+            <div class="flex flex-col sm:flex-row gap-2 md:gap-4">
+              <input type="text" id="startup-search" placeholder="Search..." class="border rounded-lg px-3 py-2 text-sm w-full sm:w-48 md:w-64">
+              <select id="startup-filter" class="border rounded-lg px-3 py-2 text-sm w-full sm:w-auto">
+                <option value="">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="startups-list" class="space-y-4">
+            <p class="text-gray-500 text-center py-8">Loading startups...</p>
+          </div>
+
+          <!-- Startup Detail Modal -->
+          <div id="startup-detail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-2 md:p-4" style="display: none;">
+            <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+              <div class="bg-gradient-to-r from-purple-600 to-blue-600 p-3 md:p-6 text-white sticky top-0 z-10">
+                <div class="flex items-center justify-between">
+                  <h2 class="text-base md:text-2xl font-bold" id="startup-modal-title">
+                    <i class="fas fa-rocket mr-1 md:mr-2"></i>Startup Details
+                  </h2>
+                  <button onclick="closeStartupDetailModal()" class="text-white hover:text-purple-200 text-xl md:text-2xl">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-3 md:p-6" id="startup-detail-content">
+                <p class="text-gray-500 text-center py-8">Loading...</p>
+              </div>
             </div>
           </div>
         </div>
@@ -436,6 +478,8 @@ export function getAdminDashboard(props: AdminDashboardProps): string {
           loadUsersList();
         } else if (tab === 'statistics') {
           loadRecentActivity();
+        } else if (tab === 'startups') {
+          loadStartupsList();
         }
       }
 
@@ -694,6 +738,445 @@ export function getAdminDashboard(props: AdminDashboardProps): string {
         loadAdminStats();
         loadRecentActivity();
       });
+
+      // ========== STARTUPS TAB FUNCTIONS ==========
+
+      async function loadStartupsList() {
+        try {
+          const token = getAuthToken();
+          console.log('Loading startups with token:', token ? 'present' : 'missing');
+          
+          const response = await axios.get('/api/projects/leaderboard/top', {
+            headers: { Authorization: \`Bearer \${token}\` }
+          });
+
+          console.log('API Response:', response.data);
+          
+          // El API devuelve { leaderboard: [...], isAdmin: true } o { projects: [...] }
+          const startups = response.data.leaderboard || response.data.projects || [];
+          console.log('Startups found:', startups.length);
+          
+          const searchInput = document.getElementById('startup-search');
+          const filterSelect = document.getElementById('startup-filter');
+
+          function renderStartups(filteredStartups = startups) {
+            console.log('Rendering startups:', filteredStartups.length);
+            
+            if (filteredStartups.length === 0) {
+              document.getElementById('startups-list').innerHTML = '<p class="text-gray-500 text-center py-8">No startups found. Total projects in DB: ' + startups.length + '</p>';
+              return;
+            }
+
+            const startupsHtml = filteredStartups.map(startup => \`
+              <div class="border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer bg-white" onclick="viewStartupDetails(\${startup.user_id || startup.creator_id || startup.company_user_id})">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center space-x-4 flex-1">
+                    <img src="\${startup.creator_avatar_url || startup.avatar_url || '/default-avatar.png'}" alt="\${startup.creator_name || 'User'}" class="w-16 h-16 rounded-full border-2 border-purple-200">
+                    <div class="flex-1">
+                      <h3 class="text-lg font-bold text-gray-900">\${startup.title}</h3>
+                      <p class="text-sm text-gray-600 mb-2"><i class="fas fa-user mr-1"></i>\${startup.creator_name} (\${startup.creator_email || 'No email'})</p>
+                      <p class="text-sm text-gray-700 line-clamp-2">\${startup.description || 'No description available'}</p>
+                      
+                      <div class="flex items-center space-x-4 mt-3">
+                        <span class="text-xs px-3 py-1 rounded-full bg-purple-100 text-purple-700">
+                          <i class="fas fa-fire mr-1"></i>\${startup.votes_count || startup.votes || 0} votes
+                        </span>
+                        <span class="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700">
+                          <i class="fas fa-bullseye mr-1"></i>\${startup.total_goals || startup.goals_count || 0} goals
+                        </span>
+                        <span class="text-xs px-3 py-1 rounded-full bg-green-100 text-green-700">
+                          <i class="fas fa-check-circle mr-1"></i>\${startup.completed_goals || 0} completed
+                        </span>
+                        \${startup.current_users ? \`
+                          <span class="text-xs px-3 py-1 rounded-full bg-indigo-100 text-indigo-700">
+                            <i class="fas fa-users mr-1"></i>\${startup.current_users} users
+                          </span>
+                        \` : ''}
+                        \${startup.current_revenue ? \`
+                          <span class="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                            <i class="fas fa-dollar-sign mr-1"></i>$\${startup.current_revenue}
+                          </span>
+                        \` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <button class="text-blue-600 hover:text-blue-800">
+                      <i class="fas fa-arrow-right text-xl"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            \`).join('');
+
+            document.getElementById('startups-list').innerHTML = startupsHtml;
+          }
+
+          // Search and filter handlers (only add once)
+          searchInput.onchange = null;
+          searchInput.oninput = () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filtered = startups.filter(s => 
+              s.title.toLowerCase().includes(searchTerm) ||
+              s.creator_name.toLowerCase().includes(searchTerm) ||
+              (s.description && s.description.toLowerCase().includes(searchTerm))
+            );
+            renderStartups(filtered);
+          };
+
+          filterSelect.onchange = null;
+          filterSelect.onchange = () => {
+            const filterValue = filterSelect.value;
+            let filtered = startups;
+            
+            if (filterValue === 'active') {
+              filtered = startups.filter(s => (s.total_goals || s.goals_count || 0) > 0);
+            } else if (filterValue === 'inactive') {
+              filtered = startups.filter(s => (s.total_goals || s.goals_count || 0) === 0);
+            }
+            
+            renderStartups(filtered);
+          };
+
+          renderStartups();
+        } catch (error) {
+          console.error('Failed to load startups:', error);
+          document.getElementById('startups-list').innerHTML = '<p class="text-red-500 text-center py-8">Failed to load startups: ' + error.message + '</p>';
+        }
+      }
+
+      async function viewStartupDetails(userId) {
+        try {
+          const token = getAuthToken();
+          
+          // Load user goals using the specific endpoint
+          let userGoals = [];
+          try {
+            console.log('Fetching goals for user:', userId);
+            const goalsResponse = await axios.get(\`/api/dashboard/goals/user/\${userId}\`, {
+              headers: { Authorization: \`Bearer \${token}\` }
+            });
+            
+            console.log('Goals API response for user', userId, ':', goalsResponse.data);
+            userGoals = goalsResponse.data.goals || [];
+            console.log('User goals found:', userGoals.length);
+            if (userGoals.length > 0) {
+              console.log('First goal sample:', userGoals[0]);
+            }
+          } catch (goalsError) {
+            console.error('Error loading goals:', goalsError);
+            console.error('Error details:', goalsError.response?.data);
+          }
+          
+          console.log('About to calculate completedGoals with userGoals.length =', userGoals.length);
+          
+          // Load user projects
+          const projectsResponse = await axios.get('/api/projects/leaderboard/top', {
+            headers: { Authorization: \`Bearer \${token}\` }
+          });
+
+          console.log('Projects response:', projectsResponse.data);
+          const allProjects = projectsResponse.data.leaderboard || projectsResponse.data.projects || [];
+          const userProjects = allProjects.filter(p => (p.user_id == userId || p.creator_id == userId || p.company_user_id == userId));
+          
+          console.log('User projects found:', userProjects.length, userProjects);
+          
+          const userInfo = userProjects[0] || { creator_name: 'Unknown User', user_id: userId };
+
+          // Use metrics from the project data directly (already includes current_users, current_revenue, etc.)
+          const userMetrics = {
+            total_users: userInfo.current_users || 0,
+            users: userInfo.current_users || 0,
+            total_revenue: userInfo.current_revenue || 0,
+            revenue: userInfo.current_revenue || 0,
+            completed_goals: userInfo.completed_goals || userGoals.filter(g => g.status === 'completed' || g.goal_status === 'completed').length,
+            total_goals: userInfo.total_goals || userGoals.length,
+            mrr: userInfo.mrr || 0,
+            active_users: userInfo.active_users || 0,
+            users_growth: userInfo.users_growth || 'N/A',
+            revenue_growth: userInfo.revenue_growth || 'N/A',
+            churn_rate: userInfo.churn_rate || 'N/A',
+            last_updated: userInfo.updated_at || userInfo.created_at
+          };
+          
+          console.log('User metrics:', userMetrics);
+
+          document.getElementById('startup-modal-title').innerHTML = \`
+            <i class="fas fa-rocket mr-2"></i>\${userInfo.creator_name || 'User'}'s Complete Profile
+          \`;
+
+          const completedGoals = userGoals.filter(g => g.status === 'completed' || g.goal_status === 'completed').length;
+          const activeGoals = userGoals.filter(g => g.status === 'in_progress' || g.goal_status === 'in_progress').length;
+          const pendingGoals = userGoals.filter(g => g.status === 'pending' || g.goal_status === 'pending' || (!g.status && !g.goal_status)).length;
+
+          // Group goals by category/type
+          const goalsByCategory = {
+            'Product': userGoals.filter(g => g.category === 'product' || (g.description && g.description.toLowerCase().includes('product'))),
+            'Marketing': userGoals.filter(g => g.category === 'marketing' || (g.description && g.description.toLowerCase().includes('marketing'))),
+            'Sales': userGoals.filter(g => g.category === 'sales' || (g.description && (g.description.toLowerCase().includes('sales') || g.description.toLowerCase().includes('revenue')))),
+            'Growth': userGoals.filter(g => g.category === 'growth' || (g.description && (g.description.toLowerCase().includes('user') || g.description.toLowerCase().includes('growth')))),
+            'Other': userGoals.filter(g => !['product', 'marketing', 'sales', 'growth'].includes(g.category))
+          };
+
+          const detailHtml = \`
+            <div class="space-y-6">
+              <!-- User Info Header -->
+              <div class="bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-lg">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-4">
+                    <img src="\${userInfo.creator_avatar_url || '/default-avatar.png'}" alt="\${userInfo.creator_name}" class="w-20 h-20 rounded-full border-4 border-white shadow">
+                    <div>
+                      <h3 class="text-2xl font-bold text-gray-900">\${userInfo.creator_name || 'Unknown'}</h3>
+                      <p class="text-gray-600">\${userInfo.creator_email || 'No email'}</p>
+                      <div class="flex items-center space-x-3 mt-2">
+                        <span class="text-xs px-3 py-1 rounded-full bg-purple-600 text-white">
+                          <i class="fas fa-id-badge mr-1"></i>ID: \${userId}
+                        </span>
+                        <span class="text-xs px-3 py-1 rounded-full bg-blue-600 text-white">
+                          <i class="fas fa-user mr-1"></i>\${userInfo.creator_role || 'Founder'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Key Metrics Dashboard -->
+              <div>
+                <h4 class="text-lg font-bold mb-3 flex items-center">
+                  <i class="fas fa-chart-line mr-2 text-green-600"></i>Key Metrics Overview
+                </h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                    <div class="text-3xl font-bold text-blue-700">\${userProjects.length}</div>
+                    <div class="text-sm text-blue-600 font-medium">Projects</div>
+                  </div>
+                  <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                    <div class="text-3xl font-bold text-green-700">\${completedGoals}</div>
+                    <div class="text-sm text-green-600 font-medium">Completed Goals</div>
+                  </div>
+                  <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+                    <div class="text-3xl font-bold text-yellow-700">\${activeGoals}</div>
+                    <div class="text-sm text-yellow-600 font-medium">Active Goals</div>
+                  </div>
+                  <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                    <div class="text-3xl font-bold text-purple-700">\${userProjects.reduce((sum, p) => sum + (p.votes || 0), 0)}</div>
+                    <div class="text-sm text-purple-600 font-medium">Total Votes</div>
+                  </div>
+                  <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
+                    <div class="text-3xl font-bold text-emerald-700">\${userMetrics.total_users || userMetrics.users || 0}</div>
+                    <div class="text-sm text-emerald-600 font-medium">Users</div>
+                    \${userMetrics.users_growth ? \`<div class="text-xs text-emerald-500 mt-1"><i class="fas fa-arrow-up mr-1"></i>\${userMetrics.users_growth}</div>\` : ''}
+                  </div>
+                  <div class="bg-gradient-to-br from-pink-50 to-pink-100 p-4 rounded-lg border border-pink-200">
+                    <div class="text-3xl font-bold text-pink-700">$\${userMetrics.total_revenue || userMetrics.revenue || 0}</div>
+                    <div class="text-sm text-pink-600 font-medium">Revenue</div>
+                    \${userMetrics.revenue_growth ? \`<div class="text-xs text-pink-500 mt-1"><i class="fas fa-arrow-up mr-1"></i>\${userMetrics.revenue_growth}</div>\` : ''}
+                  </div>
+                  <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200">
+                    <div class="text-3xl font-bold text-indigo-700">\${pendingGoals}</div>
+                    <div class="text-sm text-indigo-600 font-medium">Pending Goals</div>
+                  </div>
+                  <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+                    <div class="text-3xl font-bold text-orange-700">\${Math.round((completedGoals / (userGoals.length || 1)) * 100)}%</div>
+                    <div class="text-sm text-orange-600 font-medium">Completion Rate</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Revenue & Users History -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border rounded-lg p-4 bg-gradient-to-br from-green-50 to-emerald-50">
+                  <h5 class="font-bold text-gray-900 mb-3 flex items-center">
+                    <i class="fas fa-dollar-sign mr-2 text-green-600"></i>Revenue Metrics
+                  </h5>
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-center py-2 border-b border-green-200">
+                      <span class="text-sm text-gray-600">Current MRR:</span>
+                      <span class="font-bold text-green-700">$\${userMetrics.mrr || 0}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-green-200">
+                      <span class="text-sm text-gray-600">Total Revenue:</span>
+                      <span class="font-bold text-green-700">$\${userMetrics.total_revenue || userMetrics.revenue || 0}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-green-200">
+                      <span class="text-sm text-gray-600">Growth Rate:</span>
+                      <span class="font-bold text-green-700">\${userMetrics.revenue_growth || 'N/A'}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2">
+                      <span class="text-sm text-gray-600">Last Updated:</span>
+                      <span class="text-xs text-gray-500">\${userMetrics.last_updated ? new Date(userMetrics.last_updated).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+                  <h5 class="font-bold text-gray-900 mb-3 flex items-center">
+                    <i class="fas fa-users mr-2 text-blue-600"></i>User Metrics
+                  </h5>
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-center py-2 border-b border-blue-200">
+                      <span class="text-sm text-gray-600">Total Users:</span>
+                      <span class="font-bold text-blue-700">\${userMetrics.total_users || userMetrics.users || 0}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-blue-200">
+                      <span class="text-sm text-gray-600">Active Users:</span>
+                      <span class="font-bold text-blue-700">\${userMetrics.active_users || 'N/A'}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-blue-200">
+                      <span class="text-sm text-gray-600">Growth Rate:</span>
+                      <span class="font-bold text-blue-700">\${userMetrics.users_growth || 'N/A'}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2">
+                      <span class="text-sm text-gray-600">Churn Rate:</span>
+                      <span class="text-xs text-gray-500">\${userMetrics.churn_rate || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Projects Section -->
+              <div>
+                <h4 class="text-lg font-bold mb-3 flex items-center">
+                  <i class="fas fa-rocket mr-2 text-purple-600"></i>Projects (\${userProjects.length})
+                </h4>
+                <div class="space-y-3">
+                  \${userProjects.length > 0 ? userProjects.map(project => \`
+                    <div class="border rounded-lg p-4 bg-white hover:shadow-md transition">
+                      <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                          <div class="flex items-center space-x-2 mb-2">
+                            <h5 class="font-semibold text-gray-900 text-lg">\${project.title}</h5>
+                            <span class="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                              <i class="fas fa-fire mr-1"></i>\${project.votes || 0} votes
+                            </span>
+                          </div>
+                          <p class="text-sm text-gray-600 mt-1">\${project.description || 'No description'}</p>
+                          <div class="flex items-center space-x-3 mt-3">
+                            \${project.image_url ? \`<a href="\${project.image_url}" target="_blank" class="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"><i class="fas fa-image mr-1"></i>Image</a>\` : ''}
+                            \${project.link ? \`<a href="\${project.link}" target="_blank" class="text-xs px-3 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200"><i class="fas fa-link mr-1"></i>Website</a>\` : ''}
+                            <span class="text-xs text-gray-500"><i class="fas fa-calendar mr-1"></i>\${project.created_at ? new Date(project.created_at).toLocaleDateString() : 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  \`).join('') : '<p class="text-gray-500 text-center py-4">No projects yet</p>'}
+                </div>
+              </div>
+
+              <!-- Goals by Category -->
+              <div>
+                <h4 class="text-lg font-bold mb-3 flex items-center">
+                  <i class="fas fa-bullseye mr-2 text-blue-600"></i>All Goals (\${userGoals.length}) - Organized by Category
+                </h4>
+                
+                <!-- Goals Summary -->
+                <div class="grid grid-cols-3 gap-3 mb-4">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-green-700">\${completedGoals}</div>
+                    <div class="text-xs text-green-600">Completed</div>
+                  </div>
+                  <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-blue-700">\${activeGoals}</div>
+                    <div class="text-xs text-blue-600">In Progress</div>
+                  </div>
+                  <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-gray-700">\${pendingGoals}</div>
+                    <div class="text-xs text-gray-600">Pending</div>
+                  </div>
+                </div>
+
+                <!-- Goals by Category -->
+                <div class="space-y-4">
+                  \${Object.entries(goalsByCategory).map(([category, goals]) => {
+                    if (goals.length === 0) return '';
+                    return \`
+                      <div class="border rounded-lg p-4 bg-gray-50">
+                        <h5 class="font-bold text-gray-900 mb-3 flex items-center">
+                          <i class="fas fa-\${
+                            category === 'Product' ? 'box' :
+                            category === 'Marketing' ? 'bullhorn' :
+                            category === 'Sales' ? 'dollar-sign' :
+                            category === 'Growth' ? 'chart-line' : 'star'
+                          } mr-2"></i>\${category} Goals (\${goals.length})
+                        </h5>
+                        <div class="space-y-2">
+                          \${goals.map(goal => \`
+                            <div class="border rounded-lg p-3 bg-white hover:bg-gray-50 transition">
+                              <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                  <div class="flex items-center space-x-2">
+                                    <h6 class="font-medium text-gray-900">\${goal.task || goal.description || 'Goal'}</h6>
+                                    <span class="text-xs px-2 py-1 rounded-full \${
+                                      (goal.status === 'completed' || goal.goal_status === 'completed') ? 'bg-green-100 text-green-700' :
+                                      (goal.status === 'in_progress' || goal.goal_status === 'in_progress') ? 'bg-blue-100 text-blue-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }">
+                                      <i class="fas fa-\${(goal.status === 'completed' || goal.goal_status === 'completed') ? 'check-circle' : (goal.status === 'in_progress' || goal.goal_status === 'in_progress') ? 'spinner' : 'clock'} mr-1"></i>\${goal.goal_status || goal.status || 'pending'}
+                                    </span>
+                                    \${goal.priority ? \`<span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">\${goal.priority_label || 'P' + goal.priority}</span>\` : ''}
+                                  </div>
+                                  \${goal.description && goal.task !== goal.description ? \`<p class="text-xs text-gray-600 mt-1">\${goal.description}</p>\` : ''}
+                                  <div class="flex items-center space-x-3 mt-2 text-xs text-gray-500">
+                                    \${goal.deadline ? \`<span><i class="fas fa-calendar mr-1"></i>\${new Date(goal.deadline).toLocaleDateString()}</span>\` : ''}
+                                    \${goal.created_at ? \`<span><i class="fas fa-clock mr-1"></i>Created: \${new Date(goal.created_at).toLocaleDateString()}</span>\` : ''}
+                                    \${goal.cadence ? \`<span><i class="fas fa-repeat mr-1"></i>\${goal.cadence}</span>\` : ''}
+                                    \${goal.dri ? \`<span><i class="fas fa-user mr-1"></i>DRI: \${goal.dri}</span>\` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          \`).join('')}
+                        </div>
+                      </div>
+                    \`;
+                  }).join('')}
+                </div>
+
+                <!-- All Goals if no categorization -->
+                \${userGoals.length > 0 && Object.values(goalsByCategory).every(g => g.length === 0) ? \`
+                  <div class="space-y-2">
+                    \${userGoals.map(goal => \`
+                      <div class="border rounded-lg p-3 bg-white hover:bg-gray-50 transition">
+                        <div class="flex items-start justify-between">
+                          <div class="flex-1">
+                            <div class="flex items-center space-x-2">
+                              <h5 class="font-medium text-gray-900">\${goal.task || goal.description || 'Goal'}</h5>
+                              <span class="text-xs px-2 py-1 rounded-full \${
+                                (goal.status === 'completed' || goal.goal_status === 'completed') ? 'bg-green-100 text-green-700' :
+                                (goal.status === 'in_progress' || goal.goal_status === 'in_progress') ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-700'
+                              }">
+                                \${goal.goal_status || goal.status || 'pending'}
+                              </span>
+                            </div>
+                            \${goal.description && goal.task !== goal.description ? \`<p class="text-xs text-gray-600 mt-1">\${goal.description}</p>\` : ''}
+                            <div class="flex items-center space-x-2 mt-2">
+                              \${goal.deadline ? \`<span class="text-xs text-gray-500"><i class="fas fa-calendar mr-1"></i>\${new Date(goal.deadline).toLocaleDateString()}</span>\` : ''}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    \`).join('')}
+                  </div>
+                \` : ''}
+
+                \${userGoals.length === 0 ? '<p class="text-gray-500 text-center py-4">No goals yet</p>' : ''}
+              </div>
+            </div>
+          \`;
+
+          document.getElementById('startup-detail-content').innerHTML = detailHtml;
+          document.getElementById('startup-detail-modal').style.display = 'flex';
+        } catch (error) {
+          console.error('Failed to load startup details:', error);
+          alert('Failed to load startup details: ' + error.message);
+        }
+      }
+
+      function closeStartupDetailModal() {
+        document.getElementById('startup-detail-modal').style.display = 'none';
+      }
     </script>
   `;
 

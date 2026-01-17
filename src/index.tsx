@@ -3,11 +3,12 @@ import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/cloudflare-workers';
 import { verify } from 'hono/jwt';
 import { jsx } from 'hono/jsx';
-import type { Bindings } from './types';
+import type { Bindings, ScheduledEvent } from './types';
 import { getNotFoundPage, getVotePage } from './html-templates';
 import { getDirectoryPage } from './marketplace-page';
 import { getOnboardingPage } from './onboarding-page';
 import { getCompetitionsPage } from './competitions-page';
+import { getLeaderboardPage } from './leaderboard-page';
 import { getAdminDashboard } from './admin-dashboard';
 import { getCompetitionLeaderboard } from './competition-leaderboard';
 
@@ -37,6 +38,9 @@ import competitions from './api/competitions';
 import admin from './api/admin';
 import metricsData from './api/metrics-data';
 import aiCMO from './api/ai-cmo';
+import astarMessages from './api/astar-messages';
+import team from './api/team';
+import connector from './api/connector';
 import { renderAICMOPage } from './ai-cmo-page';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -69,6 +73,9 @@ app.route('/api/competitions', competitions);
 app.route('/api/admin', admin);
 app.route('/api/metrics-data', metricsData);
 app.route('/api/ai-cmo', aiCMO);
+app.route('/api/astar-messages', astarMessages);
+app.route('/api/team', team);
+app.route('/api/connector', connector);
 
 // Page Routes - Onboarding for new users
 app.get('/onboarding', async (c) => {
@@ -126,10 +133,22 @@ app.get('/dashboard', async (c) => {
     payload = { userName: 'Guest', email: '', userId: 0, role: 'guest' };
   }
 
+  // Get user role from database if user is logged in
+  let userRole = payload.role || 'founder';
+  if (payload.userId) {
+    const user = await c.env.DB.prepare(`
+      SELECT role FROM users WHERE id = ?
+    `).bind(payload.userId).first();
+    
+    if (user) {
+      userRole = user.role || 'founder';
+    }
+  }
+
   const html = getDirectoryPage({
     userName: payload.userName || payload.name || payload.email || 'User',
     userAvatar: payload.avatar_url,
-    userRole: payload.role || 'founder'
+    userRole: userRole
   });
 
   return c.html(html);
@@ -165,6 +184,44 @@ app.get('/competitions', async (c) => {
     userRole: payload.role || 'guest'
   });
 
+  return c.html(html);
+});
+
+// Team Management page
+app.get('/team', async (c) => {
+  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  const tokenInUrl = c.req.query('token');
+
+  if (!authToken && !tokenInUrl) {
+    return c.redirect('/');
+  }
+
+  let payload: any = null;
+  const tokenToVerify = authToken || tokenInUrl;
+  
+  if (tokenToVerify) {
+    try {
+      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+    } catch (error) {
+      return c.redirect('/');
+    }
+  }
+
+  if (!payload || !payload.userId) {
+    return c.redirect('/');
+  }
+
+  // Get user data
+  const user = await c.env.DB.prepare(`
+    SELECT id, email, name, role, avatar_url FROM users WHERE id = ?
+  `).bind(payload.userId).first();
+
+  if (!user) {
+    return c.redirect('/');
+  }
+
+  const { renderTeamManagementPage } = await import('./team-page');
+  const html = renderTeamManagementPage(user);
   return c.html(html);
 });
 
@@ -303,21 +360,8 @@ app.get('/vote/:projectId', async (c) => {
 
 // Frontend Routes - Redirect to Dashboard (Unified Directory)
 app.get('/', async (c) => {
-  // Check if user is authenticated
-  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
-  
-  if (authToken) {
-    try {
-      // Verify token
-      const payload = await verify(authToken, JWT_SECRET) as any;
-      if (payload && payload.userId) {
-        // Authenticated user - redirect to dashboard
-        return c.redirect('/dashboard');
-      }
-    } catch (error) {
-      // Invalid token, show landing page
-    }
-  }
+  // Always show landing page - no automatic redirect
+  // Users can click "Go to Hub" button to access dashboard
   
   // Not authenticated - show simple landing page
   return c.html(`
@@ -326,9 +370,9 @@ app.get('/', async (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ASTAR* - Connecting the brightest minds in the universe</title>
+    <title>ASTAR* - Connecting the brightest minds in the world</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
       * {
         margin: 0;
@@ -341,7 +385,7 @@ app.get('/', async (c) => {
       }
       
       body {
-        font-family: 'Space Grotesk', system-ui, sans-serif;
+        font-family: 'Montserrat', system-ui, sans-serif;
         overflow-x: hidden;
         overflow-y: auto;
       }
@@ -503,10 +547,6 @@ app.get('/', async (c) => {
                         <span>🎯</span>
                         <span class="hidden sm:inline">Hub</span>
                     </a>
-                    <a href="/dashboard?tab=directory" class="nav-link text-white flex items-center space-x-2">
-                        <span>🚀</span>
-                        <span class="hidden sm:inline">Startups</span>
-                    </a>
                     <a href="/competitions" class="nav-link text-white flex items-center space-x-2">
                         <span>🏅</span>
                         <span class="hidden sm:inline">Competitions</span>
@@ -514,6 +554,10 @@ app.get('/', async (c) => {
                     <a href="/leaderboard" class="nav-link text-white flex items-center space-x-2">
                         <span>🏆</span>
                         <span class="hidden sm:inline">Leaderboard</span>
+                    </a>
+                    <a href="/dashboard?tab=directory" class="nav-link text-white flex items-center space-x-2">
+                        <span>🔥</span>
+                        <span class="hidden sm:inline">Trending Startups</span>
                     </a>
                     <button onclick="showAuthModal('login')" class="bg-white text-black px-6 py-2 rounded-full font-semibold hover:bg-gray-200 transition">
                         Sign In
@@ -534,13 +578,15 @@ app.get('/', async (c) => {
                 Welcome to the <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500">ASTAR*</span> ecosystem
             </h1>
             
+            <p class="text-lg md:text-xl text-gray-300 mb-16 max-w-4xl mx-auto leading-relaxed">
+                ASTAR* is an AI superconnector helping early-stage founders get traction. We operate weekly progress-based competitions and monthly live pitch events, enabling discovery, credibility, and momentum for founders worldwide.
+            </p>
+
             <p class="text-2xl md:text-3xl font-semibold text-gray-200 mb-4">
                 Choose your trajectory 🚀
             </p>
             
             <p class="text-lg md:text-xl text-gray-400 mb-16 max-w-4xl mx-auto leading-relaxed">
-                We make thoughtful introductions between startup founders, customers, investors, partners and talent.
-                <br/>
                 <span class="text-gray-300 font-medium">Which role defines your mission in the ASTAR* ecosystem?</span>
             </p>
 
@@ -1645,6 +1691,7 @@ app.get('/project/:id', async (c) => {
 
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script src="/static/app.js"></script>
+    <script src="/static/astar-notifications.js"></script>
     <script>
       // Mobile menu functions
       function toggleMobileMenu() {
@@ -2444,664 +2491,50 @@ app.get('/marketplace', async (c) => {
   }
 });
 
-// Leaderboard Page (continuará en el siguiente mensaje debido a límites de longitud)
-app.get('/leaderboard', (c) => {
-  return c.html(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏆 Project Leaderboard - ASTAR*</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: '#8B5CF6',
-              secondary: '#A78BFA',
-            }
+// Leaderboard Page
+app.get('/leaderboard', async (c) => {
+  try {
+    const authCookie = c.req.header('cookie')
+      ?.split('; ')
+      .find((c) => c.startsWith('auth='))
+      ?.split('=')[1];
+
+    let userName = 'Guest';
+    let userAvatar = undefined;
+    let userRole = 'guest';
+
+    if (authCookie) {
+      try {
+        const decoded = await verify(authCookie, JWT_SECRET);
+        if (decoded && decoded.email) {
+          const db = c.env.DB;
+          const user = await db
+            .prepare('SELECT name, avatar, role FROM users WHERE email = ?')
+            .bind(decoded.email)
+            .first();
+
+          if (user) {
+            userName = user.name || decoded.email;
+            userAvatar = user.avatar;
+            userRole = user.role || 'guest';
           }
         }
+      } catch (error) {
+        console.error('Error verifying token:', error);
       }
-    </script>
-    <style>
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
-      
-      .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-      }
-      
-      .text-gradient {
-        background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-      }
-      
-      .card-hover {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .card-hover:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(139, 92, 246, 0.2);
-      }
-      
-      .nav-blur {
-        backdrop-filter: blur(12px);
-        background-color: rgba(0, 0, 0, 0.9);
-      }
-    </style>
-</head>
-<body class="bg-black min-h-screen">
-    <!-- Navigation -->
-    <nav class="nav-blur sticky top-0 z-50 border-b border-gray-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/" class="text-2xl font-black text-gradient">
-                        <i class="fas fa-rocket mr-2"></i>
-                        ASTAR*
-                    </a>
-                </div>
-                
-                <!-- Desktop Navigation -->
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="/" class="text-gray-300 hover:text-white transition font-semibold">Home</a>
-                    <a href="/leaderboard" class="text-purple-400 font-bold">
-                        <i class="fas fa-trophy mr-1 text-purple-400"></i>Leaderboard
-                    </a>
-                    <a href="/marketplace" class="text-gray-300 hover:text-white transition font-semibold">
-                        <i class="fas fa-star mr-1 text-purple-400"></i>Marketplace
-                    </a>
-                    <a href="/pricing" class="text-gray-300 hover:text-white transition font-semibold">
-                        <i class="fas fa-tag mr-1 text-purple-400"></i>Pricing
-                    </a>
-                </div>
-                
-                <!-- Mobile menu button -->
-                <div class="md:hidden flex items-center">
-                    <button id="mobile-menu-button" onclick="toggleMobileMenu()" class="p-2 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 hover:from-primary hover:to-secondary hover:text-white transition-all duration-200 text-primary font-bold">
-                        <i class="fas fa-bars text-xl"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Mobile Navigation Menu -->
-            <div id="mobile-menu" class="hidden md:hidden bg-black border-t border-gray-800">
-                <div class="px-2 pt-2 pb-3 space-y-1">
-                    <a href="/" class="flex items-center px-3 py-2 text-gray-300 hover:text-white transition font-semibold">
-                        <i class="fas fa-home mr-2"></i>Home
-                    </a>
-                    <a href="/leaderboard" class="flex items-center px-3 py-2 text-purple-400 font-bold">
-                        <i class="fas fa-trophy mr-2 text-purple-400"></i>Leaderboard
-                    </a>
-                    <a href="/marketplace" class="flex items-center px-3 py-2 text-gray-300 hover:text-white transition font-semibold">
-                        <i class="fas fa-star mr-2 text-purple-400"></i>Marketplace
-                    </a>
-                    <a href="/pricing" class="flex items-center px-3 py-2 text-gray-300 hover:text-white transition font-semibold">
-                        <i class="fas fa-tag mr-2 text-purple-400"></i>Pricing
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
-    
-    <script>
-      function toggleMobileMenu() {
-        const menu = document.getElementById('mobile-menu');
-        const button = document.getElementById('mobile-menu-button');
-        if (menu && button) {
-          const icon = button.querySelector('i');
-          if (menu.classList.contains('hidden')) {
-            menu.classList.remove('hidden');
-            if (icon) {
-              icon.classList.remove('fa-bars');
-              icon.classList.add('fa-times');
-            }
-          } else {
-            menu.classList.add('hidden');
-            if (icon) {
-              icon.classList.remove('fa-times');
-              icon.classList.add('fa-bars');
-            }
-          }
-        }
-      }
-    </script>
+    }
 
-    <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-purple-600 to-purple-400 text-white py-16 sm:py-20">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 class="text-5xl sm:text-6xl font-black mb-4">
-                🏆 Project Leaderboard
-            </h1>
-            <p class="text-xl sm:text-2xl opacity-90 mb-8 font-medium">
-                Discover the highest-rated projects by our community
-            </p>
-        </div>
-    </div>
+    const html = getLeaderboardPage({
+      userName,
+      userAvatar,
+      userRole
+    });
 
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <!-- Category Filter -->
-        <div class="mb-8">
-            <div class="flex flex-wrap justify-center gap-2 sm:gap-4">
-                <button onclick="filterByCategory('all')" class="category-btn active px-3 sm:px-6 py-2 sm:py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary/90 transition text-sm sm:text-base">
-                    All Projects
-                </button>
-                <button onclick="filterByCategory('SaaS')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
-                    💻 SaaS
-                </button>
-                <button onclick="filterByCategory('Mobile')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
-                    � Mobile
-                </button>
-                <button onclick="filterByCategory('Web3')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
-                    🔗 Web3
-                </button>
-                <button onclick="filterByCategory('Healthcare')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
-                    🏥 Healthcare
-                </button>
-                <button onclick="filterByCategory('Fintech')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
-                    💰 Fintech
-                </button>
-                <button onclick="filterByCategory('E-commerce')" class="category-btn px-3 sm:px-6 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition text-sm sm:text-base">
-                    � E-commerce
-                </button>
-            </div>
-        </div>
-
-        <!-- Leaderboard Table -->
-        <div class="bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-purple-600">
-            <div class="px-4 sm:px-6 py-4 bg-gradient-to-r from-purple-600 to-purple-400 text-white">
-                <h2 class="text-xl sm:text-2xl font-black">🏅 Project Rankings</h2>
-            </div>
-            
-            <div id="leaderboard-loading" class="p-12 text-center">
-                <div class="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="text-gray-300 font-medium">Loading leaderboard...</p>
-            </div>
-            
-            <div id="leaderboard-content" class="hidden">
-                <div class="overflow-x-auto scrollbar-hide">
-                    <table class="w-full min-w-[1000px]">
-                        <thead class="bg-gray-800 border-b border-gray-700">
-                            <tr>
-                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-white">Rank</th>
-                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-white">Project</th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
-                                    <div class="flex flex-col items-center">
-                                        <i class="fas fa-trophy text-purple-400 mr-1"></i>
-                                        <span>Score</span>
-                                    </div>
-                                </th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
-                                    <div class="flex flex-col items-center">
-                                        <i class="fas fa-star text-purple-400 mr-1"></i>
-                                        <span>Rating</span>
-                                    </div>
-                                </th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
-                                    <div class="flex flex-col items-center">
-                                        <i class="fas fa-users text-purple-400 mr-1"></i>
-                                        <span>Users</span>
-                                    </div>
-                                </th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
-                                    <div class="flex flex-col items-center">
-                                        <i class="fas fa-dollar-sign text-purple-400 mr-1"></i>
-                                        <span>Revenue</span>
-                                    </div>
-                                </th>
-                                <th class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-bold text-white">
-                                    <div class="flex flex-col items-center">
-                                        <i class="fas fa-bullseye text-purple-400 mr-1"></i>
-                                        <span>Goals</span>
-                                    </div>
-                                </th>
-                                <th class="px-2 sm:px-4 py-4 text-left text-xs sm:text-sm font-bold text-white hidden md:table-cell">Created</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leaderboard-tbody" class="divide-y divide-gray-800">
-                            <!-- Projects will be loaded here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <div id="leaderboard-empty" class="hidden p-12 text-center">
-                <i class="fas fa-inbox text-6xl text-gray-600 mb-4"></i>
-                <h3 class="text-xl font-semibold text-gray-300 mb-2">No projects in this category</h3>
-                <p class="text-gray-400">Be the first to publish a project in this category.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
-            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-            <div id="auth-modal-content" class="p-6 sm:p-8">
-                <!-- Auth form will be inserted here -->
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-    <script>
-        let currentCategory = 'all';
-        let leaderboardData = [];
-        let authToken = localStorage.getItem('authToken');
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            loadLeaderboard();
-        });
-
-        // Load leaderboard data
-        async function loadLeaderboard() {
-            try {
-                showLoading();
-                const response = await fetch('/api/projects/leaderboard/top?limit=50');
-                const data = await response.json();
-                
-                if (data.leaderboard) {
-                    leaderboardData = data.leaderboard;
-                    renderLeaderboard();
-                } else {
-                    showEmpty();
-                }
-            } catch (error) {
-                console.error('Error loading leaderboard:', error);
-                showEmpty();
-            }
-        }
-
-        // Filter by category
-        function filterByCategory(category) {
-            currentCategory = category;
-            
-            // Update button styles
-            document.querySelectorAll('.category-btn').forEach(btn => {
-                btn.classList.remove('active', 'bg-purple-600', 'text-white');
-                btn.classList.add('bg-gray-800', 'text-gray-300');
-            });
-            
-            event.target.classList.add('active', 'bg-purple-600', 'text-white');
-            event.target.classList.remove('bg-gray-800', 'text-gray-300');
-            
-            renderLeaderboard();
-        }
-
-        // Render leaderboard
-        function renderLeaderboard() {
-            const tbody = document.getElementById('leaderboard-tbody');
-            const filteredData = currentCategory === 'all' 
-                ? leaderboardData 
-                : leaderboardData.filter(project => project.category === currentCategory);
-            
-            if (filteredData.length === 0) {
-                showEmpty();
-                return;
-            }
-            
-            tbody.innerHTML = filteredData.map(function(project, index) {
-                const escapedTitle = project.title.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const escapedDescription = (project.description || '').substring(0, 100).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const escapedCreator = (project.creator_name || 'Anonymous').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const escapedCategory = formatCategory(project.category);
-                
-                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '#' + (index + 1);
-                const score = project.leaderboard_score || 0;
-                const breakdown = project.score_breakdown || { rating: 0, growth: 0, goals: 0 };
-                const completedGoals = project.completed_goals || 0;
-                const totalGoals = project.total_goals || 0;
-                const goalsPercent = totalGoals > 0 ? (completedGoals / totalGoals * 100) : 0;
-                const currentUsers = project.current_users || 0;
-                const currentRevenue = project.current_revenue || 0;
-                
-                return '<tr class="hover:bg-gray-800 transition cursor-pointer bg-gray-900" onclick="viewProjectDetail(' + project.id + ')">' +
-                    '<td class="px-2 sm:px-6 py-4">' +
-                        '<span class="text-2xl font-bold">' + medal + '</span>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4">' +
-                        '<div class="flex items-center space-x-3">' +
-                            '<div>' +
-                                '<div class="font-bold text-white">' + escapedTitle + '</div>' +
-                                '<div class="text-sm text-gray-400">' + escapedCategory + '</div>' +
-                                '<div class="text-xs text-gray-500 mt-1">by ' + escapedCreator + '</div>' +
-                            '</div>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4">' +
-                        '<div class="text-center">' +
-                            '<div class="text-2xl sm:text-3xl font-black text-purple-400">' + score.toFixed(1) + '</div>' +
-                            '<div class="text-xs text-gray-400 mt-2 space-y-1">' +
-                                '<div class="flex items-center justify-center space-x-2 sm:space-x-3">' +
-                                    '<span title="Rating Score (40%)" class="flex items-center text-xs">' +
-                                        '<i class="fas fa-star text-purple-400 mr-1"></i>' +
-                                        '<span class="hidden sm:inline">' + (breakdown.rating ? breakdown.rating.toFixed(0) : 0) + '</span>' +
-                                    '</span>' +
-                                    '<span title="Growth Score (35%)" class="flex items-center text-xs">' +
-                                        '<i class="fas fa-chart-line text-purple-400 mr-1"></i>' +
-                                        '<span class="hidden sm:inline">' + (breakdown.growth ? breakdown.growth.toFixed(0) : 0) + '</span>' +
-                                    '</span>' +
-                                    '<span title="Goals Score (25%)" class="flex items-center text-xs">' +
-                                        '<i class="fas fa-check-circle text-purple-400 mr-1"></i>' +
-                                        '<span class="hidden sm:inline">' + (breakdown.goals ? breakdown.goals.toFixed(0) : 0) + '</span>' +
-                                    '</span>' +
-                                '</div>' +
-                            '</div>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4">' +
-                        '<div class="flex items-center justify-center">' +
-                            '<span class="text-purple-400 mr-1">★</span>' +
-                            '<span class="font-semibold text-white">' + (project.rating_average || 0).toFixed(1) + '</span>' +
-                            '<span class="text-gray-400 text-sm ml-1">(' + (project.votes_count || 0) + ')</span>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<div class="font-semibold text-white">' + formatNumber(currentUsers) + '</div>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<div class="font-semibold text-purple-400">$' + formatNumber(currentRevenue) + '</div>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-center">' +
-                        '<div class="flex flex-col items-center">' +
-                            '<div class="w-full bg-gray-700 rounded-full h-2 mb-1">' +
-                                '<div class="bg-purple-600 h-2 rounded-full" style="width: ' + goalsPercent + '%"></div>' +
-                            '</div>' +
-                            '<span class="text-xs text-gray-400">' + completedGoals + '/' + totalGoals + '</span>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-2 sm:px-6 py-4 text-gray-400 text-sm hidden md:table-cell">' +
-                        formatDate(project.created_at) +
-                    '</td>' +
-                '</tr>';
-            }).join('');
-            
-            showContent();
-        }
-        
-        // Helper function to format numbers
-        function formatNumber(num) {
-            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-            return num.toString();
-        }
-        
-        // Helper function to format dates
-        function formatDate(dateString) {
-            if (!dateString) return 'N/A';
-            const date = new Date(dateString);
-            const now = new Date();
-            const diffTime = Math.abs(now - date);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays === 0) return 'Today';
-            if (diffDays === 1) return 'Yesterday';
-            if (diffDays < 7) return diffDays + ' days ago';
-            if (diffDays < 30) return Math.floor(diffDays / 7) + ' weeks ago';
-            if (diffDays < 365) return Math.floor(diffDays / 30) + ' months ago';
-            return Math.floor(diffDays / 365) + ' years ago';
-        }
-
-        // Helper functions
-        function getPositionBadge(position) {
-            if (position === 1) return '<div class="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center"><i class="fas fa-trophy text-white text-xs"></i></div>';
-            if (position === 2) return '<div class="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center"><i class="fas fa-medal text-white text-xs"></i></div>';
-            if (position === 3) return '<div class="w-8 h-8 bg-orange-400 rounded-full flex items-center justify-center"><i class="fas fa-award text-white text-xs"></i></div>';
-            return '<div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center"><span class="text-xs font-bold text-gray-600">' + position + '</span></div>';
-        }
-
-        function getCategoryColor(category) {
-            const colors = {
-                'healthcare': 'bg-green-100 text-green-800',
-                'education': 'bg-blue-100 text-blue-800',
-                'smart-city': 'bg-purple-100 text-purple-800',
-                'finance': 'bg-green-100 text-green-800',
-                'energy': 'bg-yellow-100 text-yellow-800',
-                'agriculture': 'bg-green-100 text-green-800',
-                'retail': 'bg-pink-100 text-pink-800'
-            };
-            return colors[category] || 'bg-gray-100 text-gray-800';
-        }
-
-        function getCategoryIcon(category) {
-            const icons = {
-                'healthcare': '🏥',
-                'education': '📚',
-                'smart-city': '🏙️',
-                'finance': '💰',
-                'energy': '⚡',
-                'agriculture': '🌾',
-                'retail': '🛍️'
-            };
-            return icons[category] || '📁';
-        }
-
-        function formatCategory(category) {
-            return category.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        }
-
-        function generateStars(rating) {
-            let stars = '';
-            const fullStars = Math.floor(rating);
-            const hasHalfStar = rating % 1 >= 0.5;
-            
-            for (let i = 0; i < fullStars; i++) {
-                stars += '<i class="fas fa-star text-yellow-400"></i>';
-            }
-            
-            if (hasHalfStar) {
-                stars += '<i class="fas fa-star-half-alt text-yellow-400"></i>';
-            }
-            
-            const emptyStars = 5 - Math.ceil(rating);
-            for (let i = 0; i < emptyStars; i++) {
-                stars += '<i class="far fa-star text-gray-300"></i>';
-            }
-            
-            return stars;
-        }
-
-        function viewProject(projectId) {
-            window.location.href = '/marketplace?project=' + projectId;
-        }
-
-        function generateVoteButtons(projectId) {
-            return '<div class="flex items-center space-x-1">' +
-                [1, 2, 3, 4, 5].map(star =>
-                    '<button onclick="voteForProject(' + projectId + ', ' + star + ')" ' +
-                    'class="text-gray-300 hover:text-yellow-400 transition-colors text-lg" ' +
-                    'title="Votar ' + star + ' estrella' + (star > 1 ? 's' : '') + '">' +
-                    '<i class="fas fa-star"></i>' +
-                    '</button>'
-                ).join('') +
-                '</div>';
-        }
-
-        async function voteForProject(projectId, rating) {
-            if (!authToken) {
-                localStorage.setItem('pendingVote', JSON.stringify({ projectId, rating }));
-                showAuthModal('validator');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/projects/' + projectId + '/vote', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + authToken
-                    },
-                    body: JSON.stringify({ rating })
-                });
-
-                if (response.ok) {
-                    alert('¡Gracias por tu voto!');
-                    loadLeaderboard();
-                } else {
-                    const error = await response.json();
-                    alert('Error: ' + (error.error || 'No se pudo registrar el voto'));
-                }
-            } catch (error) {
-                console.error('Error voting:', error);
-                alert('Error al votar. Inténtalo de nuevo.');
-            }
-        }
-
-        function showLoading() {
-            document.getElementById('leaderboard-loading').classList.remove('hidden');
-            document.getElementById('leaderboard-content').classList.add('hidden');
-            document.getElementById('leaderboard-empty').classList.add('hidden');
-        }
-
-        function showContent() {
-            document.getElementById('leaderboard-loading').classList.add('hidden');
-            document.getElementById('leaderboard-content').classList.remove('hidden');
-            document.getElementById('leaderboard-empty').classList.add('hidden');
-        }
-
-        function showEmpty() {
-            document.getElementById('leaderboard-loading').classList.add('hidden');
-            document.getElementById('leaderboard-content').classList.add('hidden');
-            document.getElementById('leaderboard-empty').classList.remove('hidden');
-        }
-
-        function showAuthModal(mode) {
-            const modal = document.getElementById('auth-modal');
-            const modalContent = document.getElementById('auth-modal-content');
-            
-            if (!modal || !modalContent) return;
-            
-            modal.classList.remove('hidden');
-            
-            if (mode === 'validator') {
-                modalContent.innerHTML = '<div class="text-center">' +
-                    '<i class="fas fa-user-check text-4xl text-primary mb-4"></i>' +
-                    '<h2 class="text-2xl font-bold text-gray-900 mb-4">Registro como Validador</h2>' +
-                    '<p class="text-gray-600 mb-6">Elige tu rol para registrarte y votar proyectos</p>' +
-                    '<div class="space-y-3">' +
-                        '<button onclick="loginAsFounder()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
-                            '<i class="fas fa-lightbulb text-xl"></i>' +
-                            '<span>Fundador - Crear y validar proyectos</span>' +
-                        '</button>' +
-                        '<button onclick="loginAsValidator()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3">' +
-                            '<i class="fas fa-star text-xl"></i>' +
-                            '<span>Validador - Votar y calificar proyectos</span>' +
-                        '</button>' +
-                    '</div>' +
-                '</div>';
-            }
-        }
-
-        function closeAuthModal() {
-            const modal = document.getElementById('auth-modal');
-            if (modal) {
-                modal.classList.add('hidden');
-            }
-        }
-
-        function loginWithGoogle(role) {
-            window.location.href = '/api/auth/google?role=' + role;
-        }
-
-        function showQRCodeFromButton(button) {
-            const projectId = button.getAttribute('data-project-id');
-            const projectTitle = button.getAttribute('data-project-title');
-            showQRCode(projectId, projectTitle);
-        }
-
-        function showQRCode(projectId, projectTitle) {
-            const qrUrl = window.location.origin + '/vote/' + projectId;
-            
-            const modalContent = document.getElementById('auth-modal-content');
-            const escapedTitle = projectTitle.replace(/'/g, "\\'").replace(/"/g, '\\"');
-            const qrHtml = '<div class="text-center">' +
-                '<i class="fas fa-qrcode text-4xl text-green-600 mb-4"></i>' +
-                '<h2 class="text-2xl font-bold text-gray-900 mb-2">QR Code for Validators</h2>' +
-                '<p class="text-gray-600 mb-4">' + escapedTitle + '</p>' +
-                '<div class="bg-white p-4 rounded-lg border-2 border-gray-200 inline-block mb-6">' +
-                    '<div id="qrcode" class="mx-auto"></div>' +
-                '</div>' +
-                '<div class="flex space-x-3 justify-center">' +
-                    '<button onclick="copyCurrentQRUrl()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">' +
-                        '<i class="fas fa-copy mr-2"></i>Copiar URL' +
-                    '</button>' +
-                    '<button onclick="closeAuthModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">' +
-                        'Cerrar' +
-                    '</button>' +
-                '</div>' +
-            '</div>';
-
-            modalContent.innerHTML = qrHtml;
-
-            // Store the URL in a global variable for the copy function
-            window.currentQRUrl = qrUrl;
-
-            setTimeout(() => {
-                if (typeof QRCode !== 'undefined') {
-                    new QRCode(document.getElementById('qrcode'), {
-                        text: qrUrl,
-                        width: 200,
-                        height: 200,
-                        colorDark: '#000000',
-                        colorLight: '#ffffff',
-                        correctLevel: QRCode.CorrectLevel.H
-                    });
-                }
-            }, 100);
-
-            document.getElementById('auth-modal').classList.remove('hidden');
-        }
-
-        function copyCurrentQRUrl() {
-            const url = window.currentQRUrl;
-            if (!url) return;
-            
-            navigator.clipboard.writeText(url).then(() => {
-                alert('URL copiada al portapapeles');
-            }).catch(() => {
-                const textArea = document.createElement('textarea');
-                textArea.value = url;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                alert('URL copiada al portapapeles');
-            });
-        }
-    </script>
-    
-    <!-- Chart.js for dashboard visualizations -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- jsPDF for PDF export functionality -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
-    <script>
-      // Ensure jsPDF is globally available
-      if (typeof window.jspdf !== 'undefined' && window.jspdf.jsPDF) {
-        window.jsPDF = window.jspdf.jsPDF;
-      }
-    </script>
-</body>
-</html>
-  `);
+    return c.html(html);
+  } catch (error) {
+    console.error('Error loading leaderboard:', error);
+    return c.html('<div class="flex items-center justify-center min-h-screen"><div class="text-center"><h1 class="text-2xl font-bold text-gray-800 mb-4">Error loading leaderboard</h1><p class="text-gray-600">Please try again later.</p></div></div>');
+  }
 });
 
 export default app;

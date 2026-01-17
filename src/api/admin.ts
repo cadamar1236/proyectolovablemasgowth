@@ -562,4 +562,148 @@ admin.get('/reports/:type', adminMiddleware, async (c) => {
   }
 });
 
+// ========== COMPETITIONS MANAGEMENT ==========
+
+// Create new competition
+admin.post('/competitions', adminMiddleware, async (c) => {
+  try {
+    const data = await c.req.json();
+    const {
+      title,
+      description,
+      competition_type,
+      prize_amount,
+      deadline,
+      guidelines,
+      ticket_price,
+      event_date,
+      event_time,
+      location,
+      payment_link,
+      ticket_required
+    } = data;
+
+    const result = await c.env.DB.prepare(`
+      INSERT INTO competitions (
+        title, description, competition_type, prize_amount, deadline,
+        guidelines, ticket_price, event_date, event_time, location,
+        payment_link, ticket_required, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+    `).bind(
+      title,
+      description || null,
+      competition_type,
+      prize_amount || 0,
+      deadline || null,
+      guidelines || null,
+      ticket_price || 0,
+      event_date || null,
+      event_time || null,
+      location || null,
+      payment_link || null,
+      ticket_required ? 1 : 0
+    ).run();
+
+    return c.json({ 
+      success: true, 
+      competitionId: result.meta.last_row_id 
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error creating competition:', error);
+    return c.json({ error: 'Failed to create competition' }, 500);
+  }
+});
+
+// Update competition
+admin.put('/competitions/:id', adminMiddleware, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const data = await c.req.json();
+    const {
+      title,
+      description,
+      competition_type,
+      prize_amount,
+      deadline,
+      guidelines,
+      ticket_price,
+      event_date,
+      event_time,
+      location,
+      payment_link,
+      ticket_required,
+      status
+    } = data;
+
+    await c.env.DB.prepare(`
+      UPDATE competitions SET
+        title = ?,
+        description = ?,
+        competition_type = ?,
+        prize_amount = ?,
+        deadline = ?,
+        guidelines = ?,
+        ticket_price = ?,
+        event_date = ?,
+        event_time = ?,
+        location = ?,
+        payment_link = ?,
+        ticket_required = ?,
+        status = COALESCE(?, status),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      title,
+      description || null,
+      competition_type,
+      prize_amount || 0,
+      deadline || null,
+      guidelines || null,
+      ticket_price || 0,
+      event_date || null,
+      event_time || null,
+      location || null,
+      payment_link || null,
+      ticket_required ? 1 : 0,
+      status || null,
+      id
+    ).run();
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('[ADMIN] Error updating competition:', error);
+    return c.json({ error: 'Failed to update competition' }, 500);
+  }
+});
+
+// Delete competition
+admin.delete('/competitions/:id', adminMiddleware, async (c) => {
+  try {
+    const id = c.req.param('id');
+
+    // Delete related data first
+    await c.env.DB.prepare(`
+      DELETE FROM competition_votes WHERE competition_id = ?
+    `).bind(id).run();
+
+    await c.env.DB.prepare(`
+      DELETE FROM competition_winners WHERE competition_id = ?
+    `).bind(id).run();
+
+    await c.env.DB.prepare(`
+      DELETE FROM competition_participants WHERE competition_id = ?
+    `).bind(id).run();
+
+    // Delete competition
+    await c.env.DB.prepare(`
+      DELETE FROM competitions WHERE id = ?
+    `).bind(id).run();
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('[ADMIN] Error deleting competition:', error);
+    return c.json({ error: 'Failed to delete competition' }, 500);
+  }
+});
+
 export default admin;

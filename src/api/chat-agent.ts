@@ -135,9 +135,9 @@ async function getStartupContext(db: any, userId: number) {
         primaryConfig: primaryMetrics || { metric1_name: 'users', metric2_name: 'revenue' }
       },
       summary: `
-        Startup tiene ${goals.length} objetivos (${completedGoals.length} completados, ${activeGoals.length} activos).
-        Métricas actuales: ${latestUsers} usuarios, $${latestRevenue} revenue.
-        Crecimiento: ${userGrowth}% usuarios, ${revenueGrowth}% revenue.
+        Startup has ${goals.length} goals (${completedGoals.length} completed, ${activeGoals.length} active).
+        Current metrics: ${latestUsers} users, $${latestRevenue} revenue.
+        Growth: ${userGrowth}% users, ${revenueGrowth}% revenue.
       `
     };
   } catch (error) {
@@ -305,13 +305,197 @@ app.post('/message', jwtMiddleware, async (c) => {
     return c.json({ error: 'Invalid JSON' }, 400);
   }
   
-  const { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage } = requestBody;
-  console.log('[CHAT] Flags:', { useMetricsAgent, useBrandAgent, websiteUrl, industry, stage });
+  let { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, goalData } = requestBody;
+  console.log('[CHAT] Flags:', { useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, hasGoalData: !!goalData });
 
   if (!message?.trim()) {
     console.error('[CHAT] No message provided');
     return c.json({ error: 'Message is required' }, 400);
   }
+
+  // ============ DETECT ASTAR TRIGGER ============
+  // Si el mensaje contiene el marcador oculto __TRIGGER_GOAL_FLOW__, activar el flujo
+  if (message.includes('__TRIGGER_GOAL_FLOW__')) {
+    console.log('[CHAT] ========== ASTAR TRIGGER DETECTED ==========');
+    // Limpiar el mensaje del marcador
+    message = message.replace('__TRIGGER_GOAL_FLOW__', '').trim();
+    console.log('[CHAT] Cleaned message:', message);
+    
+    // Retornar con flag para activar el flujo en el frontend
+    return c.json({
+      message: message, // El mensaje original limpio
+      triggerGoalFlow: true, // Flag para que el frontend inicie el flujo
+      category: 'ASTAR'
+    });
+  }
+  // ============ END ASTAR TRIGGER ============
+
+  // ============ GOAL CREATION FROM FLOW ============
+  // Si viene goalData del flujo de creación de goals, crear directamente
+  if (goalData) {
+    console.log('[CHAT] ========== GOAL CREATION FROM FLOW ==========');
+    console.log('[CHAT] Goal data received:', JSON.stringify(goalData));
+    
+    try {
+      const db = c.env.DB;
+      const result = await db.prepare(`
+        INSERT INTO goals (
+          user_id, category, description, task, priority, priority_label, 
+          cadence, dri, goal_status, week_of, status, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+      `).bind(
+        user.userId,
+        goalData.category || 'ASTAR',
+        goalData.description,
+        goalData.task || null,
+        goalData.priority || 'P0',
+        goalData.priority_label || 'Urgent & important',
+        goalData.cadence || 'One time',
+        goalData.dri || null,
+        goalData.goal_status || 'To start',
+        goalData.week_of || null
+      ).run();
+      
+      console.log('[CHAT] Goal created successfully! ID:', result.meta?.last_row_id);
+      
+      const successMessage = '✅ Goal created successfully!\n\n' +
+        '📋 **' + goalData.description + '**\n' +
+        '🎯 Task: ' + (goalData.task || 'N/A') + '\n' +
+        '🏷️ Category: ' + goalData.category + '\n' +
+        '⚡ Priority: ' + goalData.priority + ' - ' + goalData.priority_label + '\n' +
+        '🔄 Cadence: ' + goalData.cadence + '\n' +
+        '👤 Owner: ' + (goalData.dri || 'Not assigned') + '\n' +
+        '📊 Status: ' + goalData.goal_status + '\n' +
+        '📅 Week: ' + (goalData.week_of || 'Not specified') + '\n\n' +
+        '🆔 Goal ID: ' + result.meta?.last_row_id + '\n\n' +
+        'Now available in your dashboard!';
+      
+      // Guardar en historial de chat
+      await db.prepare(`
+        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+        VALUES (?, 'user', ?, datetime('now'))
+      `).bind(user.userId, message).run();
+      
+      await db.prepare(`
+        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+        VALUES (?, 'assistant', ?, datetime('now'))
+      `).bind(user.userId, successMessage).run();
+      
+      return c.json({ message: successMessage });
+      
+    } catch (error) {
+      console.error('[CHAT] Error creating goal from flow:', error);
+      const errorMessage = '❌ There was an error creating the goal. Please try again.';
+      
+      // Guardar error en historial
+      try {
+        await c.env.DB.prepare(`
+          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+          VALUES (?, 'assistant', ?, datetime('now'))
+        `).bind(user.userId, errorMessage).run();
+      } catch (dbError) {
+        console.error('[CHAT] DB error:', dbError);
+      }
+      
+      return c.json({ message: errorMessage });
+    }
+  }
+
+  // ============ INTENT DETECTION ============
+  // Detectar automáticamente qué quiere el usuario basándose en su mensaje
+  const messageLower = message.toLowerCase();
+  
+  // ============ GOAL DETECTION - PRIORITY #1 ============
+  // Detectar si quiere crear un goal - ESTO VA PRIMERO antes de cualquier otro procesamiento
+  const goalKeywords = [
+    'crear goal', 'create goal', 'nuevo goal', 'new goal',
+    'crear objetivo', 'nuevo objetivo', 'añadir objetivo', 'agregar objetivo',
+    'quiero crear', 'necesito crear', 'me gustaria crear', 'me gustaría crear',
+    'registrar goal', 'definir objetivo', 'establecer goal', 'poner un objetivo',
+    'añadir goal', 'agregar goal', 'add goal', 'añadir meta', 'nueva meta',
+    'crear una meta', 'quiero un objetivo', 'quiero un goal',
+    'crea un goal', 'crea un objetivo', 'hazme un goal', 'hazme un objetivo',
+    'agrega un goal', 'agrega un objetivo', 'pon un objetivo',
+    'i want to create', 'set a goal', 'add a goal', 'make a goal'
+  ];
+  
+  const wantsToCreateGoal = goalKeywords.some(keyword => messageLower.includes(keyword));
+  
+  if (wantsToCreateGoal) {
+    console.log('[CHAT] ========== GOAL CREATION DETECTED ==========');
+    console.log('[CHAT] User wants to create a goal. Triggering flow directly');
+    
+    // Guardar mensaje del usuario
+    await c.env.DB.prepare(`
+      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+      VALUES (?, 'user', ?, datetime('now'))
+    `).bind(user.userId, message).run();
+    
+    // Responder con un flag especial que el frontend detectará
+    // IMPORTANTE: El message es un texto amigable por si el frontend NO detecta el flag
+    // Esto evita que se muestre texto técnico como __START_GOAL_FLOW__
+    console.log('[CHAT] Returning goal flow trigger');
+    
+    return c.json({ 
+      message: '✨ Perfect! Let\'s create your goal. I\'ll ask you a few quick questions to complete all the information.',
+      triggerGoalFlow: true,
+      startFlow: true
+    });
+  }
+  // ============ END GOAL DETECTION ============
+  
+  // Detectar si el usuario quiere generar imágenes
+  const wantsImage = (
+    messageLower.includes('genera') && (messageLower.includes('imagen') || messageLower.includes('imágenes') || messageLower.includes('image')) ||
+    messageLower.includes('crea') && (messageLower.includes('imagen') || messageLower.includes('banner') || messageLower.includes('post')) ||
+    messageLower.includes('quiero una imagen') ||
+    messageLower.includes('hazme una imagen') ||
+    messageLower.includes('crear imagen') ||
+    messageLower.includes('generar imagen') ||
+    messageLower.includes('diseña') && (messageLower.includes('banner') || messageLower.includes('post') || messageLower.includes('imagen')) ||
+    messageLower.includes('instagram') && (messageLower.includes('imagen') || messageLower.includes('post') || messageLower.includes('crea') || messageLower.includes('genera')) ||
+    messageLower.includes('linkedin') && (messageLower.includes('imagen') || messageLower.includes('post') || messageLower.includes('crea')) ||
+    messageLower.includes('twitter') && (messageLower.includes('imagen') || messageLower.includes('post')) ||
+    messageLower.includes('tiktok') && (messageLower.includes('imagen') || messageLower.includes('thumbnail')) ||
+    messageLower.includes('banner para') ||
+    messageLower.includes('imagen para') ||
+    messageLower.includes('post para') ||
+    messageLower.includes('thumbnail') ||
+    messageLower.includes('hero image') ||
+    messageLower.includes('imagen de portada') ||
+    messageLower.includes('diseño para') && (messageLower.includes('red') || messageLower.includes('social'))
+  );
+  
+  // Detectar si quiere análisis de marketing/marca
+  const wantsBrandAnalysis = (
+    messageLower.includes('analiza') && (messageLower.includes('marca') || messageLower.includes('brand') || messageLower.includes('web') || messageLower.includes('sitio')) ||
+    messageLower.includes('plan de marketing') ||
+    messageLower.includes('estrategia de marketing') ||
+    messageLower.includes('marketing plan') ||
+    messageLower.includes('analizar mi marca') ||
+    messageLower.includes('análisis de marca') ||
+    messageLower.includes('identidad de marca') ||
+    messageLower.includes('branding')
+  );
+  
+  // Detectar si quiere análisis de métricas
+  const wantsMetrics = (
+    messageLower.includes('métrica') ||
+    messageLower.includes('metrica') ||
+    messageLower.includes('analiza') && (messageLower.includes('dato') || messageLower.includes('número') || messageLower.includes('estadística')) ||
+    messageLower.includes('kpi') ||
+    messageLower.includes('rendimiento') ||
+    messageLower.includes('crecimiento') && (messageLower.includes('analiza') || messageLower.includes('cómo va'))
+  );
+  
+  // Extraer URL del mensaje si la hay
+  const urlMatch = message.match(/https?:\/\/[^\s]+/);
+  let detectedUrl = websiteUrl || (urlMatch ? urlMatch[0] : null);
+  
+  // Si pide imagen pero no tiene URL, pedirla o usar contexto
+  console.log('[CHAT] Intent detection:', { wantsImage, wantsBrandAnalysis, wantsMetrics, detectedUrl });
+  // ============ END INTENT DETECTION ============
 
   try {
     console.log('[CHAT] Saving user message to DB...');
@@ -329,6 +513,88 @@ app.post('/message', jwtMiddleware, async (c) => {
       railwayUrl = 'https://' + railwayUrl;
     }
     
+    // ============ AUTO-ROUTE TO RAILWAY AGENTS ============
+    
+    // Si quiere generar imagen, llamar al brand agent de Railway
+    if (wantsImage && railwayUrl && !railwayUrl.includes('localhost')) {
+      console.log('[CHAT] Auto-routing to Railway for image generation...');
+      
+      try {
+        const agentResponse = await fetch(`${railwayUrl}/api/agents/brand/generate-images`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            website_url: detectedUrl || 'general',
+            user_id: String(user.userId || user.id || '1'),
+            cloudflare_api_url: new URL(c.req.url).origin,
+            custom_prompt: message  // Pasar el mensaje completo como prompt
+          })
+        });
+
+        if (agentResponse.ok) {
+          const result = await agentResponse.json() as any;
+          
+          let responseMsg = '🎨 **Generating marketing images...**\n\n';
+          if (result.analysis) {
+            responseMsg += result.analysis + '\n\n';
+          }
+          if (result.images_generated > 0) {
+            responseMsg += `✅ **${result.images_generated} image(s) generated!**\n\n`;
+            responseMsg += '📸 You can view and approve them in the **AI CMO** section of the menu.\n\n';
+            responseMsg += '💡 *Tip: Approve the ones you like to download them in high resolution.*';
+          } else {
+            responseMsg += '⏳ Images are being processed. Check the **AI CMO** section in a moment.';
+          }
+          
+          await c.env.DB.prepare(`
+            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+            VALUES (?, 'assistant', ?, datetime('now'))
+          `).bind(user.userId, responseMsg).run();
+
+          return c.json({ message: responseMsg });
+        }
+      } catch (imageError) {
+        console.error('[CHAT] Error generating images:', imageError);
+        // Continue to normal chat flow if image generation fails
+      }
+    }
+    
+    // Si quiere análisis de marca con URL
+    if (wantsBrandAnalysis && detectedUrl && railwayUrl && !railwayUrl.includes('localhost')) {
+      console.log('[CHAT] Auto-routing to Railway for brand analysis...');
+      
+      try {
+        const agentResponse = await fetch(`${railwayUrl}/api/agents/brand/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            website_url: detectedUrl,
+            custom_prompt: message
+          })
+        });
+
+        if (agentResponse.ok) {
+          const result = await agentResponse.json() as any;
+          
+          if (result.success && result.response) {
+            const formattedResponse = `🎨 **BRAND ANALYSIS**\n\n${result.response}`;
+            
+            await c.env.DB.prepare(`
+              INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+              VALUES (?, 'assistant', ?, datetime('now'))
+            `).bind(user.userId, formattedResponse).run();
+
+            return c.json({ message: formattedResponse });
+          }
+        }
+      } catch (brandError) {
+        console.error('[CHAT] Error in brand analysis:', brandError);
+        // Continue to normal chat flow
+      }
+    }
+    
+    // ============ END AUTO-ROUTE ============
+    
     console.log('[CHAT] Railway URL configured as:', railwayUrl);
     console.log('[CHAT] Environment check - RAILWAY_API_URL exists:', !!c.env.RAILWAY_API_URL);
 
@@ -341,7 +607,7 @@ app.post('/message', jwtMiddleware, async (c) => {
       // Verificar si Railway está configurado
       if (railwayUrl.includes('your-railway-app') || railwayUrl === 'http://localhost:5000') {
         console.error('[CHAT] Railway URL not configured! Using placeholder.');
-        const errorMsg = '⚠️ **Railway no está configurado**\n\nConfigura `RAILWAY_API_URL` en Cloudflare Dashboard > Settings > Environment Variables.\n\n💡 Mientras tanto, usa el chat normal para preguntas.';
+        const errorMsg = '⚠️ **Railway is not configured**\n\nConfigure `RAILWAY_API_URL` in Cloudflare Dashboard > Settings > Environment Variables.\n\n💡 In the meantime, use the normal chat for questions.';
         
         try {
           await c.env.DB.prepare(`
@@ -376,7 +642,7 @@ app.post('/message', jwtMiddleware, async (c) => {
           
           if (result.success && result.response) {
             // Formatear respuesta bonita
-            const formattedResponse = `🎨 **ANÁLISIS DE MARCA**\n\n${result.response}\n\n---\n*Análisis generado por ASTAR* Brand Marketing Agent 🚀*`;
+            const formattedResponse = `🎨 **BRAND ANALYSIS**\n\n${result.response}\n\n---\n*Analysis generated by ASTAR* Brand Marketing Agent 🚀*`;
             
             await c.env.DB.prepare(`
               INSERT INTO agent_chat_messages (user_id, role, content, created_at)
@@ -517,108 +783,99 @@ app.post('/message', jwtMiddleware, async (c) => {
 
     try {
       // Generate AI response with function calling capability
-      const systemPrompt = `Eres ASTAR* Agent 🚀, un asistente de growth inteligente y carismático para startups.
+      const systemPrompt = `You are ASTAR* Agent 🚀, a growth assistant for startups.
 
-Tu personalidad es entusiasta, directa y motivadora. Usas emojis de forma estratégica y estructuras tus respuestas con formato markdown para que sean fáciles de leer.
+🚫 ABSOLUTELY PROHIBITED:
+- NEVER create goals directly
+- NEVER use ACTION:CREATE_GOAL (that command DOES NOT EXIST)
+- NEVER respond with "New Goal created" or goal data
+- NEVER show IDs, categories, or technical values
 
-ESTILO DE RESPUESTA:
-- Usa **negritas** para resaltar puntos clave
-- Usa emojis relevantes (📊 📈 💡 🎯 ✨ 🚀)
-- Organiza con bullet points o listas numeradas
-- Añade secciones con ### títulos cuando sea apropiado
-- Sé conciso pero completo
-- Termina con una pregunta o call-to-action cuando sea apropiado
+⚠️ RULE #1 - CREATE GOALS:
+When user asks to create a goal, respond EXACTLY with these 2 words:
+TRIGGER:START_GOAL_FLOW
 
-FORMATO EJEMPLO:
-### 📊 Análisis de tus Métricas
+Do NOT add ANYTHING else. Just those 2 words.
 
-Aquí está lo que he encontrado:
+CORRECT Examples:
+User: "create goal" 
+You: TRIGGER:START_GOAL_FLOW
 
-**Estado Actual:**
-- ✅ Objetivo 1: En progreso (75%)
-- 🎯 Objetivo 2: Pendiente
+User: "new goal"
+You: TRIGGER:START_GOAL_FLOW
 
-**Recomendaciones:**
-1. Enfócate en...
-2. Te sugiero...
+User: "I want to create a goal"
+You: TRIGGER:START_GOAL_FLOW
 
-💡 **Próximo paso:** [acción específica]
+User: "add goal"
+You: TRIGGER:START_GOAL_FLOW
 
----
+❌ WRONG (DON'T DO THIS):
+User: "create goal"
+You: "New Goal created: ID: 177..." ← NEVER DO THIS!
 
-ACCIONES DISPONIBLES:
-1. ACTION:ADD_METRIC|metric_name|value - Registrar métricas
-2. ACTION:UPDATE_GOAL|goal_id|value - Actualizar progreso de objetivo
-3. ACTION:UPDATE_GOAL_STATUS|goal_id|status - Cambiar estado (active, completed, in_progress)
-4. ACTION:UPDATE_GOAL_DESCRIPTION|goal_id|new_description - Cambiar descripción
-5. ACTION:UPDATE_GOAL_DEADLINE|goal_id|new_deadline - Cambiar fecha límite (YYYY-MM-DD)
-6. ACTION:UPDATE_GOAL_CATEGORY|goal_id|new_category - Cambiar categoría/importancia
-7. ACTION:COMPLETE_GOAL|goal_id - Marcar objetivo como completado
-8. ACTION:DELETE_GOAL|goal_id - Eliminar objetivo
-9. ACTION:FETCH_LEADERBOARD|global - Ver leaderboard de startups
-10. ACTION:FETCH_LEADERBOARD|goals - Ver leaderboard de objetivos
-11. ACTION:FETCH_LEADERBOARD|competitions - Ver competiciones activas
+📊 COMMANDS FOR METRICS (USERS AND REVENUE):
 
-DETECCIÓN DE INTENCIONES:
+ACTION:SET_USERS|value - Set number of users
+ACTION:SET_REVENUE|value - Set revenue (in dollars)
+ACTION:ADD_USERS|value - Add users to current total
+ACTION:ADD_REVENUE|value - Add revenue to current total
 
-**CREAR GOAL:**
-Si dice: "crear goal", "añadir goal", "nuevo objetivo"
-→ Responde: "TRIGGER:START_GOAL_FLOW"
+📝 METRIC EXAMPLES:
 
-**EDITAR/VER GOALS:**
-Si dice: "editar goal", "modificar objetivo", "ver mis objetivos", "lista de goals"
-→ Muestra lista formateada:
-🎯 **Tus Objetivos:**
+User: "we have 500 users"
+You: ACTION:SET_USERS|500
+👥 Updated! You now have 500 registered users.
 
-${context.goals.all.map((g: any, i: number) => `${i+1}. **[ID: ${g.id}]** ${g.description || g.task}
-   • Estado: ${g.status === 'completed' ? '✅ Completado' : g.status === 'in_progress' ? '🔄 En Progreso' : '⏳ Pendiente'}
-   • Progreso: ${g.current_value || 0}/${g.target_value || 100}
-   • Categoría: ${g.category || 'general'}`).join('\n\n')}
+User: "update revenue to 15000"
+You: ACTION:SET_REVENUE|15000
+💰 Revenue updated to $15,000!
 
-Dime el ID del objetivo que quieres modificar y qué quieres cambiar.
+User: "we got 50 new users"
+You: ACTION:ADD_USERS|50
+🎉 +50 users! Total: \${context.metrics.current.users + 50}
 
-⚡ **EDICIÓN RÁPIDA DE GOALS:**
-REGLA: Cuando el usuario pida editar/completar/eliminar un goal, ejecuta la acción INMEDIATAMENTE y responde SOLO con un emoji. NO des explicaciones.
+User: "we made 2000 in sales today"
+You: ACTION:ADD_REVENUE|2000
+💵 +$2,000! Total revenue: $\${context.metrics.current.revenue + 2000}
 
-Ejemplos:
-- "completar objetivo 5" → ACTION:COMPLETE_GOAL|5 → Responde solo: "🎉"
-- "cambiar descripción del 3 a nueva desc" → ACTION:UPDATE_GOAL_DESCRIPTION|3|nueva desc → Solo: "📝"  
-- "poner el 2 en progreso" → ACTION:UPDATE_GOAL_STATUS|2|in_progress → Solo: "🔄"
-- "eliminar goal 7" → ACTION:DELETE_GOAL|7 → Solo: "🗑️"
-- "cambiar deadline del 4 a 2026-02-15" → ACTION:UPDATE_GOAL_DEADLINE|4|2026-02-15 → Solo: "📅"
-- "cambiar categoría del 6 a high" → ACTION:UPDATE_GOAL_CATEGORY|6|high → Solo: "🔥"
-- "actualizar progreso del 1 a 75" → ACTION:UPDATE_GOAL|1|75 → Solo: "✅"
+User: "we now have 1200 users and $8000 revenue"
+You: ACTION:SET_USERS|1200
+ACTION:SET_REVENUE|8000
+📊 Metrics updated! 1,200 users and $8,000 revenue.
 
-**CONSULTAR LEADERBOARDS:**
-Si menciona: "leaderboard", "ranking", "posición"
-→ Responde: ACTION:FETCH_LEADERBOARD|global
+🔧 COMMANDS TO EDIT EXISTING GOALS:
 
-**ANÁLISIS DE MÉTRICAS:**
-Menciona el botón "📊 Analizar Objetivos" para análisis con Metrics Agent.
+ACTION:UPDATE_GOAL_STATUS|goal_id|status - Change status (WIP, To start, Done, etc.)
+ACTION:UPDATE_GOAL_DESCRIPTION|goal_id|new_description - Change description
+ACTION:COMPLETE_GOAL|goal_id - Mark as completed
+ACTION:DELETE_GOAL|goal_id - Delete goal
 
-**PLAN DE MARKETING:**
-Menciona el botón "🎨 Plan de Marketing" para Brand Marketing Agent.
+📝 EDITING EXAMPLES:
 
-CONTEXTO DEL USUARIO:
+User: "complete goal 145"
+You: ACTION:COMPLETE_GOAL|145
+🎉 Goal completed!
 
-📋 **Objetivos:**
-${context.goals.all.map((g: any, i: number) => `${i+1}. [ID: ${g.id}] ${g.task || g.description} - ${g.status || 'active'} - ${g.current_value || 0}/${g.target_value || 100}`).join('\n')}
+User: "delete goal 136"
+You: ACTION:DELETE_GOAL|136
+🗑️ Deleted
 
-📊 **Métricas Actuales:**
-- Usuarios: ${context.metrics.current.users}
-- Revenue: $${context.metrics.current.revenue}
-- Total de objetivos: ${context.goals.totalCount}
-- Completados: ${context.goals.completedCount} (${context.goals.completionRate}%)
+📊 USER CONTEXT:
+- Has \${context.goals.totalCount} goals (\${context.goals.completedCount} completed)
+- \${context.metrics.current.users} users, $\${context.metrics.current.revenue} revenue
 
-REGLAS:
-- Responde en español 🇪🇸
-- Sé motivador y positivo ✨
-- Estructura tus respuestas con markdown
-- Usa emojis moderadamente pero estratégicamente
-- Verifica que el ID del objetivo existe antes de ejecutar acciones
-- Las acciones ACTION: deben ir al inicio de la respuesta`;
+🎯 ACTIVE GOALS (use these IDs to edit):
+\${context.goals.active.slice(0, 10).map((g: any) => \`[ID:\${g.id}] \${g.description} - Status: \${g.status}\`).join('\\n')}
+
+REMEMBER:
+- To CREATE → respond ONLY: TRIGGER:START_GOAL_FLOW
+- To EDIT → use ACTION: with the correct ID
+- Be brief and natural
+- Respond in English`;
 
       const aiResponse = await generateAIResponse(groqKey || '', systemPrompt, message, context, c.env.AI, chatHistory);
+      assistantMessage = await processAIActions(c.env.DB, user.userId, aiResponse, context);
       assistantMessage = await processAIActions(c.env.DB, user.userId, aiResponse, context);
     } catch (error) {
       console.error('[CHAT] AI error:', error);
@@ -703,17 +960,17 @@ app.post('/determine-category', jwtMiddleware, async (c) => {
         messages: [
           { 
             role: 'system', 
-            content: `Eres un clasificador de goals para startups. Debes clasificar cada goal en una de estas 3 categorías:
+            content: `You are a goal classifier for startups. You must classify each goal into one of these 3 categories:
 
-- ASTAR: Todo lo relacionado con blockchain, web3, Astar Network, smart contracts, DeFi, NFTs, crypto
-- MAGCIENT: Todo lo relacionado con IA, Machine Learning, automation, data science, AI agents, LLMs
-- OTHER: Todo lo demás (marketing, ventas, producto, operaciones, finanzas, etc.)
+- ASTAR: Everything related to blockchain, web3, Astar Network, smart contracts, DeFi, NFTs, crypto
+- MAGCIENT: Everything related to AI, Machine Learning, automation, data science, AI agents, LLMs
+- OTHER: Everything else (marketing, sales, product, operations, finance, etc.)
 
-Responde SOLO con una palabra: ASTAR, MAGCIENT u OTHER.`
+Respond ONLY with one word: ASTAR, MAGCIENT or OTHER.`
           },
           { 
             role: 'user', 
-            content: `Descripción: ${description}\nTarea: ${task}\n\n¿Categoría?` 
+            content: `Description: ${description}\nTask: ${task}\n\nCategory?` 
           }
         ],
         max_tokens: 10,
@@ -744,10 +1001,13 @@ Responde SOLO con una palabra: ASTAR, MAGCIENT u OTHER.`
 // Process AI actions (create goals, add metrics, etc.)
 async function processAIActions(db: any, userId: number, aiResponse: string, context: any): Promise<string> {
   console.log('[PROCESS-ACTIONS] AI Response:', aiResponse);
+  console.log('[PROCESS-ACTIONS] User ID:', userId);
   
   const actions = aiResponse.match(/ACTION:([A-Z_]+)\|([^\n]+)/g);
+  console.log('[PROCESS-ACTIONS] Found actions:', actions);
   
   if (!actions || actions.length === 0) {
+    console.log('[PROCESS-ACTIONS] No actions found in response');
     return aiResponse;
   }
   
@@ -757,18 +1017,123 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
   for (const action of actions) {
     const parts = action.replace('ACTION:', '').split('|');
     const actionType = parts[0];
+    console.log('[PROCESS-ACTIONS] Processing action:', actionType, 'with parts:', parts);
     
     try {
-      if (actionType === 'CREATE_GOAL') {
-        const [, description, targetValue, category] = parts;
-        await db.prepare(`
-          INSERT INTO goals (user_id, description, target_value, current_value, category, status)
-          VALUES (?, ?, ?, 0, ?, 'active')
-        `).bind(userId, description, parseInt(targetValue) || 100, category || 'general').run();
+      // ============ METRICS COMMANDS ============
+      if (actionType === 'SET_USERS') {
+        const [, value] = parts;
+        const today = new Date().toISOString().split('T')[0];
+        const numValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
         
-        executionResults.push(`✅ Objetivo creado: "${description}"`);
-        console.log('[ACTION] Goal created:', description);
+        if (isNaN(numValue)) {
+          executionResults.push(`❌ Valor inválido para usuarios: ${value}`);
+        } else {
+          // Delete today's entry if exists, then insert new one
+          await db.prepare(`
+            DELETE FROM user_metrics 
+            WHERE user_id = ? AND metric_name = 'users' AND recorded_date = ?
+          `).bind(userId, today).run();
+          
+          await db.prepare(`
+            INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+            VALUES (?, 'users', ?, ?)
+          `).bind(userId, numValue, today).run();
+          
+          executionResults.push(`👥 Updated! You now have ${numValue.toLocaleString()} users.`);
+          console.log('[ACTION] Users set to:', numValue);
+        }
       }
+      else if (actionType === 'SET_REVENUE') {
+        const [, value] = parts;
+        const today = new Date().toISOString().split('T')[0];
+        const numValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
+        
+        if (isNaN(numValue)) {
+          executionResults.push(`❌ Valor inválido para revenue: ${value}`);
+        } else {
+          // Delete today's entry if exists, then insert new one
+          await db.prepare(`
+            DELETE FROM user_metrics 
+            WHERE user_id = ? AND metric_name = 'revenue' AND recorded_date = ?
+          `).bind(userId, today).run();
+          
+          await db.prepare(`
+            INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+            VALUES (?, 'revenue', ?, ?)
+          `).bind(userId, numValue, today).run();
+          
+          executionResults.push(`💰 Revenue updated to $${numValue.toLocaleString()}!`);
+          console.log('[ACTION] Revenue set to:', numValue);
+        }
+      }
+      else if (actionType === 'ADD_USERS') {
+        const [, value] = parts;
+        const today = new Date().toISOString().split('T')[0];
+        const addValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
+        
+        if (isNaN(addValue)) {
+          executionResults.push(`❌ Valor inválido para usuarios: ${value}`);
+        } else {
+          // Get current value
+          const currentMetric = await db.prepare(`
+            SELECT metric_value FROM user_metrics 
+            WHERE user_id = ? AND metric_name = 'users'
+            ORDER BY recorded_date DESC LIMIT 1
+          `).bind(userId).first();
+          
+          const currentValue = currentMetric?.metric_value || 0;
+          const newValue = currentValue + addValue;
+          
+          // Delete today's entry if exists, then insert new one
+          await db.prepare(`
+            DELETE FROM user_metrics 
+            WHERE user_id = ? AND metric_name = 'users' AND recorded_date = ?
+          `).bind(userId, today).run();
+          
+          await db.prepare(`
+            INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+            VALUES (?, 'users', ?, ?)
+          `).bind(userId, newValue, today).run();
+          
+          executionResults.push(`🎉 ¡+${addValue.toLocaleString()} usuarios! Total: ${newValue.toLocaleString()}`);
+          console.log('[ACTION] Users added:', addValue, 'Total:', newValue);
+        }
+      }
+      else if (actionType === 'ADD_REVENUE') {
+        const [, value] = parts;
+        const today = new Date().toISOString().split('T')[0];
+        const addValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
+        
+        if (isNaN(addValue)) {
+          executionResults.push(`❌ Valor inválido para revenue: ${value}`);
+        } else {
+          // Get current value
+          const currentMetric = await db.prepare(`
+            SELECT metric_value FROM user_metrics 
+            WHERE user_id = ? AND metric_name = 'revenue'
+            ORDER BY recorded_date DESC LIMIT 1
+          `).bind(userId).first();
+          
+          const currentValue = currentMetric?.metric_value || 0;
+          const newValue = currentValue + addValue;
+          
+          // Delete today's entry if exists, then insert new one
+          await db.prepare(`
+            DELETE FROM user_metrics 
+            WHERE user_id = ? AND metric_name = 'revenue' AND recorded_date = ?
+          `).bind(userId, today).run();
+          
+          await db.prepare(`
+            INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+            VALUES (?, 'revenue', ?, ?)
+          `).bind(userId, newValue, today).run();
+          
+          executionResults.push(`💵 ¡+$${addValue.toLocaleString()}! Revenue total: $${newValue.toLocaleString()}`);
+          console.log('[ACTION] Revenue added:', addValue, 'Total:', newValue);
+        }
+      }
+      // ============ END METRICS COMMANDS ============
       else if (actionType === 'ADD_METRIC') {
         const [, metricName, value] = parts;
         const today = new Date().toISOString().split('T')[0];
@@ -782,35 +1147,59 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
         console.log('[ACTION] Metric added:', metricName, value);
       }
       else if (actionType === 'UPDATE_GOAL') {
-        const [, goalId, currentValue] = parts;
-        await db.prepare(`
+        const [, goalId, newDescription] = parts;
+        console.log('[ACTION] ========== UPDATE_GOAL START ==========');
+        console.log('[ACTION] UPDATE_GOAL - goalId:', goalId);
+        console.log('[ACTION] UPDATE_GOAL - newDescription:', newDescription);
+        console.log('[ACTION] UPDATE_GOAL - userId:', userId);
+        
+        const result = await db.prepare(`
           UPDATE goals 
-          SET current_value = ?,
-              status = CASE WHEN current_value >= target_value THEN 'completed' ELSE status END,
+          SET description = ?,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ? AND user_id = ?
-        `).bind(parseInt(currentValue), parseInt(goalId), userId).run();
+        `).bind(newDescription, parseInt(goalId), userId).run();
         
-        executionResults.push(`✅ Objetivo actualizado`);
-        console.log('[ACTION] Goal updated:', goalId);
+        console.log('[ACTION] UPDATE_GOAL - Rows affected:', result.meta?.changes);
+        console.log('[ACTION] ========== UPDATE_GOAL END ==========');
+        
+        if (result.meta?.changes === 0) {
+          executionResults.push(`❌ Goal ${goalId} not found`);
+        } else {
+          executionResults.push(`✅ Goal ${goalId} updated`);
+        }
       }
       else if (actionType === 'UPDATE_GOAL_STATUS') {
-        const [, goalId, status] = parts;
-        const validStatuses = ['active', 'completed', 'in_progress'];
+        const [, goalId, newGoalStatus] = parts;
+        const validStatuses = ['WIP', 'To start', 'On Hold', 'Delayed', 'Blocked', 'Done'];
+        console.log('[ACTION] ========== UPDATE_GOAL_STATUS START ==========');
+        console.log('[ACTION] UPDATE_GOAL_STATUS - goalId:', goalId);
+        console.log('[ACTION] UPDATE_GOAL_STATUS - newGoalStatus:', newGoalStatus);
+        console.log('[ACTION] UPDATE_GOAL_STATUS - userId:', userId);
+        console.log('[ACTION] UPDATE_GOAL_STATUS - Valid statuses:', validStatuses);
         
-        if (!validStatuses.includes(status)) {
-          executionResults.push(`❌ Estado inválido. Usa: active, completed, in_progress`);
+        if (!validStatuses.includes(newGoalStatus)) {
+          console.log('[ACTION] UPDATE_GOAL_STATUS - Invalid status provided');
+          executionResults.push(`❌ Invalid status. Use: WIP, To start, On Hold, Delayed, Blocked, Done`);
         } else {
-          await db.prepare(`
+          const result = await db.prepare(`
             UPDATE goals 
-            SET status = ?,
+            SET goal_status = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
-          `).bind(status, parseInt(goalId), userId).run();
+          `).bind(newGoalStatus, parseInt(goalId), userId).run();
           
-          const statusEmoji = status === 'completed' ? '✅' : status === 'in_progress' ? '🔄' : '⏳';
-          executionResults.push(`${statusEmoji}`);
-          console.log('[ACTION] Goal status updated:', goalId, status);
+          console.log('[ACTION] UPDATE_GOAL_STATUS result:', JSON.stringify(result));
+          console.log('[ACTION] UPDATE_GOAL_STATUS - Rows affected:', result.meta?.changes);
+          console.log('[ACTION] ========== UPDATE_GOAL_STATUS END ==========');
+          
+          if (result.meta?.changes === 0) {
+            executionResults.push(`❌ Goal ${goalId} not found`);
+          } else {
+            const statusEmoji = newGoalStatus === 'Done' ? '✅' : newGoalStatus === 'WIP' ? '🔄' : '⏳';
+            executionResults.push(`${statusEmoji} Status updated to ${newGoalStatus}`);
+          }
+          console.log('[ACTION] Goal status updated:', goalId, newGoalStatus);
         }
       }
       else if (actionType === 'UPDATE_GOAL_DESCRIPTION') {
@@ -856,8 +1245,9 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
       }
       else if (actionType === 'COMPLETE_GOAL') {
         const [, goalId] = parts;
+        console.log('[ACTION] COMPLETE_GOAL - goalId:', goalId, 'userId:', userId);
         
-        await db.prepare(`
+        const result = await db.prepare(`
           UPDATE goals 
           SET status = 'completed',
               current_value = target_value,
@@ -865,18 +1255,33 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           WHERE id = ? AND user_id = ?
         `).bind(parseInt(goalId), userId).run();
         
-        executionResults.push(`🎉`);
+        console.log('[ACTION] COMPLETE_GOAL result:', JSON.stringify(result));
+        console.log('[ACTION] Rows affected:', result.meta?.changes);
+        
+        if (result.meta?.changes === 0) {
+          executionResults.push(`❌ No se encontró el objetivo ${goalId}`);
+        } else {
+          executionResults.push(`🎉`);
+        }
         console.log('[ACTION] Goal completed:', goalId);
       }
       else if (actionType === 'DELETE_GOAL') {
         const [, goalId] = parts;
+        console.log('[ACTION] DELETE_GOAL - goalId:', goalId, 'userId:', userId);
         
-        await db.prepare(`
+        const result = await db.prepare(`
           DELETE FROM goals 
           WHERE id = ? AND user_id = ?
         `).bind(parseInt(goalId), userId).run();
         
-        executionResults.push(`🗑️`);
+        console.log('[ACTION] DELETE_GOAL result:', JSON.stringify(result));
+        console.log('[ACTION] Rows affected:', result.meta?.changes);
+        
+        if (result.meta?.changes === 0) {
+          executionResults.push(`❌ No se encontró el objetivo ${goalId}`);
+        } else {
+          executionResults.push(`🗑️`);
+        }
         console.log('[ACTION] Goal deleted:', goalId);
       }
       else if (actionType === 'FETCH_LEADERBOARD') {
@@ -931,15 +1336,15 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           }).slice(0, 10);
           
           if (allItems.length > 0) {
-            let result = '🏆 **LEADERBOARD GLOBAL** (Top startups):\n\n';
+            let result = '🏆 **GLOBAL LEADERBOARD** (Top startups):\n\n';
             allItems.forEach((item: any, idx: number) => {
               result += `${idx + 1}. **${item.title}** - ${item.founder_name}\n`;
-              result += `   ⭐ Rating: ${item.rating_average || 0} | 👥 Votos: ${item.votes_count || 0}\n`;
-              result += `   Tipo: ${item.type === 'project' ? '📊 Startup' : '🚀 Producto'}\n\n`;
+              result += `   ⭐ Rating: ${item.rating_average || 0} | 👥 Votes: ${item.votes_count || 0}\n`;
+              result += `   Type: ${item.type === 'project' ? '📊 Startup' : '🚀 Product'}\n\n`;
             });
             executionResults.push(result);
           } else {
-            executionResults.push('📊 No hay startups en el leaderboard todavía.');
+            executionResults.push('📊 No startups in the leaderboard yet.');
           }
         }
         else if (leaderboardType === 'goals') {
@@ -962,15 +1367,15 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           
           const founders = leaderboard.results || [];
           if (founders.length > 0) {
-            let result = '🎯 **LEADERBOARD DE OBJETIVOS** (Top founders):\n\n';
+            let result = '🎯 **GOALS LEADERBOARD** (Top founders):\n\n';
             founders.forEach((founder: any, idx: number) => {
               result += `${idx + 1}. **${founder.name}**\n`;
-              result += `   ✅ Completados: ${founder.completed_goals} / ${founder.total_goals}\n`;
+              result += `   ✅ Completed: ${founder.completed_goals} / ${founder.total_goals}\n`;
               result += `   🏅 Score: ${founder.score}\n\n`;
             });
             executionResults.push(result);
           } else {
-            executionResults.push('🎯 No hay objetivos completados todavía.');
+            executionResults.push('🎯 No completed goals yet.');
           }
         }
         else if (leaderboardType === 'competitions') {
@@ -994,24 +1399,24 @@ async function processAIActions(db: any, userId: number, aiResponse: string, con
           
           const comps = competitions.results || [];
           if (comps.length > 0) {
-            let result = '🏅 **COMPETICIONES ACTIVAS:**\n\n';
+            let result = '🏅 **ACTIVE COMPETITIONS:**\n\n';
             comps.forEach((comp: any) => {
               result += `**${comp.title}**\n`;
-              result += `💰 Premio: $${comp.prize_amount}\n`;
-              result += `👥 Participantes: ${comp.participants_count}\n`;
-              result += `📅 Fecha: ${comp.event_date}\n\n`;
+              result += `💰 Prize: $${comp.prize_amount}\n`;
+              result += `👥 Participants: ${comp.participants_count}\n`;
+              result += `📅 Date: ${comp.event_date}\n\n`;
             });
-            result += '\n💡 Para ver el ranking de una competición específica, visita /competitions';
+            result += '\n💡 To see the ranking of a specific competition, visit /competitions';
             executionResults.push(result);
           } else {
-            executionResults.push('🏅 No hay competiciones activas en este momento.');
+            executionResults.push('🏅 No active competitions at the moment.');
           }
         }
       }
     } catch (error) {
       console.error('[ACTION-ERROR]', actionType, 'Error details:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      executionResults.push(`❌ Error ejecutando ${actionType}: ${errorMessage}`);
+      executionResults.push(`❌ Error executing ${actionType}: ${errorMessage}`);
     }
     
     // Remove action command from response
@@ -1031,30 +1436,30 @@ function generateFallbackResponse(message: string, context: any): string {
   const lowerMessage = message.toLowerCase();
   
   // Check if user wants to create a goal
-  if (lowerMessage.includes('añadir') || lowerMessage.includes('crear') || lowerMessage.includes('nuevo objetivo') || lowerMessage.includes('new goal') || (lowerMessage.includes('quiero') && !lowerMessage.includes('analiza'))) {
-    return `🎯 **Para activar la IA que crea objetivos automáticamente:**\n\n` +
-      `1. Obtén una API key gratis en https://console.groq.com/\n` +
-      `2. Añádela a tu proyecto en Cloudflare\n\n` +
-      `**Mientras tanto**, puedes:\n` +
-      `• Ir a la vista **Traction** en el dashboard\n` +
-      `• Hacer clic en "Add Goal"\n` +
-      `• Crear tus objetivos manualmente\n\n` +
-      `💡 Con la API key configurada, podré crear objetivos solo diciéndome "Quiero llegar a 1000 usuarios"`;
+  if (lowerMessage.includes('añadir') || lowerMessage.includes('crear') || lowerMessage.includes('nuevo objetivo') || lowerMessage.includes('new goal') || lowerMessage.includes('add') || lowerMessage.includes('create') || (lowerMessage.includes('quiero') && !lowerMessage.includes('analiza'))) {
+    return `🎯 **To enable the AI that creates goals automatically:**\n\n` +
+      `1. Get a free API key at https://console.groq.com/\n` +
+      `2. Add it to your project in Cloudflare\n\n` +
+      `**In the meantime**, you can:\n` +
+      `• Go to the **Traction** view in the dashboard\n` +
+      `• Click on "Add Goal"\n` +
+      `• Create your goals manually\n\n` +
+      `💡 With the API key configured, I can create goals just by telling me "I want to reach 1000 users"`;
   }
   
-  if (lowerMessage.includes('objetivo') || lowerMessage.includes('goal') || lowerMessage.includes('meta') || lowerMessage.includes('analiza')) {
+  if (lowerMessage.includes('objetivo') || lowerMessage.includes('goal') || lowerMessage.includes('meta') || lowerMessage.includes('analiza') || lowerMessage.includes('analyze')) {
     const { goals } = context;
     if (goals.totalCount === 0) {
-      return `📊 No tienes objetivos registrados aún.\n\n💡 Te recomiendo crear tu primer objetivo. Ve a la sección de Traction y añade objetivos como:\n- Conseguir X usuarios\n- Alcanzar $X en revenue\n- Lanzar X feature`;
+      return `📊 You don't have any goals registered yet.\n\n💡 I recommend creating your first goal. Go to the Traction section and add goals like:\n- Get X users\n- Reach $X in revenue\n- Launch X feature`;
     }
     
-    let response = `📊 **Análisis de tus objetivos:**\n\n`;
-    response += `• Total: ${goals.totalCount} objetivos\n`;
-    response += `• Completados: ${goals.completedCount} (${goals.completionRate}%)\n`;
-    response += `• Activos: ${goals.active.length}\n\n`;
+    let response = `📊 **Analysis of your goals:**\n\n`;
+    response += `• Total: ${goals.totalCount} goals\n`;
+    response += `• Completed: ${goals.completedCount} (${goals.completionRate}%)\n`;
+    response += `• Active: ${goals.active.length}\n\n`;
     
     if (goals.active.length > 0) {
-      response += `**Objetivos activos:**\n`;
+      response += `**Active goals:**\n`;
       goals.active.slice(0, 5).forEach((g: any, i: number) => {
         const progress = g.target_value > 0 ? Math.round((g.current_value / g.target_value) * 100) : 0;
         response += `${i + 1}. ${g.description} - ${progress}% (${g.current_value}/${g.target_value})\n`;
@@ -1066,40 +1471,40 @@ function generateFallbackResponse(message: string, context: any): string {
   
   if (lowerMessage.includes('métrica') || lowerMessage.includes('metric') || lowerMessage.includes('crecimiento') || lowerMessage.includes('growth')) {
     const { metrics } = context;
-    let response = `📈 **Resumen de métricas:**\n\n`;
-    response += `• Usuarios actuales: ${metrics.current.users}\n`;
-    response += `• Revenue actual: $${metrics.current.revenue}\n`;
-    response += `• Crecimiento usuarios: ${metrics.growth.users}%\n`;
-    response += `• Crecimiento revenue: ${metrics.growth.revenue}%\n`;
+    let response = `📈 **Metrics summary:**\n\n`;
+    response += `• Current users: ${metrics.current.users}\n`;
+    response += `• Current revenue: $${metrics.current.revenue}\n`;
+    response += `• User growth: ${metrics.growth.users}%\n`;
+    response += `• Revenue growth: ${metrics.growth.revenue}%\n`;
     
     if (metrics.history.length < 2) {
-      response += `\n💡 Tip: Registra métricas regularmente para ver tendencias de crecimiento.`;
+      response += `\n💡 Tip: Record metrics regularly to see growth trends.`;
     }
     
     return response;
   }
   
   if (lowerMessage.includes('marketing') || lowerMessage.includes('plan')) {
-    return `🚀 **Recomendaciones de Marketing:**\n\n` +
-      `Basado en tus ${context.goals.totalCount} objetivos y ${context.metrics.current.users} usuarios:\n\n` +
-      `1. **Content Marketing**: Crea contenido que resuelva problemas de tus usuarios\n` +
-      `2. **Social Proof**: Comparte testimonios y casos de éxito\n` +
-      `3. **Referidos**: Implementa un programa de referidos\n` +
-      `4. **SEO**: Optimiza tu presencia en buscadores\n\n` +
-      `💡 ¿Quieres que profundice en alguna estrategia específica?`;
+    return `🚀 **Marketing Recommendations:**\n\n` +
+      `Based on your ${context.goals.totalCount} goals and ${context.metrics.current.users} users:\n\n` +
+      `1. **Content Marketing**: Create content that solves your users' problems\n` +
+      `2. **Social Proof**: Share testimonials and success stories\n` +
+      `3. **Referrals**: Implement a referral program\n` +
+      `4. **SEO**: Optimize your search engine presence\n\n` +
+      `💡 Would you like me to go deeper into any specific strategy?`;
   }
   
   // Default response
-  return `👋 ¡Hola! Soy tu ASTAR Agent.\n\n` +
-    `Puedo ayudarte con:\n` +
-    `• 📊 Analizar tus objetivos\n` +
-    `• 📈 Revisar tus métricas de crecimiento\n` +
-    `• 🎯 Crear planes de marketing\n` +
-    `• 💡 Generar ideas de contenido\n\n` +
-    `**Tu resumen actual:**\n` +
-    `• ${context.goals.totalCount} objetivos (${context.goals.completionRate}% completados)\n` +
-    `• ${context.metrics.current.users} usuarios, $${context.metrics.current.revenue} revenue\n\n` +
-    `¿En qué te puedo ayudar?`;
+  return `👋 Hi! I'm your ASTAR Agent.\n\n` +
+    `I can help you with:\n` +
+    `• 📊 Analyze your goals\n` +
+    `• 📈 Review your growth metrics\n` +
+    `• 🎯 Create marketing plans\n` +
+    `• 💡 Generate content ideas\n\n` +
+    `**Your current summary:**\n` +
+    `• ${context.goals.totalCount} goals (${context.goals.completionRate}% completed)\n` +
+    `• ${context.metrics.current.users} users, $${context.metrics.current.revenue} revenue\n\n` +
+    `How can I help you?`;
 }
 
 // Analyze goals endpoint
@@ -1119,19 +1524,19 @@ app.post('/analyze-goals', jwtMiddleware, async (c) => {
 
     if (!apiKey) {
       console.log('[ANALYZE-GOALS] Using fallback response (no API key)');
-      analysis = generateFallbackResponse('analiza mis objetivos', context);
+      analysis = generateFallbackResponse('analyze my goals', context);
     } else {
       console.log('[ANALYZE-GOALS] Generating AI response...');
-      const systemPrompt = `Eres un analista de startups experto. Analiza los objetivos del usuario y proporciona:
-1. Estado actual de cada objetivo con porcentaje de progreso
-2. Qué objetivos están en riesgo de no completarse
-3. Recomendaciones específicas para mejorar
-4. Priorización sugerida
+      const systemPrompt = `You are an expert startup analyst. Analyze the user's goals and provide:
+1. Current status of each goal with progress percentage
+2. Which goals are at risk of not being completed
+3. Specific recommendations for improvement
+4. Suggested prioritization
 
-Responde en español, sé específico y usa los datos proporcionados.`;
+Respond in English, be specific and use the provided data.`;
 
       try {
-        analysis = await generateAIResponse(apiKey, systemPrompt, 'Analiza mis objetivos y dame recomendaciones', context);
+        analysis = await generateAIResponse(apiKey, systemPrompt, 'Analyze my goals and give me recommendations', context);
         console.log('[ANALYZE-GOALS] AI response generated successfully');
       } catch (aiError) {
         console.error('[ANALYZE-GOALS] AI generation failed:', aiError);
@@ -1354,6 +1759,71 @@ app.get('/leaderboard/competitions/:id', jwtMiddleware, async (c) => {
   } catch (error) {
     console.error('Error getting competition leaderboard:', error);
     return c.json({ error: 'Failed to get competition leaderboard' }, 500);
+  }
+});
+
+// Proxy endpoint for brand marketing agent - generate images
+app.post('/brand/generate-images', jwtMiddleware, async (c) => {
+  try {
+    const user = c.get('user');
+    const body = await c.req.json();
+    const { website_url, custom_prompt } = body;
+
+    console.log('[BRAND] User object:', JSON.stringify(user));
+
+    if (!website_url && !custom_prompt) {
+      return c.json({ error: 'website_url or custom_prompt is required' }, 400);
+    }
+
+    // Get user ID from various possible fields
+    const userId = user?.id || user?.userId || user?.sub || '1';
+
+    let railwayUrl = c.env.RAILWAY_API_URL || '';
+    if (!railwayUrl) {
+      return c.json({ 
+        error: 'Railway API not configured',
+        message: 'Configure RAILWAY_API_URL in Cloudflare environment variables'
+      }, 500);
+    }
+
+    if (!railwayUrl.startsWith('http://') && !railwayUrl.startsWith('https://')) {
+      railwayUrl = 'https://' + railwayUrl;
+    }
+
+    console.log('[BRAND] Calling Railway generate-images:', `${railwayUrl}/api/agents/brand/generate-images`);
+    console.log('[BRAND] User ID:', userId);
+    console.log('[BRAND] Custom prompt:', custom_prompt);
+
+    const response = await fetch(`${railwayUrl}/api/agents/brand/generate-images`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        website_url: website_url || 'general',
+        user_id: String(userId),
+        cloudflare_api_url: new URL(c.req.url).origin,
+        custom_prompt: custom_prompt || null
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[BRAND] Railway error:', response.status, errorText);
+      return c.json({ 
+        error: 'Railway API error',
+        detail: errorText
+      }, response.status);
+    }
+
+    const data = await response.json();
+    return c.json(data);
+  } catch (error) {
+    console.error('[BRAND] Error calling Railway:', error);
+    return c.json({ 
+      error: 'Failed to generate images',
+      detail: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
   }
 });
 

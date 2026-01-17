@@ -4,6 +4,7 @@
  */
 
 import { createLayoutWithSidebars } from './layout-with-sidebars';
+import { renderAICMOPage } from './ai-cmo-page';
 
 export interface DirectoryPageProps {
   userName: string;
@@ -11,38 +12,57 @@ export interface DirectoryPageProps {
   userRole?: string;
 }
 
+function renderAICMOPageString() {
+  // Return the AI CMO page function as a string to inject into the page
+  return renderAICMOPage.toString();
+}
+
 export function getDirectoryPage(props: DirectoryPageProps): string {
   const { userName, userAvatar, userRole } = props;
 
   const content = `
-    <div class="p-6 max-w-7xl mx-auto">
+    <style>
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+    <div class="p-4 md:p-6 max-w-7xl mx-auto">
       <!-- Header -->
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Welcome back, ${userName}! 👋</h1>
-        <p class="text-gray-500">Manage your startup growth and connect with validators</p>
+      <div class="mb-4 md:mb-6">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-900">Welcome back, ${userName}! 👋</h1>
+        <p class="text-sm md:text-base text-gray-500">Manage your startup growth and connect with validators</p>
       </div>
 
       <!-- Tab Navigation -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-        <div class="flex border-b border-gray-200">
+        <div class="flex overflow-x-auto border-b border-gray-200 scrollbar-hide">
           ${userRole === 'founder' ? `
-          <button onclick="switchTab('home')" id="tab-home" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-primary border-b-2 border-primary">
-            <i class="fas fa-home mr-2"></i>Hub
+          <button onclick="switchTab('home')" id="tab-home" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-primary border-b-2 border-primary">
+            <i class="fas fa-home mr-1 md:mr-2"></i><span class="hidden sm:inline">Hub</span>
           </button>
-          <button onclick="switchTab('traction')" id="tab-traction" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
-            <i class="fas fa-chart-line mr-2"></i>Traction
+          <button onclick="switchTab('traction')" id="tab-traction" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
+            <i class="fas fa-chart-line mr-1 md:mr-2"></i><span class="hidden sm:inline">Traction</span>
           </button>
           ` : ''}
-          <button onclick="switchTab('inbox')" id="tab-inbox" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold ${userRole === 'founder' ? 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent' : 'text-primary border-b-2 border-primary'}">
-            <i class="fas fa-inbox mr-2"></i>Inbox
+          <button onclick="switchTab('inbox')" id="tab-inbox" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold ${userRole === 'founder' ? 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent' : 'text-primary border-b-2 border-primary'}">
+            <i class="fas fa-inbox mr-1 md:mr-2"></i><span class="hidden sm:inline">Inbox</span>
             <span id="unread-badge" class="hidden ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">0</span>
           </button>
-          <button onclick="window.location.href='/competitions'" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
-            <i class="fas fa-trophy mr-2"></i>Competitions
+          <button onclick="switchTab('directory')" id="tab-directory" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
+            <i class="fas fa-store mr-1 md:mr-2"></i><span class="hidden sm:inline">Directory</span>
           </button>
-          <button onclick="switchTab('directory')" id="tab-directory" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
-            <i class="fas fa-store mr-2"></i>Directory
+          <button onclick="switchTab('connector')" id="tab-connector" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-purple-50 to-indigo-50">
+            <i class="fas fa-network-wired mr-1 md:mr-2"></i><span class="hidden sm:inline">AI Connector</span>
           </button>
+          ${userRole === 'admin' ? `
+          <button onclick="window.location.href='/admin'" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-purple-50 to-blue-50">
+            <i class="fas fa-shield-alt mr-1 md:mr-2"></i><span class="hidden sm:inline">Admin</span>
+          </button>
+          ` : ''}
         </div>
       </div>
 
@@ -51,51 +71,51 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
       ${userRole === 'founder' ? `
       <!-- HOME TAB -->
       <div id="content-home" class="tab-content">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+          <div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-gray-200">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-medium text-gray-500 uppercase">Goals</p>
-                <p class="text-2xl font-bold text-gray-900" id="stat-goals">-</p>
+                <p class="text-xl md:text-2xl font-bold text-gray-900" id="stat-goals">-</p>
               </div>
-              <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <i class="fas fa-bullseye text-blue-600 text-xl"></i>
+              <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-bullseye text-blue-600 text-lg md:text-xl"></i>
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-2"><span id="stat-active">-</span> active</p>
           </div>
-          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+          <div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-gray-200">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-medium text-gray-500 uppercase">Completion</p>
-                <p class="text-2xl font-bold text-gray-900" id="stat-completion">-</p>
+                <p class="text-xl md:text-2xl font-bold text-gray-900" id="stat-completion">-</p>
               </div>
-              <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <i class="fas fa-check-circle text-green-600 text-xl"></i>
+              <div class="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-check-circle text-green-600 text-lg md:text-xl"></i>
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-2"><span id="stat-completed">-</span> completed</p>
           </div>
-          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+          <div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-gray-200">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-medium text-gray-500 uppercase">Users</p>
-                <p class="text-2xl font-bold text-gray-900" id="stat-users">-</p>
+                <p class="text-xl md:text-2xl font-bold text-gray-900" id="stat-users">-</p>
               </div>
-              <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <i class="fas fa-users text-purple-600 text-xl"></i>
+              <div class="w-10 h-10 md:w-12 md:h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-users text-purple-600 text-lg md:text-xl"></i>
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-2" id="stat-users-growth">-</p>
           </div>
-          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+          <div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-gray-200">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-medium text-gray-500 uppercase">Revenue</p>
-                <p class="text-2xl font-bold text-gray-900" id="stat-revenue">-</p>
+                <p class="text-xl md:text-2xl font-bold text-gray-900" id="stat-revenue">-</p>
               </div>
-              <div class="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-                <i class="fas fa-dollar-sign text-yellow-600 text-xl"></i>
+              <div class="w-10 h-10 md:w-12 md:h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-dollar-sign text-yellow-600 text-lg md:text-xl"></i>
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-2" id="stat-revenue-growth">-</p>
@@ -104,19 +124,61 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         
         <!-- Goals Table Section -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-          <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+          <div class="p-4 md:p-6 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
             <div>
-              <h3 class="font-bold text-gray-900 text-xl">GOAL OF THE WEEK:</h3>
-              <div class="flex gap-2 mt-2 text-sm">
-                <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full font-medium">P0 - Urgent & important</span>
-                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">P1 - Urgent or important</span>
-                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium">P2 - Urgent but not important</span>
-                <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full font-medium">P3 - Neither but cool</span>
+              <h3 class="font-bold text-gray-900 text-lg md:text-xl">GOAL OF THE WEEK:</h3>
+              <div class="flex flex-wrap gap-2 mt-2 text-xs md:text-sm">
+                <span class="px-2 md:px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full font-medium">P0 - Urgent</span>
+                <span class="px-2 md:px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium hidden md:inline">P1 - Urgent or important</span>
+                <span class="px-2 md:px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium hidden md:inline">P2 - Urgent but not important</span>
+                <span class="px-2 md:px-3 py-1 bg-gray-100 text-gray-800 rounded-full font-medium hidden md:inline">P3 - Neither but cool</span>
               </div>
             </div>
-            <button onclick="openGoalModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+            <button onclick="openGoalModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">
               <i class="fas fa-plus mr-2"></i>New Goal
             </button>
+          </div>
+          
+          <!-- Monthly Timeline Overview (Weeks) -->
+          <!-- Monthly Calendar Overview -->
+          <div id="monthly-calendar-overview" class="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-purple-100">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="font-semibold text-gray-700 flex items-center gap-2">
+                <i class="fas fa-calendar-alt text-purple-600"></i>
+                <span id="calendar-month-title">January 2026</span>
+              </h4>
+              <div class="flex items-center gap-2">
+                <button onclick="changeCalendarMonth(-1)" class="p-1 hover:bg-purple-100 rounded">
+                  <i class="fas fa-chevron-left text-purple-600"></i>
+                </button>
+                <button onclick="changeCalendarMonth(1)" class="p-1 hover:bg-purple-100 rounded">
+                  <i class="fas fa-chevron-right text-purple-600"></i>
+                </button>
+                <span id="timeline-total-tasks" class="text-sm text-gray-500 ml-2">Loading...</span>
+              </div>
+            </div>
+            <!-- Calendar Grid -->
+            <div class="grid grid-cols-7 gap-1 mb-2">
+              <div class="text-center text-xs font-semibold text-gray-500 py-1">Mon</div>
+              <div class="text-center text-xs font-semibold text-gray-500 py-1">Tue</div>
+              <div class="text-center text-xs font-semibold text-gray-500 py-1">Wed</div>
+              <div class="text-center text-xs font-semibold text-gray-500 py-1">Thu</div>
+              <div class="text-center text-xs font-semibold text-gray-500 py-1">Fri</div>
+              <div class="text-center text-xs font-semibold text-gray-400 py-1">Sat</div>
+              <div class="text-center text-xs font-semibold text-gray-400 py-1">Sun</div>
+            </div>
+            <div id="calendar-grid" class="grid grid-cols-7 gap-1">
+              <!-- Calendar days will be generated dynamically -->
+            </div>
+            <!-- Legend -->
+            <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <div class="flex items-center gap-4">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-400 rounded"></span> Light (1-2)</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 rounded"></span> Medium (3-4)</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-400 rounded"></span> Heavy (5+)</span>
+              </div>
+              <span id="busiest-day" class="font-medium"></span>
+            </div>
           </div>
           
           <!-- Goals Table -->
@@ -124,27 +186,22 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <table class="w-full">
               <thead class="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Category</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Description</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Task</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Priority</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Cadence</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">DRI</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
-                  <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" colspan="3">December 30</th>
-                  <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
-                </tr>
-                <tr class="bg-purple-500">
-                  <th colspan="7"></th>
-                  <th class="px-2 py-2 text-center text-xs font-medium">MON</th>
-                  <th class="px-2 py-2 text-center text-xs font-medium">TUE</th>
-                  <th class="px-2 py-2 text-center text-xs font-medium">WED</th>
-                  <th></th>
+                  <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">Category</th>
+                  <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">Description</th>
+                  <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">Task</th>
+                  <th class="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider">Priority</th>
+                  <th class="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider">Cadence</th>
+                  <th class="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider">DRI</th>
+                  <th class="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider">Status</th>
+                  <th class="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                    <i class="fas fa-calendar-day mr-1"></i>Schedule
+                  </th>
+                  <th class="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody id="goals-table-body" class="divide-y divide-gray-200 bg-white">
                 <tr>
-                  <td colspan="11" class="px-4 py-8 text-center text-gray-500">
+                  <td colspan="9" class="px-4 py-8 text-center text-gray-500">
                     <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                     <p>Loading goals...</p>
                   </td>
@@ -177,7 +234,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-bold text-gray-900">Recent Messages</h3>
-              <button onclick="switchTab('inbox')" class="text-purple-600 text-sm font-medium hover:underline">View all →</button>
+              <button onclick="switchTab(\'inbox\')" class="text-purple-600 text-sm font-medium hover:underline">View all →</button>
             </div>
             <div id="home-messages" class="space-y-3">
               <div class="animate-pulse"><div class="h-12 bg-gray-200 rounded"></div></div>
@@ -188,6 +245,49 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
 
       <!-- TRACTION TAB -->
       <div id="content-traction" class="tab-content hidden">
+        <!-- Team To-Do List Overview -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+          <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-bold text-gray-900 flex items-center gap-2">
+                  <i class="fas fa-tasks text-purple-600"></i>
+                  Team To-Do List
+                </h3>
+                <p class="text-sm text-gray-500 mt-1">Based on goals - see who does what</p>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="text-right">
+                  <div class="text-2xl font-bold text-purple-600" id="overall-completion">0%</div>
+                  <div class="text-xs text-gray-500">Overall completion</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Overall Progress Bar -->
+          <div class="px-6 py-4 bg-gray-50 border-b">
+            <div class="flex items-center gap-4">
+              <div class="flex-1">
+                <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div id="overall-progress-bar" class="h-full bg-gradient-to-r from-purple-500 to-indigo-600 transition-all duration-500" style="width: 0%"></div>
+                </div>
+              </div>
+              <div class="text-sm text-gray-600">
+                <span id="completed-count" class="font-semibold text-green-600">0</span> / <span id="total-count">0</span> completed
+              </div>
+            </div>
+          </div>
+          
+          <!-- Team Members Progress -->
+          <div id="team-todo-list" class="divide-y divide-gray-100">
+            <div class="p-8 text-center text-gray-500">
+              <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+              <p>Loading team to-do list...</p>
+            </div>
+          </div>
+        </div>
+        
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 class="font-bold text-gray-900 mb-4">User Growth</h3>
@@ -284,21 +384,21 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
 
       <!-- DIRECTORY TAB -->
       <div id="content-directory" class="tab-content hidden">
-        <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
-          <button onclick="showDirectorySection('products')" id="mp-products-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-primary border-b-2 border-primary whitespace-nowrap">Products</button>
-          <button onclick="showDirectorySection('founders')" id="mp-founders-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Founders</button>
-          <button onclick="showDirectorySection('investors')" id="mp-investors-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Investors</button>
-          <button onclick="showDirectorySection('validators')" id="mp-validators-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Validators</button>
-          <button onclick="showDirectorySection('scouts')" id="mp-scouts-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Scouts</button>
-          <button onclick="showDirectorySection('partners')" id="mp-partners-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Partners</button>
-          <button onclick="showDirectorySection('talent')" id="mp-talent-btn" class="mp-btn px-6 py-3 text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Talent</button>
+        <div class="flex border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
+          <button onclick="showDirectorySection('products')" id="mp-products-btn" class="mp-btn px-4 md:px-6 py-3 text-xs md:text-sm font-semibold text-primary border-b-2 border-primary whitespace-nowrap">Products</button>
+          <button onclick="showDirectorySection('founders')" id="mp-founders-btn" class="mp-btn px-4 md:px-6 py-3 text-xs md:text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Founders</button>
+          <button onclick="showDirectorySection('investors')" id="mp-investors-btn" class="mp-btn px-4 md:px-6 py-3 text-xs md:text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Investors</button>
+          <button onclick="showDirectorySection('validators')" id="mp-validators-btn" class="mp-btn px-4 md:px-6 py-3 text-xs md:text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Validators</button>
+          <button onclick="showDirectorySection('scouts')" id="mp-scouts-btn" class="mp-btn px-4 md:px-6 py-3 text-xs md:text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Scouts</button>
+          <button onclick="showDirectorySection('partners')" id="mp-partners-btn" class="mp-btn px-4 md:px-6 py-3 text-xs md:text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Partners</button>
+          <button onclick="showDirectorySection('talent')" id="mp-talent-btn" class="mp-btn px-4 md:px-6 py-3 text-xs md:text-sm font-semibold text-gray-500 border-b-2 border-transparent whitespace-nowrap">Talent</button>
         </div>
 
         <!-- Products Section -->
         <div id="mp-products" class="mp-section">
-          <div class="flex justify-between items-center mb-6">
-            <div class="flex space-x-4">
-              <select id="product-category" onchange="loadProducts()" class="border border-gray-300 rounded-lg px-4 py-2">
+          <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+            <div class="flex flex-col sm:flex-row gap-3 flex-1">
+              <select id="product-category" onchange="loadProducts()" class="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1">
                 <option value="">All Categories</option>
                 <option value="SaaS">SaaS</option>
                 <option value="Mobile">Mobile</option>
@@ -306,7 +406,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
                 <option value="Fintech">Fintech</option>
                 <option value="Healthcare">Healthcare</option>
               </select>
-              <select id="product-stage" onchange="loadProducts()" class="border border-gray-300 rounded-lg px-4 py-2">
+              <select id="product-stage" onchange="loadProducts()" class="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1">
                 <option value="">All Stages</option>
                 <option value="idea">Idea</option>
                 <option value="mvp">MVP</option>
@@ -314,9 +414,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
                 <option value="launched">Launched</option>
               </select>
             </div>
-            <button onclick="openProductModal()" class="bg-primary text-white px-4 py-2 rounded-lg font-semibold"><i class="fas fa-plus mr-2"></i>Add Product</button>
+            <button onclick="openProductModal()" class="bg-primary text-white px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap w-full md:w-auto"><i class="fas fa-plus mr-2"></i>Add Product</button>
           </div>
-          <div id="products-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
           </div>
         </div>
@@ -324,9 +424,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         <!-- Validators Section -->
         <div id="mp-validators" class="mp-section hidden">
           <div class="mb-6">
-            <input type="text" id="validator-search" placeholder="Search validators..." onkeyup="searchUsers('validators')" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+            <input type="text" id="validator-search" placeholder="Search validators..." onkeyup="searchUsers('validators')" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm">
           </div>
-          <div id="validators-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div id="validators-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
           </div>
         </div>
@@ -334,9 +434,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         <!-- Founders Section -->
         <div id="mp-founders" class="mp-section hidden">
           <div class="mb-6">
-            <input type="text" placeholder="Search founders..." onkeyup="searchUsers('founders')" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+            <input type="text" placeholder="Search founders..." onkeyup="searchUsers('founders')" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm">
           </div>
-          <div id="founders-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div id="founders-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
           </div>
         </div>
@@ -378,6 +478,91 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           </div>
           <div id="talent-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div class="animate-pulse"><div class="h-48 bg-gray-200 rounded-xl"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI CMO TAB -->
+      <div id="content-aicmo" class="tab-content hidden">
+        <!-- Content will be loaded dynamically -->
+      </div>
+
+      <!-- AI CONNECTOR TAB -->
+      <div id="content-connector" class="tab-content hidden">
+        <div class="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 rounded-2xl p-6 mb-6 border border-indigo-100">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <i class="fas fa-network-wired text-white text-xl"></i>
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-gray-900">AI SuperConnector</h2>
+              <p class="text-sm text-gray-600">Tell me what connections you're looking for and I'll find the best matches</p>
+            </div>
+          </div>
+          
+          <!-- Chat Interface -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <!-- Chat Messages -->
+            <div id="connector-chat-messages" class="h-80 overflow-y-auto p-4 space-y-4">
+              <div class="flex gap-3">
+                <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <i class="fas fa-robot text-white text-sm"></i>
+                </div>
+                <div class="bg-gray-100 rounded-2xl rounded-tl-none px-4 py-3 max-w-[80%]">
+                  <p class="text-sm text-gray-800">👋 Hi! I'm your AI SuperConnector. I can help you find:</p>
+                  <ul class="text-sm text-gray-700 mt-2 space-y-1">
+                    <li>🚀 <strong>Founders</strong> with similar challenges or complementary skills</li>
+                    <li>💰 <strong>Investors</strong> interested in your industry</li>
+                    <li>✅ <strong>Validators</strong> expert in your field</li>
+                    <li>🤝 <strong>Partners</strong> for collaboration opportunities</li>
+                    <li>👥 <strong>Talent</strong> to join your team</li>
+                  </ul>
+                  <p class="text-sm text-gray-700 mt-2">Just tell me what you need! For example: <em>"Find me investors interested in SaaS"</em> or <em>"Connect me with founders in fintech"</em></p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Chat Input -->
+            <div class="border-t border-gray-200 p-4 bg-gray-50">
+              <form id="connector-chat-form" onsubmit="sendConnectorMessage(event)" class="flex gap-3">
+                <input 
+                  type="text" 
+                  id="connector-chat-input" 
+                  placeholder="Tell me what connections you're looking for..." 
+                  class="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  autocomplete="off"
+                >
+                <button type="submit" class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold text-sm hover:from-purple-600 hover:to-indigo-700 transition-all shadow-md">
+                  <i class="fas fa-paper-plane mr-2"></i>Send
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Suggested Connections -->
+        <div id="connector-results" class="hidden">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-gray-900">
+              <i class="fas fa-users text-purple-500 mr-2"></i>Suggested Connections
+            </h3>
+            <span id="connector-results-count" class="text-sm text-gray-500"></span>
+          </div>
+          <div id="connector-results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Results will be loaded here -->
+          </div>
+        </div>
+        
+        <!-- Recent Connection Requests -->
+        <div class="mt-6">
+          <h3 class="text-lg font-bold text-gray-900 mb-4">
+            <i class="fas fa-history text-indigo-500 mr-2"></i>Recent Suggestions
+          </h3>
+          <div id="recent-connections" class="space-y-3">
+            <div class="bg-white rounded-xl p-4 border border-gray-200 text-center text-gray-500">
+              <i class="fas fa-search text-3xl text-gray-300 mb-2"></i>
+              <p class="text-sm">Your suggested connections will appear here</p>
+            </div>
           </div>
         </div>
       </div>
@@ -453,6 +638,95 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <button type="submit" class="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold">Create Goal</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Goal Calendar Modal -->
+    <div id="goal-calendar-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center">
+      <div class="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-xl">
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 id="goal-calendar-title" class="text-lg font-bold text-white truncate pr-4">Schedule Goal</h3>
+            <button onclick="closeGoalCalendarModal()" class="text-white/70 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+          </div>
+        </div>
+        <div class="p-4">
+          <!-- Month Navigation -->
+          <div class="flex items-center justify-between mb-4">
+            <button onclick="changeGoalCalendarMonth(-1)" class="p-2 hover:bg-gray-100 rounded-lg">
+              <i class="fas fa-chevron-left text-gray-600"></i>
+            </button>
+            <span id="goal-calendar-month" class="font-semibold text-gray-700">January 2026</span>
+            <button onclick="changeGoalCalendarMonth(1)" class="p-2 hover:bg-gray-100 rounded-lg">
+              <i class="fas fa-chevron-right text-gray-600"></i>
+            </button>
+          </div>
+          <!-- Day Headers -->
+          <div class="grid grid-cols-7 gap-1 mb-2">
+            <div class="text-center text-xs font-semibold text-gray-500 py-1">Mon</div>
+            <div class="text-center text-xs font-semibold text-gray-500 py-1">Tue</div>
+            <div class="text-center text-xs font-semibold text-gray-500 py-1">Wed</div>
+            <div class="text-center text-xs font-semibold text-gray-500 py-1">Thu</div>
+            <div class="text-center text-xs font-semibold text-gray-500 py-1">Fri</div>
+            <div class="text-center text-xs font-semibold text-gray-400 py-1">Sat</div>
+            <div class="text-center text-xs font-semibold text-gray-400 py-1">Sun</div>
+          </div>
+          <!-- Calendar Grid -->
+          <div id="goal-calendar-grid" class="grid grid-cols-7 gap-1">
+            <!-- Days will be generated dynamically -->
+          </div>
+          <p class="text-xs text-gray-500 mt-4 text-center">Click on days to schedule/unschedule this task</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goal Detail Modal -->
+    <div id="goal-detail-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center">
+      <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 rounded-t-2xl">
+          <div class="flex justify-between items-start">
+            <div>
+              <span id="detail-category" class="px-2 py-1 bg-white/20 text-white text-xs rounded-full font-medium"></span>
+              <h3 id="detail-task" class="text-xl font-bold text-white mt-2"></h3>
+            </div>
+            <button onclick="closeGoalDetailModal()" class="text-white/70 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+          </div>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="text-xs font-medium text-gray-500 uppercase">Description</label>
+            <p id="detail-description" class="text-gray-800 mt-1"></p>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-gray-50 p-3 rounded-lg">
+              <label class="text-xs font-medium text-gray-500 uppercase">Priority</label>
+              <p id="detail-priority" class="font-semibold mt-1"></p>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg">
+              <label class="text-xs font-medium text-gray-500 uppercase">Status</label>
+              <p id="detail-status" class="font-semibold mt-1"></p>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg">
+              <label class="text-xs font-medium text-gray-500 uppercase">Cadence</label>
+              <p id="detail-cadence" class="font-semibold mt-1"></p>
+            </div>
+            <div class="bg-gray-50 p-3 rounded-lg">
+              <label class="text-xs font-medium text-gray-500 uppercase">DRI</label>
+              <p id="detail-dri" class="font-semibold mt-1"></p>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-500 uppercase mb-2 block">Scheduled Dates</label>
+            <div id="detail-schedule" class="flex flex-wrap gap-2">
+            </div>
+          </div>
+          <div class="flex gap-3 pt-4 border-t">
+            <button onclick="editGoalFromDetail()" class="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold">
+              <i class="fas fa-edit mr-2"></i>Edit Goal
+            </button>
+            <button onclick="closeGoalDetailModal()" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg">Close</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -556,15 +830,609 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           b.classList.remove('text-primary', 'border-primary');
           b.classList.add('text-gray-500', 'border-transparent');
         });
-        document.getElementById('tab-' + tab).classList.remove('text-gray-500', 'border-transparent');
-        document.getElementById('tab-' + tab).classList.add('text-primary', 'border-primary');
+        document.getElementById('tab-' + tab)?.classList.remove('text-gray-500', 'border-transparent');
+        document.getElementById('tab-' + tab)?.classList.add('text-primary', 'border-primary');
         
         document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-        document.getElementById('content-' + tab).classList.remove('hidden');
+        const contentEl = document.getElementById('content-' + tab);
+        if (contentEl) contentEl.classList.remove('hidden');
         
-        if (tab === 'traction') setTimeout(initCharts, 100);
+        if (tab === 'traction') {
+          setTimeout(initCharts, 100);
+          renderTeamTodoList();
+        }
         if (tab === 'inbox') loadConversations();
         if (tab === 'directory') { loadProducts(); loadValidators(); }
+        if (tab === 'connector') initConnector();
+      }
+      
+      // ============== AI CONNECTOR FUNCTIONS ==============
+      let connectorSessionId = null;
+      let connectorMessages = [];
+      
+      function initConnector() {
+        // Generate session ID if not exists
+        if (!connectorSessionId) {
+          connectorSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+      }
+      
+      async function sendConnectorMessage(event) {
+        event.preventDefault();
+        const input = document.getElementById('connector-chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+        
+        // Clear input
+        input.value = '';
+        
+        // Add user message to chat
+        addConnectorMessage(message, 'user');
+        
+        // Show loading indicator
+        const loadingId = 'loading_' + Date.now();
+        addConnectorLoadingMessage(loadingId);
+        
+        try {
+          // Call the connector API
+          const response = await axios.post('/api/connector/chat', {
+            message: message,
+            session_id: connectorSessionId
+          });
+          
+          // Remove loading indicator
+          removeConnectorLoadingMessage(loadingId);
+          
+          const data = response.data;
+          
+          // Add AI response
+          addConnectorMessage(data.response || data.message, 'ai');
+          
+          // Show matches if any
+          if (data.matches && data.matches.length > 0) {
+            showConnectorMatches(data.matches);
+          }
+        } catch (error) {
+          removeConnectorLoadingMessage(loadingId);
+          console.error('Connector error:', error);
+          addConnectorMessage('Sorry, there was an error processing your request. Please try again.', 'ai');
+        }
+      }
+      
+      function addConnectorMessage(text, sender) {
+        const container = document.getElementById('connector-chat-messages');
+        const isUser = sender === 'user';
+        
+        const messageHtml = \`
+          <div class="flex gap-3 \${isUser ? 'justify-end' : ''}">
+            \${!isUser ? \`
+              <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-robot text-white text-sm"></i>
+              </div>
+            \` : ''}
+            <div class="\${isUser ? 'bg-purple-500 text-white rounded-2xl rounded-tr-none' : 'bg-gray-100 rounded-2xl rounded-tl-none'} px-4 py-3 max-w-[80%]">
+              <p class="text-sm \${isUser ? 'text-white' : 'text-gray-800'}">\${text}</p>
+            </div>
+            \${isUser ? \`
+              <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-user text-gray-500 text-sm"></i>
+              </div>
+            \` : ''}
+          </div>
+        \`;
+        
+        container.insertAdjacentHTML('beforeend', messageHtml);
+        container.scrollTop = container.scrollHeight;
+      }
+      
+      function addConnectorLoadingMessage(id) {
+        const container = document.getElementById('connector-chat-messages');
+        const loadingHtml = \`
+          <div id="\${id}" class="flex gap-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-robot text-white text-sm"></i>
+            </div>
+            <div class="bg-gray-100 rounded-2xl rounded-tl-none px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+              </div>
+            </div>
+          </div>
+        \`;
+        container.insertAdjacentHTML('beforeend', loadingHtml);
+        container.scrollTop = container.scrollHeight;
+      }
+      
+      function removeConnectorLoadingMessage(id) {
+        const loadingEl = document.getElementById(id);
+        if (loadingEl) loadingEl.remove();
+      }
+      
+      function showConnectorMatches(matches) {
+        const container = document.getElementById('connector-results');
+        const grid = document.getElementById('connector-results-grid');
+        const countEl = document.getElementById('connector-results-count');
+        
+        container.classList.remove('hidden');
+        countEl.textContent = \`\${matches.length} match\${matches.length !== 1 ? 'es' : ''} found\`;
+        
+        grid.innerHTML = matches.map(match => {
+          const initials = (match.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          const avatarColors = ['bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500', 'bg-indigo-500'];
+          const colorIndex = (match.name || 'U').charCodeAt(0) % avatarColors.length;
+          const userTypeLabels = {
+            founder: { label: 'Founder', color: 'bg-blue-100 text-blue-700' },
+            investor: { label: 'Investor', color: 'bg-green-100 text-green-700' },
+            validator: { label: 'Validator', color: 'bg-purple-100 text-purple-700' },
+            partner: { label: 'Partner', color: 'bg-orange-100 text-orange-700' },
+            talent: { label: 'Talent', color: 'bg-pink-100 text-pink-700' },
+            scout: { label: 'Scout', color: 'bg-yellow-100 text-yellow-700' }
+          };
+          const typeInfo = userTypeLabels[match.user_type] || { label: match.user_type || 'User', color: 'bg-gray-100 text-gray-700' };
+          const score = match.score ? Math.round(match.score * 100) : null;
+          
+          return \`
+            <div class="bg-white rounded-xl p-5 border border-gray-200 hover:shadow-lg transition-all hover:border-purple-200">
+              <div class="flex items-start gap-4 mb-4">
+                <div class="w-14 h-14 \${avatarColors[colorIndex]} rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                  \${match.avatar ? \`<img src="\${match.avatar}" class="w-14 h-14 rounded-full object-cover">\` : initials}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <h4 class="font-semibold text-gray-900 truncate">\${match.name || 'Anonymous'}</h4>
+                  <span class="\${typeInfo.color} text-xs font-medium px-2 py-0.5 rounded-full">\${typeInfo.label}</span>
+                  \${score ? \`<span class="ml-2 text-xs text-purple-600 font-medium">\${score}% match</span>\` : ''}
+                </div>
+              </div>
+              <div class="space-y-2 mb-4">
+                \${match.industry ? \`
+                  <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <i class="fas fa-briefcase text-gray-400 w-4"></i>
+                    <span>\${match.industry}</span>
+                  </div>
+                \` : ''}
+                \${match.country ? \`
+                  <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <i class="fas fa-map-marker-alt text-gray-400 w-4"></i>
+                    <span>\${match.country}</span>
+                  </div>
+                \` : ''}
+                \${match.stage ? \`
+                  <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <i class="fas fa-rocket text-gray-400 w-4"></i>
+                    <span>\${match.stage}</span>
+                  </div>
+                \` : ''}
+              </div>
+              \${match.reason ? \`
+                <div class="bg-purple-50 rounded-lg p-3 mb-4">
+                  <p class="text-xs text-purple-700"><i class="fas fa-lightbulb mr-1"></i> <strong>Why connect:</strong> \${match.reason}</p>
+                </div>
+              \` : ''}
+              <div class="flex gap-2">
+                <button onclick="startConversation(\${match.id})" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all">
+                  <i class="fas fa-comment-dots mr-1"></i>Connect
+                </button>
+                <button onclick="viewProfile(\${match.id})" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all">
+                  <i class="fas fa-user"></i>
+                </button>
+              </div>
+            </div>
+          \`;
+        }).join('');
+        
+        // Also add to recent suggestions
+        updateRecentSuggestions(matches);
+      }
+      
+      function updateRecentSuggestions(matches) {
+        const container = document.getElementById('recent-connections');
+        if (matches.length === 0) return;
+        
+        // Get existing recent or start fresh
+        let recent = JSON.parse(localStorage.getItem('recentConnectorSuggestions') || '[]');
+        
+        // Add new matches at the beginning
+        matches.forEach(m => {
+          // Remove duplicate if exists
+          recent = recent.filter(r => r.id !== m.id);
+          recent.unshift({ ...m, timestamp: Date.now() });
+        });
+        
+        // Keep only last 9 suggestions
+        recent = recent.slice(0, 9);
+        localStorage.setItem('recentConnectorSuggestions', JSON.stringify(recent));
+        
+        renderRecentSuggestions(recent);
+      }
+      
+      function renderRecentSuggestions(suggestions) {
+        const container = document.getElementById('recent-connections');
+        if (!suggestions || suggestions.length === 0) {
+          container.innerHTML = \`
+            <div class="bg-white rounded-xl p-4 border border-gray-200 text-center text-gray-500">
+              <i class="fas fa-search text-3xl text-gray-300 mb-2"></i>
+              <p class="text-sm">Your suggested connections will appear here</p>
+            </div>
+          \`;
+          return;
+        }
+        
+        const userTypeLabels = {
+          founder: { label: 'Founder', color: 'bg-blue-100 text-blue-700' },
+          investor: { label: 'Investor', color: 'bg-green-100 text-green-700' },
+          validator: { label: 'Validator', color: 'bg-purple-100 text-purple-700' },
+          partner: { label: 'Partner', color: 'bg-orange-100 text-orange-700' },
+          talent: { label: 'Talent', color: 'bg-pink-100 text-pink-700' }
+        };
+        
+        container.innerHTML = \`
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            \${suggestions.slice(0, 6).map(s => {
+              const initials = (s.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+              const typeInfo = userTypeLabels[s.user_type] || { label: s.user_type || 'User', color: 'bg-gray-100 text-gray-700' };
+              return \`
+                <div class="bg-white rounded-lg p-3 border border-gray-200 hover:border-purple-200 transition-all cursor-pointer" onclick="viewProfile(\${s.id})">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                      \${initials}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="font-medium text-gray-900 text-sm truncate">\${s.name || 'Anonymous'}</p>
+                      <span class="\${typeInfo.color} text-xs px-2 py-0.5 rounded-full">\${typeInfo.label}</span>
+                    </div>
+                  </div>
+                </div>
+              \`;
+            }).join('')}
+          </div>
+        \`;
+      }
+      
+      // Load recent suggestions on page load
+      function loadRecentSuggestions() {
+        const recent = JSON.parse(localStorage.getItem('recentConnectorSuggestions') || '[]');
+        renderRecentSuggestions(recent);
+      }
+      // ============== END AI CONNECTOR FUNCTIONS ==============
+      
+      // Function to render Team To-Do List based on goals
+      function renderTeamTodoList() {
+        const container = document.getElementById('team-todo-list');
+        if (!container || !allGoals.length) {
+          if (container) {
+            container.innerHTML = '<div class="p-8 text-center text-gray-500"><i class="fas fa-clipboard-list text-4xl mb-3 text-gray-300"></i><p>No goals yet. Create goals to see your team to-do list.</p></div>';
+          }
+          return;
+        }
+        
+        // Group goals by DRI (Directly Responsible Individual)
+        const byDRI = {};
+        allGoals.forEach(goal => {
+          const dri = goal.dri || 'Unassigned';
+          if (!byDRI[dri]) byDRI[dri] = [];
+          byDRI[dri].push(goal);
+        });
+        
+        // Calculate overall stats
+        const totalGoals = allGoals.length;
+        const completedGoals = allGoals.filter(g => g.goal_status === 'Done').length;
+        const overallPercentage = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
+        
+        // Update overall stats
+        document.getElementById('overall-completion').textContent = overallPercentage + '%';
+        document.getElementById('overall-progress-bar').style.width = overallPercentage + '%';
+        document.getElementById('completed-count').textContent = completedGoals;
+        document.getElementById('total-count').textContent = totalGoals;
+        
+        // Render each DRI section
+        container.innerHTML = Object.entries(byDRI).map(([dri, goals]) => {
+          const completed = goals.filter(g => g.goal_status === 'Done').length;
+          const total = goals.length;
+          const percentage = Math.round((completed / total) * 100);
+          const wip = goals.filter(g => g.goal_status === 'WIP').length;
+          const toStart = goals.filter(g => g.goal_status === 'To start').length;
+          
+          // Get initials for avatar
+          const initials = dri.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          const avatarColors = ['bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500', 'bg-indigo-500'];
+          const colorIndex = dri.charCodeAt(0) % avatarColors.length;
+          
+          return \`
+            <div class="p-4 hover:bg-gray-50 transition-colors">
+              <div class="flex items-center gap-4">
+                <!-- Avatar -->
+                <div class="w-12 h-12 \${avatarColors[colorIndex]} rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                  \${initials}
+                </div>
+                
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between mb-1">
+                    <h4 class="font-semibold text-gray-900 truncate">\${dri}</h4>
+                    <span class="text-sm font-bold \${percentage === 100 ? 'text-green-600' : percentage >= 50 ? 'text-blue-600' : 'text-orange-600'}">
+                      \${percentage}%
+                    </span>
+                  </div>
+                  
+                  <!-- Progress bar -->
+                  <div class="h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
+                    <div class="h-full transition-all duration-500 \${percentage === 100 ? 'bg-green-500' : 'bg-gradient-to-r from-purple-500 to-indigo-500'}" style="width: \${percentage}%"></div>
+                  </div>
+                  
+                  <!-- Stats -->
+                  <div class="flex items-center gap-3 text-xs">
+                    <span class="text-gray-500">\${total} tasks</span>
+                    <span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>\${completed} done</span>
+                    \${wip > 0 ? \`<span class="text-blue-600"><i class="fas fa-spinner mr-1"></i>\${wip} WIP</span>\` : ''}
+                    \${toStart > 0 ? \`<span class="text-orange-600"><i class="fas fa-clock mr-1"></i>\${toStart} to start</span>\` : ''}
+                  </div>
+                </div>
+                
+                <!-- Expand button -->
+                <button onclick="toggleDRITasks('\${dri}')" class="text-gray-400 hover:text-purple-600 p-2">
+                  <i class="fas fa-chevron-down" id="dri-chevron-\${dri.replace(/\\s/g, '-')}"></i>
+                </button>
+              </div>
+              
+              <!-- Task list (collapsible) -->
+              <div id="dri-tasks-\${dri.replace(/\\s/g, '-')}" class="hidden mt-3 ml-16 space-y-2">
+                \${goals.map(goal => {
+                  const statusIcon = goal.goal_status === 'Done' ? 'fa-check-circle text-green-500' 
+                    : goal.goal_status === 'WIP' ? 'fa-spinner text-blue-500' 
+                    : 'fa-circle text-gray-300';
+                  const taskClass = goal.goal_status === 'Done' ? 'line-through text-gray-400' : 'text-gray-700';
+                  
+                  return \`
+                    <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 cursor-pointer" onclick="showGoalDetail(\${goal.id})">
+                      <i class="fas \${statusIcon}"></i>
+                      <span class="flex-1 text-sm \${taskClass}">\${goal.task || goal.description}</span>
+                      <span class="px-2 py-0.5 text-xs rounded-full \${
+                        goal.priority === 'P0' ? 'bg-yellow-100 text-yellow-700' 
+                        : goal.priority === 'P1' ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-600'
+                      }">\${goal.priority || 'P0'}</span>
+                    </div>
+                  \`;
+                }).join('')}
+              </div>
+            </div>
+          \`;
+        }).join('');
+      }
+      
+      // Toggle DRI tasks visibility
+      window.toggleDRITasks = function(dri) {
+        const safeDri = dri.replace(/\\s/g, '-');
+        const tasksEl = document.getElementById('dri-tasks-' + safeDri);
+        const chevron = document.getElementById('dri-chevron-' + safeDri);
+        
+        if (tasksEl) {
+          tasksEl.classList.toggle('hidden');
+          if (chevron) {
+            chevron.classList.toggle('fa-chevron-down');
+            chevron.classList.toggle('fa-chevron-up');
+          }
+        }
+      };
+      
+      function loadAICMOPage() {
+        const contentEl = document.getElementById('content-aicmo');
+        if (contentEl) {
+          contentEl.innerHTML = window.renderAICMOPage ? window.renderAICMOPage({}) : '<div class="p-8"><h2>AI CMO</h2><p>Loading...</p></div>';
+          // Load images after a small delay to ensure DOM is ready
+          setTimeout(function() {
+            loadAICMOImages('pending');
+          }, 100);
+        }
+      }
+
+      // AI CMO Functions - defined globally
+      window.showAICMOSection = function(section) {
+        ['pending', 'approved', 'rejected', 'history'].forEach(function(s) {
+          var btn = document.getElementById('ai-cmo-' + s + '-btn');
+          var content = document.getElementById('ai-cmo-' + s + '-content');
+          
+          if (s === section) {
+            if (btn) {
+              btn.classList.remove('text-gray-500', 'border-transparent');
+              btn.classList.add('text-primary', 'border-primary', 'bg-primary/5');
+            }
+            if (content) content.classList.remove('hidden');
+          } else {
+            if (btn) {
+              btn.classList.remove('text-primary', 'border-primary', 'bg-primary/5');
+              btn.classList.add('text-gray-500', 'border-transparent');
+            }
+            if (content) content.classList.add('hidden');
+          }
+        });
+        loadAICMOImages(section);
+      };
+
+      window.loadAICMOImages = loadAICMOImages;
+      
+      async function loadAICMOImages(section) {
+        section = section || 'pending';
+        try {
+          var token = document.cookie.match(/authToken=([^;]+)/);
+          var authToken = token ? token[1] : localStorage.getItem('authToken');
+          console.log('[AI-CMO] Loading images, authToken exists:', !!authToken);
+          
+          var response = await fetch('/api/ai-cmo/images', {
+            credentials: 'include',
+            headers: { 
+              'Authorization': 'Bearer ' + (authToken || ''),
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!response.ok) throw new Error('Failed to load images');
+
+          var data = await response.json();
+          var images = data.images || [];
+
+          var filtered = images.filter(function(img) {
+            if (section === 'pending') return img.status === 'pending';
+            if (section === 'approved') return img.status === 'approved';
+            if (section === 'rejected') return img.status === 'rejected';
+            return true;
+          });
+
+          var gridId = section === 'history' ? 'history-list' : section + '-images-grid';
+          var emptyId = section + '-empty';
+          var grid = document.getElementById(gridId);
+          var empty = document.getElementById(emptyId);
+
+          if (!grid) return;
+
+          if (filtered.length === 0) {
+            grid.innerHTML = '';
+            grid.classList.add('hidden');
+            if (empty) empty.classList.remove('hidden');
+            return;
+          }
+
+          grid.classList.remove('hidden');
+          if (empty) empty.classList.add('hidden');
+
+          grid.innerHTML = filtered.map(function(img) {
+            var actions = '';
+            if (img.status === 'pending') {
+              actions = '<button onclick="approveAICMOImage(\\'' + img.id + '\\')" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600"><i class="fas fa-check mr-1"></i> Aprobar</button>' +
+                        '<button onclick="rejectAICMOImage(\\'' + img.id + '\\')" class="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600"><i class="fas fa-times mr-1"></i> Rechazar</button>';
+            } else if (img.status === 'approved') {
+              actions = '<button onclick="downloadAICMOImage(\\'' + img.image_url + '\\', \\'' + img.id + '\\')" class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600"><i class="fas fa-download mr-1"></i> Descargar</button>';
+            } else {
+              actions = '<button onclick="regenerateAICMOImage(\\'' + img.id + '\\')" class="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600"><i class="fas fa-redo mr-1"></i> Regenerar</button>';
+            }
+            return '<div class="bg-white rounded-xl shadow-sm overflow-hidden">' +
+              '<img src="' + (img.image_url || '') + '" alt="Generated" class="w-full h-48 object-cover" onerror="this.style.display=\\'none\\'" />' +
+              '<div class="p-4"><div class="flex gap-2">' + actions + '</div>' +
+              '<p class="text-sm text-gray-600 mt-3 line-clamp-2">' + (img.prompt || 'Sin prompt') + '</p>' +
+              '<p class="text-xs text-gray-400 mt-1">' + new Date(img.created_at).toLocaleDateString() + '</p>' +
+              '</div></div>';
+          }).join('');
+        } catch (error) {
+          console.error('Error loading AI CMO images:', error);
+        }
+      }
+
+      window.approveAICMOImage = async function(imageId) {
+        try {
+          var token = document.cookie.match(/authToken=([^;]+)/);
+          var authToken = token ? token[1] : localStorage.getItem('authToken');
+          await fetch('/api/ai-cmo/images/' + imageId + '/approve', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+          });
+          loadAICMOImages('pending');
+        } catch (e) { alert('Error al aprobar'); }
+      };
+
+      window.rejectAICMOImage = async function(imageId) {
+        try {
+          var token = document.cookie.match(/authToken=([^;]+)/);
+          var authToken = token ? token[1] : localStorage.getItem('authToken');
+          await fetch('/api/ai-cmo/images/' + imageId + '/reject', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+          });
+          loadAICMOImages('pending');
+        } catch (e) { alert('Error al rechazar'); }
+      };
+
+      window.downloadAICMOImage = async function(imageUrl, imageId) {
+        try {
+          var response = await fetch(imageUrl);
+          var blob = await response.blob();
+          var url = window.URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'marketing-' + imageId + '.png';
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } catch (e) { alert('Error al descargar'); }
+      };
+
+      window.regenerateAICMOImage = async function(imageId) {
+        try {
+          var token = document.cookie.match(/authToken=([^;]+)/);
+          var authToken = token ? token[1] : localStorage.getItem('authToken');
+          await fetch('/api/ai-cmo/images/' + imageId + '/regenerate', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+          });
+          loadAICMOImages('pending');
+        } catch (e) { alert('Error al regenerar'); }
+      };
+
+      async function generateMarketingPlan() {
+        const websiteUrl = prompt('Enter website URL to analyze:');
+        if (!websiteUrl) return;
+        
+        const chatBox = document.getElementById('chat-messages');
+        if (!chatBox) return;
+        
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'flex gap-3 mb-4';
+        loadingMsg.innerHTML = \`
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold">AI</div>
+          <div class="flex-1 bg-white rounded-lg p-4 shadow-sm"><div class="animate-pulse">Analyzing brand and generating images...</div></div>
+        \`;
+        chatBox.appendChild(loadingMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        
+        try {
+          // Use Cloudflare proxy endpoint instead of calling Railway directly
+          const response = await axios.post('/api/chat-agent/brand/generate-images', {
+            website_url: websiteUrl
+          });
+          
+          loadingMsg.remove();
+          
+          const aiMsg = document.createElement('div');
+          aiMsg.className = 'flex gap-3 mb-4';
+          const formattedResponse = formatMarkdownToHTML(response.data.analysis || 'Analysis complete!');
+          const imagesInfo = response.data.images_generated ? '<div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg"><p class="text-sm text-green-800"><i class="fas fa-check-circle mr-2"></i>' + response.data.images_generated + ' images generated! <a href="#" onclick="switchTab(String.fromCharCode(97,105,99,109,111)); return false;" class="font-semibold underline">View in AI CMO</a></p></div>' : '';
+          aiMsg.innerHTML = \`
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold">AI</div>
+            <div class="flex-1 bg-white rounded-lg p-4 shadow-sm">\${formattedResponse}\${imagesInfo}</div>
+          \`;
+          chatBox.appendChild(aiMsg);
+          chatBox.scrollTop = chatBox.scrollHeight;
+        } catch (error) {
+          loadingMsg.remove();
+          const errorMsg = document.createElement('div');
+          errorMsg.className = 'flex gap-3 mb-4';
+          errorMsg.innerHTML = \`
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-semibold">!</div>
+            <div class="flex-1 bg-red-50 rounded-lg p-4 border border-red-200"><p class="text-red-800">\${error.response?.data?.detail || error.message || 'Error generating marketing plan'}</p></div>
+          \`;
+          chatBox.appendChild(errorMsg);
+          chatBox.scrollTop = chatBox.scrollHeight;
+        }
+      }
+
+      function formatMarkdownToHTML(text) {
+        if (!text) return '';
+        var backtick = String.fromCharCode(96);
+        var backtickRegex = new RegExp(backtick + '([^' + backtick + ']+)' + backtick, 'g');
+        
+        let formatted = text
+          .replace(/^### (.+)$/gm, '<h3 class="text-xl font-bold mt-6 mb-3 text-gray-800">$1</h3>')
+          .replace(/^#### (.+)$/gm, '<h4 class="text-lg font-semibold mt-4 mb-2 text-gray-700">$1</h4>')
+          .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold mt-8 mb-4 text-gray-900">$1</h2>')
+          .replace(/^# (.+)$/gm, '<h1 class="text-3xl font-bold mt-8 mb-6 text-gray-900">$1</h1>')
+          .replace(/[*][*](.+?)[*][*]/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+          .replace(/[*](.+?)[*]/g, '<em>$1</em>')
+          .replace(/^- (.+)$/gm, '<li class="ml-6 mb-2 list-disc">$1</li>')
+          .replace(backtickRegex, '<code class="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-purple-600">$1</code>');
+        
+        return '<div class="prose max-w-none">' + formatted + '</div>';
       }
 
       // Load dashboard data
@@ -677,13 +1545,25 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         }
         container.innerHTML = '<div class="text-center py-6 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">No messages yet</p></div>';
       }
+      
+      // Helper function to parse scheduled_dates (handles both string and array)
+      function parseScheduledDates(value) {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      }
 
       function renderGoalsTable() {
         const tbody = document.getElementById('goals-table-body');
         if (!allGoals.length) {
           tbody.innerHTML = \`
             <tr>
-              <td colspan="11" class="px-4 py-8 text-center text-gray-500">
+              <td colspan="15" class="px-4 py-8 text-center text-gray-500">
                 <i class="fas fa-bullseye text-4xl mb-2 text-gray-300"></i>
                 <p>No goals yet</p>
                 <button onclick="openGoalModal()" class="text-purple-600 text-sm mt-2 hover:underline">Create your first goal</button>
@@ -723,46 +1603,53 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
               'Blocked': 'bg-red-200 text-red-900',
               'Done': 'bg-green-100 text-green-800'
             };
+            
+            // Parse scheduled dates for this goal
+            let scheduledDates = parseScheduledDates(goal.scheduled_dates);
+            const scheduledCount = scheduledDates.length;
 
             return \`
-              <tr class="\${idx === 0 ? categoryColor : 'hover:bg-gray-50'}">
-                <td class="px-4 py-3 text-sm font-medium text-gray-900">\${idx === 0 ? category : ''}</td>
-                <td class="px-4 py-3 text-sm text-gray-700">\${goal.description || ''}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 font-medium">\${goal.task || goal.description || ''}</td>
-                <td class="px-4 py-3">
+              <tr class="\${idx === 0 ? categoryColor : 'hover:bg-gray-50'} group cursor-pointer" onclick="showGoalDetail(\${goal.id})">
+                <td class="px-3 py-3 text-sm font-medium text-gray-900">\${idx === 0 ? category : ''}</td>
+                <td class="px-3 py-3 text-sm text-gray-700 max-w-[150px]">
+                  <div class="truncate hover:whitespace-normal hover:overflow-visible" title="\${goal.description || ''}">\${goal.description || ''}</div>
+                </td>
+                <td class="px-3 py-3 text-sm text-gray-900 font-medium max-w-[200px]">
+                  <div class="truncate hover:whitespace-normal hover:overflow-visible" title="\${goal.task || goal.description || ''}">\${goal.task || goal.description || ''}</div>
+                </td>
+                <td class="px-2 py-3 text-center">
                   <span class="px-2 py-1 text-xs font-medium rounded-full \${priorityColors[goal.priority] || 'bg-gray-100 text-gray-800'}">
                     \${goal.priority || 'P0'}
                   </span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-600">\${goal.cadence || 'One time'}</td>
-                <td class="px-4 py-3 text-sm text-gray-600">\${goal.dri || 'Giorgio'}</td>
-                <td class="px-4 py-3">
+                <td class="px-2 py-3 text-sm text-gray-600 text-center">\${goal.cadence || 'One time'}</td>
+                <td class="px-2 py-3 text-sm text-gray-600 text-center">\${goal.dri || '-'}</td>
+                <td class="px-2 py-3 text-center">
                   <span class="px-2 py-1 text-xs font-medium rounded-full \${statusColors[goal.goal_status] || 'bg-gray-100 text-gray-800'}">
                     \${goal.goal_status || 'To start'}
                   </span>
                 </td>
-                <td class="px-2 py-3 text-center">
-                  <button onclick="toggleDay(\${goal.id}, 'day_mon')" class="w-8 h-8 rounded \${goal.day_mon ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'} hover:opacity-80">
-                    \${goal.day_mon || 0}
+                <td class="px-2 py-3 text-center" onclick="event.stopPropagation()">
+                  <button 
+                    onclick="openGoalCalendar(\${goal.id})" 
+                    class="px-3 py-2 rounded-lg transition-all duration-200 \${
+                      scheduledCount > 0 
+                        ? 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-md' 
+                        : 'bg-gray-100 text-gray-500 hover:bg-purple-100 border border-gray-200'
+                    }"
+                    title="Schedule on calendar"
+                  >
+                    <i class="fas fa-calendar-day"></i>
+                    \${scheduledCount > 0 ? '<span class="ml-1 text-xs">' + scheduledCount + '</span>' : ''}
                   </button>
                 </td>
-                <td class="px-2 py-3 text-center">
-                  <button onclick="toggleDay(\${goal.id}, 'day_tue')" class="w-8 h-8 rounded \${goal.day_tue ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'} hover:opacity-80">
-                    \${goal.day_tue || 0}
-                  </button>
-                </td>
-                <td class="px-2 py-3 text-center">
-                  <button onclick="toggleDay(\${goal.id}, 'day_wed')" class="w-8 h-8 rounded \${goal.day_wed ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'} hover:opacity-80">
-                    \${goal.day_wed || 0}
-                  </button>
-                </td>
-                <td class="px-2 py-3 text-center">
-                  <div class="flex gap-1 justify-center">
-                    <button onclick="editGoal(\${goal.id})" class="text-gray-400 hover:text-purple-600">
-                      <i class="fas fa-edit"></i>
+                <td class="px-2 py-3 text-center" onclick="event.stopPropagation()">
+                  <div class="flex gap-1 justify-center opacity-50 group-hover:opacity-100 transition-opacity">
+                    <button onclick="editGoal(\${goal.id})" class="text-gray-400 hover:text-purple-600 p-1">
+                      <i class="fas fa-edit text-sm"></i>
                     </button>
-                    <button onclick="deleteGoal(\${goal.id})" class="text-gray-400 hover:text-red-600">
-                      <i class="fas fa-trash"></i>
+                    <button onclick="deleteGoal(\${goal.id})" class="text-gray-400 hover:text-red-600 p-1">
+                      <i class="fas fa-trash text-sm"></i>
                     </button>
                   </div>
                 </td>
@@ -770,20 +1657,317 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             \`;
           }).join('');
         }).join('');
+        
+        // Update timeline overview after rendering table
+        updateCalendarOverview();
       }
-
-      window.toggleDay = async function(goalId, dayField) {
-        try {
-          const goal = allGoals.find(g => g.id === goalId);
-          if (!goal) return;
+      
+      // Calendar state
+      let currentCalendarYear = new Date().getFullYear();
+      let currentCalendarMonth = new Date().getMonth();
+      let currentGoalIdForCalendar = null;
+      
+      // Function to update the monthly calendar overview visualization
+      function updateCalendarOverview() {
+        const calendarGrid = document.getElementById('calendar-grid');
+        const monthTitle = document.getElementById('calendar-month-title');
+        if (!calendarGrid) return;
+        
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+        if (monthTitle) {
+          monthTitle.textContent = monthNames[currentCalendarMonth] + ' ' + currentCalendarYear;
+        }
+        
+        // Get first day and days in month
+        const firstDay = new Date(currentCalendarYear, currentCalendarMonth, 1);
+        const lastDay = new Date(currentCalendarYear, currentCalendarMonth + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        let startDayOfWeek = firstDay.getDay(); // 0 = Sunday
+        startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // Convert to Monday = 0
+        
+        // Count tasks per day
+        const taskCounts = {};
+        allGoals.forEach(goal => {
+          let dates = parseScheduledDates(goal.scheduled_dates);
+          dates.forEach(dateStr => {
+            if (taskCounts[dateStr]) {
+              taskCounts[dateStr]++;
+            } else {
+              taskCounts[dateStr] = 1;
+            }
+          });
+        });
+        
+        // Build calendar HTML
+        let html = '';
+        const today = new Date();
+        const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        
+        // Empty cells before first day
+        for (let i = 0; i < startDayOfWeek; i++) {
+          html += '<div class="h-10"></div>';
+        }
+        
+        // Day cells
+        let totalScheduled = 0;
+        let busiestDay = null;
+        let busiestCount = 0;
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dateStr = currentCalendarYear + '-' + String(currentCalendarMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+          const count = taskCounts[dateStr] || 0;
+          totalScheduled += count;
           
-          const newValue = goal[dayField] ? 0 : 1;
-          await axios.put(\`/api/dashboard/goals/\${goalId}\`, { [dayField]: newValue });
-          goal[dayField] = newValue;
+          if (count > busiestCount) {
+            busiestCount = count;
+            busiestDay = day;
+          }
+          
+          const isToday = dateStr === todayStr;
+          const isWeekend = ((startDayOfWeek + day - 1) % 7) >= 5;
+          
+          let bgColor = 'bg-white';
+          let textColor = 'text-gray-700';
+          if (count >= 5) {
+            bgColor = 'bg-red-400';
+            textColor = 'text-white';
+          } else if (count >= 3) {
+            bgColor = 'bg-yellow-400';
+            textColor = 'text-white';
+          } else if (count > 0) {
+            bgColor = 'bg-green-400';
+            textColor = 'text-white';
+          } else if (isWeekend) {
+            bgColor = 'bg-gray-50';
+            textColor = 'text-gray-400';
+          }
+          
+          html += \`
+            <div class="h-10 \${bgColor} \${textColor} rounded-lg flex flex-col items-center justify-center text-xs font-medium relative cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all \${isToday ? 'ring-2 ring-purple-600' : ''}" 
+                 onclick="showDayTasks('\${dateStr}')" title="\${count} tasks">
+              <span>\${day}</span>
+              \${count > 0 ? '<span class="text-[10px] opacity-80">' + count + '</span>' : ''}
+            </div>
+          \`;
+        }
+        
+        calendarGrid.innerHTML = html;
+        
+        // Update total
+        const totalEl = document.getElementById('timeline-total-tasks');
+        if (totalEl) {
+          totalEl.textContent = totalScheduled + ' tasks scheduled';
+        }
+        
+        // Update busiest day
+        const busiestEl = document.getElementById('busiest-day');
+        if (busiestEl) {
+          if (busiestDay && busiestCount > 0) {
+            busiestEl.innerHTML = '<i class="fas fa-fire text-orange-500"></i> Busiest: Day ' + busiestDay + ' (' + busiestCount + ' tasks)';
+          } else {
+            busiestEl.textContent = 'No tasks scheduled yet';
+          }
+        }
+      }
+      
+      window.changeCalendarMonth = function(delta) {
+        currentCalendarMonth += delta;
+        if (currentCalendarMonth < 0) {
+          currentCalendarMonth = 11;
+          currentCalendarYear--;
+        } else if (currentCalendarMonth > 11) {
+          currentCalendarMonth = 0;
+          currentCalendarYear++;
+        }
+        updateCalendarOverview();
+      };
+      
+      window.showDayTasks = function(dateStr) {
+        // Find tasks scheduled for this day
+        const tasksForDay = allGoals.filter(goal => {
+          let dates = parseScheduledDates(goal.scheduled_dates);
+          return dates.includes(dateStr);
+        });
+        
+        if (tasksForDay.length === 0) {
+          alert('No tasks scheduled for ' + dateStr);
+          return;
+        }
+        
+        const taskList = tasksForDay.map(g => '• ' + (g.task || g.description)).join('\\n');
+        alert('Tasks for ' + dateStr + ':\\n\\n' + taskList);
+      };
+      
+      window.openGoalCalendar = function(goalId) {
+        const goal = allGoals.find(g => g.id === goalId);
+        if (!goal) return;
+        
+        currentGoalIdForCalendar = goalId;
+        
+        // Show the goal calendar modal
+        const modal = document.getElementById('goal-calendar-modal');
+        if (modal) {
+          document.getElementById('goal-calendar-title').textContent = goal.task || goal.description || 'Schedule Goal';
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+          renderGoalCalendar();
+        }
+      };
+      
+      window.closeGoalCalendarModal = function() {
+        const modal = document.getElementById('goal-calendar-modal');
+        if (modal) {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        }
+        currentGoalIdForCalendar = null;
+      };
+      
+      function renderGoalCalendar() {
+        const goal = allGoals.find(g => g.id === currentGoalIdForCalendar);
+        if (!goal) return;
+        
+        let scheduledDates = parseScheduledDates(goal.scheduled_dates);
+        
+        const calendarGrid = document.getElementById('goal-calendar-grid');
+        const monthTitle = document.getElementById('goal-calendar-month');
+        if (!calendarGrid) return;
+        
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+        if (monthTitle) {
+          monthTitle.textContent = monthNames[currentCalendarMonth] + ' ' + currentCalendarYear;
+        }
+        
+        // Get first day and days in month
+        const firstDay = new Date(currentCalendarYear, currentCalendarMonth, 1);
+        const lastDay = new Date(currentCalendarYear, currentCalendarMonth + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        let startDayOfWeek = firstDay.getDay();
+        startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+        
+        let html = '';
+        const today = new Date();
+        const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        
+        // Empty cells
+        for (let i = 0; i < startDayOfWeek; i++) {
+          html += '<div class="h-12"></div>';
+        }
+        
+        // Day cells
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dateStr = currentCalendarYear + '-' + String(currentCalendarMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+          const isScheduled = scheduledDates.includes(dateStr);
+          const isToday = dateStr === todayStr;
+          const isWeekend = ((startDayOfWeek + day - 1) % 7) >= 5;
+          
+          html += \`
+            <button 
+              onclick="toggleGoalDate('\${dateStr}')"
+              class="h-12 rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-200 \${
+                isScheduled 
+                  ? 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg scale-105' 
+                  : isWeekend 
+                    ? 'bg-gray-100 text-gray-400 hover:bg-purple-100' 
+                    : 'bg-white text-gray-700 hover:bg-purple-100 border border-gray-200'
+              } \${isToday ? 'ring-2 ring-purple-600' : ''}"
+            >
+              \${day}
+              \${isScheduled ? '<i class="fas fa-check ml-1 text-xs"></i>' : ''}
+            </button>
+          \`;
+        }
+        
+        calendarGrid.innerHTML = html;
+      }
+      
+      window.toggleGoalDate = async function(dateStr) {
+        const goal = allGoals.find(g => g.id === currentGoalIdForCalendar);
+        if (!goal) return;
+        
+        let scheduledDates = parseScheduledDates(goal.scheduled_dates);
+        
+        const idx = scheduledDates.indexOf(dateStr);
+        if (idx >= 0) {
+          scheduledDates.splice(idx, 1);
+        } else {
+          scheduledDates.push(dateStr);
+          scheduledDates.sort();
+        }
+        
+        try {
+          await axios.put('/api/dashboard/goals/' + goal.id, { scheduled_dates: scheduledDates });
+          goal.scheduled_dates = JSON.stringify(scheduledDates);
+          renderGoalCalendar();
           renderGoalsTable();
         } catch (e) {
-          console.error('Error toggling day:', e);
-          alert('Failed to update goal');
+          console.error('Error updating schedule:', e);
+          alert('Failed to update schedule');
+        }
+      };
+      
+      window.changeGoalCalendarMonth = function(delta) {
+        currentCalendarMonth += delta;
+        if (currentCalendarMonth < 0) {
+          currentCalendarMonth = 11;
+          currentCalendarYear--;
+        } else if (currentCalendarMonth > 11) {
+          currentCalendarMonth = 0;
+          currentCalendarYear++;
+        }
+        renderGoalCalendar();
+      };
+      
+      // Goal detail modal functions
+      let currentDetailGoalId = null;
+      
+      window.showGoalDetail = function(goalId) {
+        const goal = allGoals.find(g => g.id === goalId);
+        if (!goal) return;
+        
+        currentDetailGoalId = goalId;
+        
+        // Populate modal
+        document.getElementById('detail-category').textContent = goal.category || 'ASTAR';
+        document.getElementById('detail-task').textContent = goal.task || goal.description || 'No task defined';
+        document.getElementById('detail-description').textContent = goal.description || 'No description';
+        document.getElementById('detail-priority').textContent = goal.priority || 'P0';
+        document.getElementById('detail-status').textContent = goal.goal_status || 'To start';
+        document.getElementById('detail-cadence').textContent = goal.cadence || 'One time';
+        document.getElementById('detail-dri').textContent = goal.dri || 'Not assigned';
+        
+        // Populate scheduled dates
+        let scheduledDates = parseScheduledDates(goal.scheduled_dates);
+        
+        let scheduleHtml = '';
+        if (scheduledDates.length === 0) {
+          scheduleHtml = '<span class="text-gray-400 text-sm">No dates scheduled</span>';
+        } else {
+          scheduleHtml = scheduledDates.map(dateStr => {
+            const date = new Date(dateStr);
+            const options = { weekday: 'short', month: 'short', day: 'numeric' };
+            return \`<span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-sm rounded-full">\${date.toLocaleDateString('en-US', options)}</span>\`;
+          }).join('');
+        }
+        document.getElementById('detail-schedule').innerHTML = scheduleHtml;
+        
+        // Show modal
+        document.getElementById('goal-detail-modal').classList.remove('hidden');
+        document.getElementById('goal-detail-modal').classList.add('flex');
+      };
+      
+      window.closeGoalDetailModal = function() {
+        document.getElementById('goal-detail-modal').classList.add('hidden');
+        document.getElementById('goal-detail-modal').classList.remove('flex');
+        currentDetailGoalId = null;
+      };
+      
+      window.editGoalFromDetail = function() {
+        if (currentDetailGoalId) {
+          closeGoalDetailModal();
+          editGoal(currentDetailGoalId);
         }
       };
 
@@ -1094,12 +2278,14 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
 
       function renderHomeMessages() {
         const container = document.getElementById('home-messages');
+        if (!container) return; // Element doesn't exist, skip rendering
+        
         if (!conversations.length) {
           container.innerHTML = '<div class="text-center py-6 text-gray-500"><p class="text-sm">No messages yet</p></div>';
           return;
         }
         container.innerHTML = conversations.slice(0, 3).map(c => \`
-          <div onclick="switchTab('inbox'); setTimeout(() => selectConversation(\${c.id}), 100);" class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+          <div onclick="switchTab(\\'inbox\\'); setTimeout(() => selectConversation(\${c.id}), 100);" class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
             <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold">\${(c.other_user_name || 'U')[0].toUpperCase()}</div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-gray-900 truncate">\${c.other_user_name || 'User'}</p>
@@ -1821,13 +3007,16 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         const urlParams = new URLSearchParams(window.location.search);
         const tabParam = urlParams.get('tab');
         
-        if (tabParam && ['home', 'traction', 'inbox', 'directory'].includes(tabParam)) {
+        if (tabParam && ['home', 'traction', 'inbox', 'directory', 'aicmo'].includes(tabParam)) {
           // Switch to the requested tab
           switchTab(tabParam);
         } else if (currentUserRole !== 'founder') {
           // Switch to inbox tab for non-founders if no tab specified
           switchTab('inbox');
         }
+        
+        // Initialize AI CMO page renderer
+        window.renderAICMOPage = ${renderAICMOPageString()};
       });
     </script>
   `;

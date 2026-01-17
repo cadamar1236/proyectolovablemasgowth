@@ -211,16 +211,38 @@ projects.get('/leaderboard/top', async (c) => {
   const category = c.req.query('category') || 'all';
   const limit = parseInt(c.req.query('limit') || '50');
   const timeframe = c.req.query('timeframe') || 'all';
-
-  // Try to get from cache first
-  const cacheKey = `leaderboard:${category}:${timeframe}:${limit}`;
-  try {
-    const cached = await c.env.CACHE?.get(cacheKey, 'json');
-    if (cached) {
-      return c.json(cached);
+  
+  // Verificar si el usuario autenticado es admin
+  const authHeader = c.req.header('Authorization') || c.req.header('Cookie');
+  let isAdmin = false;
+  if (authHeader) {
+    try {
+      // Extraer token y verificar rol
+      const token = authHeader.includes('Bearer ') 
+        ? authHeader.replace('Bearer ', '')
+        : authHeader.match(/authToken=([^;]+)/)?.[1];
+      
+      if (token) {
+        const { verify } = await import('hono/jwt');
+        const payload = await verify(token, c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var') as any;
+        isAdmin = payload.role === 'admin';
+      }
+    } catch (e) {
+      // Not authenticated or invalid token
     }
-  } catch (e) {
-    // Cache miss or not configured, continue
+  }
+
+  // Try to get from cache first (solo si no es admin)
+  const cacheKey = `leaderboard:${category}:${timeframe}:${limit}${isAdmin ? ':admin' : ''}`;
+  if (!isAdmin) {
+    try {
+      const cached = await c.env.CACHE?.get(cacheKey, 'json');
+      if (cached) {
+        return c.json(cached);
+      }
+    } catch (e) {
+      // Cache miss or not configured, continue
+    }
   }
 
   // Query que obtiene únicamente los items del marketplace (beta_products)
@@ -289,10 +311,10 @@ projects.get('/leaderboard/top', async (c) => {
     // Re-sort by the new composite score
     projectsWithScores.sort((a: any, b: any) => b.leaderboard_score - a.leaderboard_score);
 
-    // Apply limit
-    const limitedResults = projectsWithScores.slice(0, limit);
+    // Apply limit (solo si no es admin)
+    const limitedResults = isAdmin ? projectsWithScores : projectsWithScores.slice(0, limit);
 
-    const result = { leaderboard: limitedResults };
+    const result = { leaderboard: limitedResults, isAdmin };
 
     // Store in cache for 5 minutes
     try {

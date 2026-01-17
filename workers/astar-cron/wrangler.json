@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "astar-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-01",
+  "triggers": {
+    "crons": [
+      "0 8 * * *",
+      "0 20 * * *"
+    ]
+  },
+  "vars": {
+    "LOVABLEGROWTH_URL": "https://astarlabshub.com",
+    "CRON_SECRET": "CONFIGURE_IN_CLOUDFLARE_DASHBOARD"
+  }
+}

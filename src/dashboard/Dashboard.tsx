@@ -67,6 +67,14 @@ interface DBAchievement {
   created_at: string;
 }
 
+interface AstarPendingMessage {
+  sent_message_id: number;
+  sent_at: string;
+  subject: string;
+  response_prompt: string;
+  category: string;
+}
+
 const Dashboard = () => {
   console.log("Dashboard component loaded");
   
@@ -83,6 +91,12 @@ const Dashboard = () => {
   const [whatsappCode, setWhatsappCode] = useState<WhatsAppCode | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+  
+  // ASTAR Messages state
+  const [astarPendingMessages, setAstarPendingMessages] = useState<AstarPendingMessage[]>([]);
+  const [showAstarNotification, setShowAstarNotification] = useState(false);
+  const [astarResponse, setAstarResponse] = useState('');
+  const [respondingToMessage, setRespondingToMessage] = useState<number | null>(null);
   
   // LinkedIn Connector state
   const [linkedinProfiles, setLinkedinProfiles] = useState<LinkedInProfile[]>([]);
@@ -123,6 +137,49 @@ const Dashboard = () => {
       setAchievements(data.achievements.map(a => ({ id: a.id, date: a.date, description: a.description })));
     } catch (error) {
       console.error('Error fetching achievements:', error);
+    }
+  };
+
+  const fetchAstarPendingMessages = async () => {
+    try {
+      const response = await fetch('/api/astar-messages/pending');
+      if (response.ok) {
+        const data = await response.json() as { pending: AstarPendingMessage[] };
+        setAstarPendingMessages(data.pending);
+        setShowAstarNotification(data.pending.length > 0);
+      }
+    } catch (error) {
+      console.error('Error fetching ASTAR pending messages:', error);
+    }
+  };
+
+  const submitAstarResponse = async (messageId: number) => {
+    if (!astarResponse.trim()) return;
+    
+    try {
+      setRespondingToMessage(messageId);
+      const response = await fetch('/api/astar-messages/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sent_message_id: messageId,
+          response_text: astarResponse
+        })
+      });
+
+      if (response.ok) {
+        setAstarResponse('');
+        await fetchAstarPendingMessages();
+        await fetchGoals(); // Recargar goals por si se creó uno nuevo
+        alert('¡Respuesta enviada! 🎉');
+      } else {
+        alert('Error al enviar respuesta');
+      }
+    } catch (error) {
+      console.error('Error submitting ASTAR response:', error);
+      alert('Error al enviar respuesta');
+    } finally {
+      setRespondingToMessage(null);
     }
   };
 
@@ -210,7 +267,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      await Promise.all([fetchGoals(), fetchWeeklyUpdates(), fetchAchievements()]);
+      await Promise.all([fetchGoals(), fetchWeeklyUpdates(), fetchAchievements(), fetchAstarPendingMessages()]);
       setLoading(false);
     };
     loadData();
@@ -441,6 +498,115 @@ const Dashboard = () => {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>Goals & Achievements Tracker for Founders</h1>
+
+      {/* ASTAR Pending Messages Notification */}
+      {showAstarNotification && astarPendingMessages.length > 0 && (
+        <section style={{
+          backgroundColor: '#1e293b',
+          border: '2px solid #8b5cf6',
+          borderRadius: '12px',
+          padding: '24px',
+          marginBottom: '24px',
+          boxShadow: '0 4px 20px rgba(139, 92, 246, 0.3)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h2 style={{ margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '24px' }}>🌟</span>
+              ASTAR te pregunta...
+              <span style={{
+                backgroundColor: '#8b5cf6',
+                color: '#fff',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                {astarPendingMessages.length} mensaje{astarPendingMessages.length > 1 ? 's' : ''}
+              </span>
+            </h2>
+            <button
+              onClick={() => setShowAstarNotification(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: '20px',
+                cursor: 'pointer'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {astarPendingMessages.map((msg) => (
+            <div key={msg.sent_message_id} style={{
+              backgroundColor: '#0f172a',
+              padding: '20px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              borderLeft: '4px solid #8b5cf6'
+            }}>
+              <div style={{ color: '#e2e8f0', marginBottom: '12px' }}>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>
+                  {msg.subject}
+                </div>
+                <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '12px' }}>
+                  {new Date(msg.sent_at).toLocaleDateString('es-ES', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div>
+                <div style={{ fontSize: '16px', color: '#cbd5e1', marginBottom: '16px' }}>
+                  {msg.response_prompt}
+                </div>
+              </div>
+
+              <textarea
+                value={respondingToMessage === msg.sent_message_id ? astarResponse : ''}
+                onChange={(e) => {
+                  setRespondingToMessage(msg.sent_message_id);
+                  setAstarResponse((e.target as any).value);
+                }}
+                placeholder="Escribe tu respuesta aquí..."
+                style={{
+                  width: '100%',
+                  minHeight: '100px',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: '1px solid #475569',
+                  backgroundColor: '#1e293b',
+                  color: '#e2e8f0',
+                  fontSize: '14px',
+                  resize: 'vertical',
+                  marginBottom: '12px'
+                }}
+              />
+
+              <button
+                onClick={() => submitAstarResponse(msg.sent_message_id)}
+                disabled={!astarResponse.trim() || respondingToMessage !== msg.sent_message_id}
+                style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: '#fff',
+                  padding: '12px 24px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  opacity: (!astarResponse.trim() || respondingToMessage !== msg.sent_message_id) ? 0.5 : 1
+                }}
+              >
+                📤 Enviar Respuesta
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Add Goals */}
       <section>

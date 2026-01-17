@@ -1,6 +1,12 @@
 // Type definitions for Cloudflare bindings
 export type Bindings = CloudflareBindings;
 
+// Cloudflare Scheduled Event type
+export interface ScheduledEvent {
+  scheduledTime: number;
+  cron: string;
+}
+
 // Context types for authenticated routes
 export type AuthContext = {
   userId: number;

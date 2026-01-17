@@ -62,14 +62,36 @@ async function getStartupMetricsContext(db: any, userId: number) {
     
     const goals = goalsResult.results || [];
 
-    // Get metrics history (last 90 days for better analysis)
-    const metricsResult = await db.prepare(`
-      SELECT metric_name, metric_value, recorded_date
-      FROM user_metrics 
-      WHERE user_id = ? 
-      ORDER BY recorded_date DESC
-      LIMIT 180
-    `).bind(userId).all();
+    // Check if user is part of a team
+    const teamMembership = await db.prepare(`
+      SELECT team_id
+      FROM startup_team_members
+      WHERE user_id = ?
+      ORDER BY is_creator DESC, joined_at ASC
+      LIMIT 1
+    `).bind(userId).first();
+
+    let metricsResult;
+    if (teamMembership && teamMembership.team_id) {
+      // Get metrics for all team members
+      metricsResult = await db.prepare(`
+        SELECT um.metric_name, um.metric_value, um.recorded_date
+        FROM user_metrics um
+        INNER JOIN startup_team_members stm ON um.user_id = stm.user_id
+        WHERE stm.team_id = ?
+        ORDER BY um.recorded_date DESC
+        LIMIT 180
+      `).bind(teamMembership.team_id).all();
+    } else {
+      // Fallback to user's own metrics if not in a team
+      metricsResult = await db.prepare(`
+        SELECT metric_name, metric_value, recorded_date
+        FROM user_metrics 
+        WHERE user_id = ? 
+        ORDER BY recorded_date DESC
+        LIMIT 180
+      `).bind(userId).all();
+    }
 
     const metrics = metricsResult.results || [];
 
@@ -256,12 +278,57 @@ app.get('/goals', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
   
   try {
-    const result = await c.env.DB.prepare(`
-      SELECT id, description, status, target_value, current_value, deadline, category, created_at, updated_at
-      FROM goals 
-      WHERE user_id = ? 
-      ORDER BY created_at DESC
-    `).bind(user.userId).all();
+    // First, get the user's team
+    const teamMembership = await c.env.DB.prepare(`
+      SELECT team_id
+      FROM startup_team_members
+      WHERE user_id = ?
+      ORDER BY is_creator DESC, joined_at ASC
+      LIMIT 1
+    `).bind(user.userId).first();
+
+    let result;
+    if (teamMembership && teamMembership.team_id) {
+      // Get goals for all team members
+      result = await c.env.DB.prepare(`
+        SELECT 
+          g.id, 
+          g.description, 
+          g.status, 
+          g.target_value, 
+          g.current_value, 
+          g.deadline, 
+          g.category, 
+          g.created_at, 
+          g.updated_at,
+          g.user_id,
+          u.name as creator_name,
+          u.avatar_url as creator_avatar
+        FROM goals g
+        INNER JOIN startup_team_members stm ON g.user_id = stm.user_id
+        LEFT JOIN users u ON g.user_id = u.id
+        WHERE stm.team_id = ?
+        ORDER BY g.created_at DESC
+      `).bind(teamMembership.team_id).all();
+    } else {
+      // Fallback to user's own goals if not in a team
+      result = await c.env.DB.prepare(`
+        SELECT 
+          id, 
+          description, 
+          status, 
+          target_value, 
+          current_value, 
+          deadline, 
+          category, 
+          created_at, 
+          updated_at,
+          user_id
+        FROM goals 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC
+      `).bind(user.userId).all();
+    }
 
     const goals = result.results || [];
     const activeGoals = goals.filter((g: any) => g.status === 'active' || g.status === 'in_progress');
@@ -292,13 +359,36 @@ app.get('/metrics', jwtMiddleware, async (c) => {
   const days = parseInt(c.req.query('days') || '90');
   
   try {
-    const result = await c.env.DB.prepare(`
-      SELECT metric_name, metric_value, recorded_date
-      FROM user_metrics 
-      WHERE user_id = ? 
-      ORDER BY recorded_date DESC
-      LIMIT ?
-    `).bind(user.userId, days * 2).all();
+    // Check if user is part of a team
+    const teamMembership = await c.env.DB.prepare(`
+      SELECT team_id
+      FROM startup_team_members
+      WHERE user_id = ?
+      ORDER BY is_creator DESC, joined_at ASC
+      LIMIT 1
+    `).bind(user.userId).first();
+
+    let result;
+    if (teamMembership && teamMembership.team_id) {
+      // Get metrics for all team members
+      result = await c.env.DB.prepare(`
+        SELECT um.metric_name, um.metric_value, um.recorded_date
+        FROM user_metrics um
+        INNER JOIN startup_team_members stm ON um.user_id = stm.user_id
+        WHERE stm.team_id = ?
+        ORDER BY um.recorded_date DESC
+        LIMIT ?
+      `).bind(teamMembership.team_id, days * 2).all();
+    } else {
+      // Fallback to user's own metrics if not in a team
+      result = await c.env.DB.prepare(`
+        SELECT metric_name, metric_value, recorded_date
+        FROM user_metrics 
+        WHERE user_id = ? 
+        ORDER BY recorded_date DESC
+        LIMIT ?
+      `).bind(user.userId, days * 2).all();
+    }
 
     const metrics = result.results || [];
     

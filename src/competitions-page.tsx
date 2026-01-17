@@ -16,24 +16,6 @@ export function getCompetitionsPage(props: CompetitionsPageProps): string {
 
   const content = `
     <div class="p-6">
-      <!-- Tab Navigation (same as dashboard) -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-        <div class="flex border-b border-gray-200">
-          <button onclick="window.location.href='/dashboard'" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
-            <i class="fas fa-home mr-2"></i>Hub
-          </button>
-          <button onclick="window.location.href='/dashboard?tab=inbox'" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
-            <i class="fas fa-inbox mr-2"></i>Inbox
-          </button>
-          <button onclick="window.location.href='/competitions'" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-primary border-b-2 border-primary">
-            <i class="fas fa-trophy mr-2"></i>Competitions
-          </button>
-          <button onclick="window.location.href='/dashboard?tab=directory'" class="tab-btn flex-1 px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
-            <i class="fas fa-store mr-2"></i>Directory
-          </button>
-        </div>
-      </div>
-
       <!-- Header -->
       <div class="mb-8">
         <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
@@ -53,16 +35,26 @@ export function getCompetitionsPage(props: CompetitionsPageProps): string {
 
       <!-- Tabs -->
       <div class="flex border-b border-gray-200 mb-6">
-        <button onclick="showCompetitionsTab('weekly')" id="weekly-tab" class="comp-tab px-6 py-3 text-sm font-semibold border-b-2 border-primary text-primary">
-          Weekly Competitions
-        </button>
-        <button onclick="showCompetitionsTab('monthly')" id="monthly-tab" class="comp-tab px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500">
+        <button onclick="showCompetitionsTab('monthly')" id="monthly-tab" class="comp-tab px-6 py-3 text-sm font-semibold border-b-2 border-primary text-primary">
           Monthly Prize Competitions
+        </button>
+        <button onclick="showCompetitionsTab('weekly')" id="weekly-tab" class="comp-tab px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500">
+          Weekly Competitions
         </button>
       </div>
 
+      <!-- Monthly Competitions (default visible) -->
+      <div id="monthly-competitions" class="competitions-content">
+        <div id="monthly-grid" class="grid grid-cols-1 gap-6">
+          <!-- Loading spinner -->
+          <div class="flex justify-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Weekly Competitions -->
-      <div id="weekly-competitions" class="competitions-content">
+      <div id="weekly-competitions" class="competitions-content hidden">
         <div id="weekly-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <!-- Loading spinner -->
           <div class="col-span-2 flex justify-center py-12">
@@ -163,7 +155,7 @@ export function getCompetitionsPage(props: CompetitionsPageProps): string {
     </div>
 
     <script>
-      let currentTab = 'weekly';
+      let currentTab = 'monthly';
       let weeklyCompetitions = [];
       let monthlyCompetitions = [];
 
@@ -208,13 +200,13 @@ export function getCompetitionsPage(props: CompetitionsPageProps): string {
               <p class="text-gray-700 mb-4 line-clamp-2">\${comp.description}</p>
               
               <div class="flex items-center justify-between text-sm text-gray-600 mb-4">
-                <span><i class="far fa-calendar mr-1"></i> Deadline: \${comp.deadline}</span>
-                <span><i class="fas fa-users mr-1"></i> \${comp.participant_count || 0} participants</span>
+                <span><i class="far fa-calendar mr-1"></i> Closes: \${comp.deadline || 'Sunday 11:59 PM'}</span>
+                <span><i class="fas fa-users mr-1"></i> Auto-tracking progress</span>
               </div>
               
-              <button onclick="showCompetitionDetail(\${comp.id})" class="w-full bg-primary text-white px-4 py-3 rounded-lg font-semibold hover:bg-primary/90 transition">
-                <i class="fas fa-trophy mr-2"></i>Join Mission
-              </button>
+              <a href="/leaderboard" class="block w-full bg-primary text-white px-4 py-3 rounded-lg font-semibold hover:bg-primary/90 transition text-center">
+                <i class="fas fa-trophy mr-2"></i>View Top 3 Winners
+              </a>
             </div>
           </div>
         \`).join('');
@@ -257,9 +249,9 @@ export function getCompetitionsPage(props: CompetitionsPageProps): string {
                 </div>
 
                 <div class="flex items-center space-x-4">
-                  <button onclick="showCompetitionDetail(\${comp.id})" class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-8 py-3 rounded-lg font-bold hover:opacity-90 transition">
+                  <a href="\${comp.payment_link || '#'}" target="_blank" class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-8 py-3 rounded-lg font-bold hover:opacity-90 transition">
                     <i class="fas fa-ticket-alt mr-2"></i>Get Ticket & Register
-                  </button>
+                  </a>
                   <span class="text-purple-200 text-sm">\${comp.paid_count || 0} attending</span>
                 </div>
               </div>

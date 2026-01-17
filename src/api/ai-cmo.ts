@@ -3,12 +3,76 @@
  */
 
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { verify } from 'hono/jwt';
 import type { Bindings } from '../types';
 
-const app = new Hono<{ Bindings: Bindings }>();
+type Variables = {
+  userId: number;
+};
+
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+// Enable CORS
+app.use('*', cors({
+  origin: (origin) => origin || '*',
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+}));
+
+// JWT middleware for authenticated routes
+const jwtMiddleware = async (c: any, next: any) => {
+  // Try multiple sources for the token
+  const authHeader = c.req.header('Authorization');
+  const cookieHeader = c.req.header('cookie') || c.req.header('Cookie') || '';
+  
+  console.log('[AI-CMO] Auth header:', authHeader ? 'present' : 'missing');
+  console.log('[AI-CMO] Cookie header:', cookieHeader ? 'present' : 'missing');
+  
+  let authToken = null;
+  
+  // Try Authorization header first
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    authToken = authHeader.replace('Bearer ', '');
+  }
+  
+  // Then try cookies
+  if (!authToken && cookieHeader) {
+    const match = cookieHeader.match(/authToken=([^;]+)/);
+    if (match) {
+      authToken = match[1];
+    }
+  }
+  
+  console.log('[AI-CMO] Token found:', !!authToken);
+
+  if (!authToken) {
+    console.log('[AI-CMO] No token - returning 401');
+    return c.json({ error: 'No authentication token provided' }, 401);
+  }
+
+  try {
+    const secret = c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var';
+    const payload = await verify(authToken, secret);
+    console.log('[AI-CMO] JWT payload:', JSON.stringify(payload));
+    
+    const userId = payload.id || payload.userId || payload.sub || payload.user_id;
+    if (!userId) {
+      console.log('[AI-CMO] No userId in payload');
+      return c.json({ error: 'Invalid token payload' }, 401);
+    }
+    
+    c.set('userId', userId);
+    await next();
+  } catch (error) {
+    console.error('[AI-CMO] JWT verification failed:', error);
+    return c.json({ error: 'Invalid authentication token' }, 401);
+  }
+};
 
 // Get all generated images for a user
-app.get('/images', async (c) => {
+app.get('/images', jwtMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
     if (!userId) {
@@ -21,7 +85,7 @@ app.get('/images', async (c) => {
       SELECT 
         id,
         user_id,
-        image_url as url,
+        image_url,
         prompt,
         status,
         image_type,
@@ -45,7 +109,7 @@ app.get('/images', async (c) => {
 });
 
 // Approve an image
-app.post('/images/:id/approve', async (c) => {
+app.post('/images/:id/approve', jwtMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
     if (!userId) {
@@ -80,7 +144,7 @@ app.post('/images/:id/approve', async (c) => {
 });
 
 // Reject an image
-app.post('/images/:id/reject', async (c) => {
+app.post('/images/:id/reject', jwtMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
     if (!userId) {
@@ -115,7 +179,7 @@ app.post('/images/:id/reject', async (c) => {
 });
 
 // Regenerate an image
-app.post('/images/:id/regenerate', async (c) => {
+app.post('/images/:id/regenerate', jwtMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
     if (!userId) {
@@ -162,7 +226,7 @@ app.post('/images/:id/regenerate', async (c) => {
 });
 
 // Store a new generated image (called by brand marketing agent)
-app.post('/images', async (c) => {
+app.post('/images', jwtMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
     if (!userId) {
