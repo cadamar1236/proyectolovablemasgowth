@@ -38,7 +38,20 @@ interface ConnectorChatResponse {
 async function getAllUsersForMatching(c: any, excludeUserId: number | null): Promise<any[]> {
   try {
     let query = `
-      SELECT id, name, email, user_type, country, industry, stage, avatar_url, bio, linkedin_url
+      SELECT 
+        id, 
+        name, 
+        email, 
+        role as user_type,
+        location as country,
+        company as industry,
+        plan as stage,
+        avatar_url, 
+        bio, 
+        linkedin_url,
+        interests,
+        skills,
+        looking_for
       FROM users
       WHERE name IS NOT NULL AND name != ''
     `;
@@ -51,22 +64,30 @@ async function getAllUsersForMatching(c: any, excludeUserId: number | null): Pro
     
     query += ` LIMIT 100`;  // Get up to 100 users for AI analysis
     
+    console.log('Fetching users with query:', query);
     const result = await c.env.DB.prepare(query).bind(...params).all();
+    console.log('DB returned:', result.results?.length || 0, 'users');
     
     // Convert to format expected by agent
-    return (result.results || []).map((user: any) => ({
+    const users = (result.results || []).map((user: any) => ({
       id: user.id,
       name: user.name,
       full_name: user.name,
       email: user.email,
-      user_type: user.user_type,
-      country: user.country,
-      industry: user.industry,
-      stage: user.stage,
+      user_type: user.user_type || 'founder',
+      country: user.country || '',
+      industry: user.industry || '',
+      stage: user.stage || 'starter',
       avatar_url: user.avatar_url,
       bio: user.bio,
-      linkedin_url: user.linkedin_url
+      linkedin_url: user.linkedin_url,
+      interests: user.interests ? JSON.parse(user.interests) : [],
+      skills: user.skills ? JSON.parse(user.skills) : [],
+      looking_for: user.looking_for ? JSON.parse(user.looking_for) : []
     }));
+    
+    console.log('Returning', users.length, 'formatted users');
+    return users;
   } catch (error) {
     console.error('Error getting users for matching:', error);
     return [];
@@ -547,10 +568,10 @@ app.delete('/session/:id', async (c) => {
 });
 
 /**
- * GET /api/connector/suggestions
+ * GET /api/connector/ai-suggestions
  * Get AI-suggested connections for the current user
  */
-app.get('/suggestions', async (c) => {
+app.get('/ai-suggestions', async (c) => {
   try {
     // Get user from auth token
     const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1] ||
@@ -635,6 +656,81 @@ app.get('/suggestions', async (c) => {
     return c.json({ 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+/**
+ * GET /api/connector/suggestions
+ * Get saved AI-generated suggestions for current user
+ */
+app.get('/suggestions', async (c) => {
+  try {
+    // Get auth token
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader?.replace('Bearer ', '');
+    
+    if (!token) {
+      return c.json({ success: false, error: 'No token provided' }, 401);
+    }
+
+    // Decode JWT to get user ID
+    let userId: number | null = null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userId = payload.userId;
+    } catch (e) {
+      console.error('Token decode error:', e);
+    }
+
+    if (!userId) {
+      return c.json({ success: false, error: 'Invalid token' }, 401);
+    }
+
+    // Get saved suggestions from database
+    const result = await c.env.DB.prepare(`
+      SELECT 
+        cs.id,
+        cs.suggested_user_id,
+        cs.score,
+        cs.reason,
+        cs.created_at,
+        u.name,
+        u.role as user_type,
+        u.avatar_url as avatar,
+        u.company as industry,
+        u.location as country,
+        u.bio
+      FROM connector_suggestions cs
+      JOIN users u ON cs.suggested_user_id = u.id
+      WHERE cs.user_id = ?
+      AND cs.status = 'pending'
+      ORDER BY cs.created_at DESC
+    `).bind(userId).all();
+
+    const suggestions = (result.results || []).map((s: any) => ({
+      id: s.suggested_user_id,
+      name: s.name,
+      user_type: s.user_type || 'founder',
+      avatar: s.avatar,
+      industry: s.industry,
+      country: s.country,
+      bio: s.bio,
+      score: s.score,
+      reason: s.reason,
+      created_at: s.created_at
+    }));
+
+    return c.json({
+      success: true,
+      suggestions
+    });
+
+  } catch (error) {
+    console.error('Error loading suggestions:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
   }
 });

@@ -5,10 +5,20 @@
  */
 
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { verify } from 'hono/jwt';
 import type { Bindings } from '../types';
 
 const astarMessages = new Hono<{ Bindings: Bindings }>();
+
+// Enable CORS
+astarMessages.use('*', cors({
+  origin: (origin) => origin || '*',
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+  exposeHeaders: ['Set-Cookie']
+}));
 
 const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
 
@@ -65,16 +75,29 @@ interface User {
 // Middleware de autenticación
 async function requireAuth(c: any, next: any) {
   try {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Unauthorized' }, 401);
+    // Intentar obtener token desde Authorization header
+    let token = c.req.header('Authorization')?.replace('Bearer ', '');
+    
+    // Si no está en el header, intentar desde cookies
+    if (!token) {
+      const cookieHeader = c.req.header('Cookie');
+      if (cookieHeader) {
+        const match = cookieHeader.match(/authToken=([^;]+)/);
+        if (match) token = match[1];
+      }
     }
-    const token = authHeader.substring(7);
-    const payload = await verify(token, JWT_SECRET) as any;
+    
+    if (!token) {
+      console.error('[AUTH] No token found in Authorization header or cookies');
+      return c.json({ error: 'Unauthorized - No token provided' }, 401);
+    }
+    
+    const payload = await verify(token, c.env.JWT_SECRET || JWT_SECRET) as any;
     c.set('userId', payload.userId);
     c.set('userRole', payload.role);
     await next();
-  } catch {
+  } catch (error) {
+    console.error('[AUTH] Token verification failed:', error);
     return c.json({ error: 'Invalid token' }, 401);
   }
 }
@@ -145,7 +168,42 @@ function renderTemplate(template: string, data: Record<string, any>): string {
   return result;
 }
 
-function createDashboardButtonHtml(dashboardUrl: string = 'https://astarlabshub.com/dashboard'): string {
+function createDashboardButtonHtml(category: string = 'general'): string {
+  // Todos los botones ahora llevan al chat con contexto específico
+  let dashboardUrl = 'https://astarlabshub.com/marketplace?tab=traction';
+  let buttonText = '💬 Responder en el Chat';
+  let chatContext = '';
+  
+  switch(category.toLowerCase()) {
+    case 'ideas':
+    case 'hypothesis':
+      chatContext = 'hipotesis';
+      buttonText = '💡 Compartir mis Hipótesis';
+      break;
+    case 'build':
+    case 'construction':
+      chatContext = 'construccion';
+      buttonText = '🛠️ Contar mi Progreso';
+      break;
+    case 'measure':
+    case 'measurement':
+    case 'feedback':
+      chatContext = 'metricas';
+      buttonText = '📊 Compartir mis Números';
+      break;
+    case 'reflection':
+    case 'weekly_review':
+      chatContext = 'reflexion';
+      buttonText = '🤔 Compartir Aprendizajes';
+      break;
+    default:
+      chatContext = 'general';
+      buttonText = '💬 Responder en el Chat';
+  }
+  
+  // Todos van al chat con el contexto específico
+  dashboardUrl = `https://astarlabshub.com/marketplace?tab=traction&chat=${chatContext}`;
+  
   return `
 <div style="text-align: center; margin: 32px 0;">
   <a href="${dashboardUrl}" 
@@ -159,15 +217,15 @@ function createDashboardButtonHtml(dashboardUrl: string = 'https://astarlabshub.
             font-size: 16px;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
             transition: all 0.3s ease;">
-    📊 Ir al Dashboard y Responder
+    ${buttonText}
   </a>
 </div>
 <p style="text-align: center; color: #666; font-size: 14px; margin-top: 16px;">
-  O responde directamente a este email
+  El chat automáticamente convertirá tu respuesta en objetivos, métricas o actualizaciones
 </p>`;
 }
 
-function convertToHtml(text: string): string {
+function convertToHtml(text: string, category: string = 'general'): string {
   // Primero reemplazar el placeholder de dashboard_link con un marcador temporal
   const BUTTON_MARKER = '___DASHBOARD_BUTTON___';
   const textWithMarker = text.replace(/{{dashboard_link}}/g, BUTTON_MARKER);
@@ -186,8 +244,8 @@ function convertToHtml(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/👉/g, '→');
   
-  // Finalmente reemplazar el marcador con el botón HTML real
-  const dashboardButton = createDashboardButtonHtml();
+  // Finalmente reemplazar el marcador con el botón HTML real usando la categoría
+  const dashboardButton = createDashboardButtonHtml(category);
   return html.replace(new RegExp(BUTTON_MARKER, 'g'), dashboardButton);
 }
 
@@ -354,7 +412,7 @@ astarMessages.post('/cron/send-daily', async (c) => {
 
       // Renderizar plantilla
       const body = renderTemplate(template.body_template, templateData);
-      const htmlBody = convertToHtml(body);
+      const htmlBody = convertToHtml(body, template.category);
 
       // Enviar email con Resend
       const result = await sendEmailWithResend(
@@ -436,7 +494,7 @@ astarMessages.post('/cron/test-email', async (c) => {
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
         <div style="background-color: white; padding: 32px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
           <h2 style="color: #1f2937; margin-bottom: 24px;">${template.subject}</h2>
-          ${convertToHtml(rendered)}
+          ${convertToHtml(rendered, template.category)}
         </div>
         <p style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px;">
           ASTAR Labs - Ayudando founders a iterar más rápido
@@ -548,7 +606,7 @@ astarMessages.post('/cron/send-all-week/:email', async (c) => {
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
           <div style="background-color: white; padding: 32px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <h2 style="color: #1f2937; margin-bottom: 24px;">${template.subject}</h2>
-            ${convertToHtml(rendered)}
+            ${convertToHtml(rendered, template.category)}
           </div>
           <p style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px;">
             ASTAR Labs - Ayudando founders a iterar más rápido
@@ -637,6 +695,7 @@ astarMessages.use('/*', async (c, next) => {
   const isPublicEndpoint = fullUrl.includes('cron/send-daily') || 
                            fullUrl.includes('cron/test-email') ||
                            fullUrl.includes('cron/send-all-week') ||
+                           fullUrl.includes('cron/send-by-day') ||
                            fullUrl.includes('debug/');
   
   // Si es un endpoint público, saltar autenticación
@@ -775,29 +834,9 @@ astarMessages.post('/respond', async (c) => {
       return c.json({ error: 'Message not found' }, 404);
     }
 
-    // Crear goal automáticamente
-    const categoryEmojis: Record<string, string> = {
-      'ideas': '💡',
-      'build': '🔨',
-      'measure': '📊',
-      'reflect': '🎯'
-    };
-    const emoji = categoryEmojis[sentMessage.category] || '⭐';
-    const goalDescription = `${emoji} ASTAR ${sentMessage.category}: ${response_text.substring(0, 200)}`;
+    // NO crear goal aquí - dejarlo para el chat
+    // Solo guardar la respuesta del usuario para procesar después
     
-    let createdGoalId: number | null = null;
-    try {
-      const goalResult = await c.env.DB.prepare(`
-        INSERT INTO dashboard_goals (
-          user_id, category, description, target_value, current_value, status
-        ) VALUES (?, 'ASTAR', ?, 1, 0, 'active')
-      `).bind(userId, goalDescription).run();
-      createdGoalId = goalResult.meta.last_row_id as number;
-    } catch (goalError) {
-      console.error('Error creating goal:', goalError);
-      // Continuar aunque falle crear el goal
-    }
-
     // Guardar respuesta
     const result = await c.env.DB.prepare(`
       INSERT INTO astar_user_responses (
@@ -810,16 +849,15 @@ astarMessages.post('/respond', async (c) => {
       response_text, 
       sentMessage.category,
       '{}',
-      createdGoalId
+      null  // No crear goal todavía
     ).run();
 
+    // Devolver la categoría para que el frontend redirija al chat con contexto
     return c.json({
       success: true,
       response_id: result.meta.last_row_id,
-      created_goal_id: createdGoalId,
-      goal_description: goalDescription,
       category: sentMessage.category,
-      response_prompt: sentMessage.response_prompt || '',
+      response_text: response_text,
       redirect_to_chat: true
     });
 
@@ -995,6 +1033,169 @@ astarMessages.post('/update-metrics', async (c) => {
   } catch (error) {
     console.error('Error updating metrics:', error);
     return c.json({ error: 'Failed to update metrics' }, 500);
+  }
+});
+
+// ENDPOINT NUEVO - Enviar email de un día específico para pruebas
+astarMessages.post('/cron/send-by-day/:dayOfWeek', async (c) => {
+  try {
+    const dayOfWeekParam = c.req.param('dayOfWeek');
+    const dayOfWeekMap: Record<string, number> = {
+      'lunes': 1,
+      'monday': 1,
+      'martes': 2,
+      'tuesday': 2,
+      'miercoles': 3,
+      'wednesday': 3,
+      'jueves': 4,
+      'thursday': 4,
+      'viernes': 5,
+      'friday': 5,
+      'sabado': 6,
+      'saturday': 6,
+      'domingo': 0,
+      'sunday': 0
+    };
+
+    const dayOfWeek = dayOfWeekMap[dayOfWeekParam.toLowerCase()];
+    if (dayOfWeek === undefined) {
+      return c.json({ 
+        error: 'Invalid day. Use: lunes, martes, miercoles, jueves, viernes, sabado, domingo (or English equivalents)',
+        provided: dayOfWeekParam 
+      }, 400);
+    }
+
+    const now = new Date();
+    const weekNumber = getWeekNumber(now);
+    const year = now.getFullYear();
+
+    // Obtener usuario de prueba
+    const user = await c.env.DB.prepare(`
+      SELECT id, email, name FROM users WHERE email = 'aihelpstudy@gmail.com'
+    `).first() as User | null;
+
+    if (!user) {
+      return c.json({ error: 'Test user not found' }, 404);
+    }
+
+    // Obtener todas las plantillas de ese día
+    const templates = await c.env.DB.prepare(`
+      SELECT * FROM astar_message_templates 
+      WHERE day_of_week = ?
+      ORDER BY time_of_day
+    `).bind(dayOfWeek).all() as { results: MessageTemplate[] };
+
+    if (!templates.results || templates.results.length === 0) {
+      return c.json({ 
+        error: 'No templates found for this day', 
+        dayOfWeek: dayOfWeek,
+        dayName: dayOfWeekParam 
+      }, 404);
+    }
+
+    const results: any[] = [];
+    const errors: string[] = [];
+
+    for (const template of templates.results) {
+      // Preparar datos para la plantilla
+      const templateData: Record<string, any> = {
+        name: user.name || 'Founder',
+        dashboard_link: '{{dashboard_link}}'
+      };
+
+      // Si es domingo (reflexión), agregar rankings ficticios para pruebas
+      if (dayOfWeek === 0 && template.time_of_day === 'evening') {
+        templateData.rankings = true;
+        templateData.first_place = { name: 'Ana García', users: 15, score: 85 };
+        templateData.second_place = { name: 'Carlos López', users: 12, score: 72 };
+        templateData.third_place = { name: 'María Torres', users: 10, score: 68 };
+        templateData.user_rank = 5;
+        templateData.user_total_users = 8;
+        templateData.user_score = 55;
+      }
+
+      // Renderizar plantilla
+      const rendered = renderTemplate(template.body_template, templateData);
+      const htmlBody = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+          <div style="background-color: white; padding: 32px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <h2 style="color: #1f2937; margin-bottom: 24px;">${template.subject}</h2>
+            ${convertToHtml(rendered, template.category)}
+          </div>
+          <p style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px;">
+            ASTAR Labs - Ayudando founders a iterar más rápido
+          </p>
+        </div>
+      `;
+
+      // Enviar email
+      const result = await sendEmailWithResend(
+        c.env.RESEND_API_KEY,
+        user.email,
+        `[${dayOfWeekParam.toUpperCase()}] ${template.subject}`,
+        htmlBody
+      );
+
+      if (result.success) {
+        // Eliminar mensaje previo si existe
+        await c.env.DB.prepare(`
+          DELETE FROM astar_user_responses 
+          WHERE sent_message_id IN (
+            SELECT id FROM astar_sent_messages 
+            WHERE user_id = ? AND template_id = ? AND week_number = ? AND year = ?
+          )
+        `).bind(user.id, template.id, weekNumber, year).run();
+        
+        await c.env.DB.prepare(`
+          DELETE FROM astar_sent_messages 
+          WHERE user_id = ? AND template_id = ? AND week_number = ? AND year = ?
+        `).bind(user.id, template.id, weekNumber, year).run();
+
+        // Guardar nuevo mensaje
+        await c.env.DB.prepare(`
+          INSERT INTO astar_sent_messages (user_id, template_id, week_number, year, sent_at, email_id)
+          VALUES (?, ?, ?, ?, datetime('now'), ?)
+        `).bind(user.id, template.id, weekNumber, year, result.emailId).run();
+
+        results.push({
+          time: template.time_of_day,
+          subject: template.subject,
+          category: template.category,
+          emailId: result.emailId,
+          success: true
+        });
+      } else {
+        errors.push(`${template.subject}: ${result.error}`);
+        results.push({
+          time: template.time_of_day,
+          subject: template.subject,
+          category: template.category,
+          error: result.error,
+          success: false
+        });
+      }
+
+      // Esperar 500ms entre emails
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    return c.json({
+      success: true,
+      user: user.email,
+      dayOfWeek: dayOfWeekParam,
+      totalTemplates: templates.results.length,
+      sent: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results,
+      errors: errors.length > 0 ? errors : undefined
+    });
+
+  } catch (error: any) {
+    console.error('Error sending day emails:', error);
+    return c.json({ 
+      error: 'Failed to send day emails', 
+      details: error.message || String(error)
+    }, 500);
   }
 });
 

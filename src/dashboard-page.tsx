@@ -249,23 +249,47 @@ app.get('/', async (c) => {
           state.isLoading = true;
           render();
           
+          // Obtener token de las cookies
+          var token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          
           const response = await axios.post('/api/astar-messages/respond', {
             sent_message_id: messageId,
             response_text: state.astarResponse
           }, {
+            headers: token ? {
+              'Authorization': 'Bearer ' + token
+            } : {},
             withCredentials: true
           });
 
           if (response.status === 200) {
             state.astarResponse = '';
             state.respondingToMessageId = null;
-            await loadAstarPendingMessages();
-            await loadGoals();
-            alert('¡Respuesta enviada! 🎉');
+            
+            var data = response.data;
+            
+            // Mapear categorías a contextos de chat
+            var contextMap = {
+              'ideas': 'hipotesis',
+              'hypothesis': 'hipotesis',
+              'build': 'construccion',
+              'construction': 'construccion',
+              'measure': 'metricas',
+              'measurement': 'metricas',
+              'feedback': 'metricas',
+              'reflect': 'reflexion',
+              'reflection': 'reflexion',
+              'weekly_review': 'reflexion'
+            };
+            
+            var chatContext = contextMap[data.category] || 'general';
+            
+            // Redirigir al dashboard con el contexto del chat
+            window.location.href = '/dashboard?emailContext=' + chatContext + '&astarResponse=' + encodeURIComponent(data.response_text);
           }
         } catch (error) {
-          console.error('Error submitting ASTAR response:', error);
-          alert('Error al enviar respuesta');
+          console.error('[ASTAR] Error submitting:', error);
+          alert('Error al enviar respuesta. Por favor intenta de nuevo.');
         } finally {
           state.isLoading = false;
           render();
@@ -719,6 +743,14 @@ app.get('/', async (c) => {
                 </div>
               </div>
             </div>
+            
+            <!-- Floating Chat Button (when chat is closed) -->
+            <button
+              onclick="toggleChat()"
+              class="fixed bottom-6 right-6 z-50 \${chatExpanded ? 'hidden' : ''} bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl hover:shadow-purple-500/50 transition-all hover:scale-110"
+            >
+              <i class="fas fa-comment-dots text-2xl"></i>
+            </button>
           </div>
         \`;
         
@@ -1359,6 +1391,84 @@ app.get('/', async (c) => {
       loadGoals();
       loadChatHistory();
       loadAstarPendingMessages();
+      
+      // Check for ASTAR email response parameters
+      var emailContext = urlParams.get('emailContext');
+      var astarResponseText = urlParams.get('astarResponse');
+      
+      console.log('[ASTAR-INIT] URL params check:', { 
+        emailContext: emailContext, 
+        astarResponseText: astarResponseText ? astarResponseText.substring(0, 50) + '...' : null,
+        fullUrl: window.location.href 
+      });
+      
+      if (emailContext && astarResponseText) {
+        console.log('[ASTAR-INIT] ✅ Email response detected! Opening chat...');
+        
+        // Decode the response text
+        var decodedResponse = decodeURIComponent(astarResponseText);
+        console.log('[ASTAR-INIT] Decoded response:', decodedResponse);
+        
+        // Open chat immediately
+        state.chatExpanded = true;
+        render();
+        
+        // Show user message in chat immediately
+        state.messages.push({
+          id: Date.now().toString(),
+          role: 'user',
+          content: decodedResponse,
+          timestamp: new Date().toISOString()
+        });
+        render();
+        
+        // Wait a moment then send to backend
+        setTimeout(async function() {
+          try {
+            console.log('[ASTAR-INIT] Sending to backend with emailContext:', emailContext);
+            
+            // Send the user's response directly to the chat agent with email context
+            var response = await axios.post('/api/chat-agent/message', {
+              message: decodedResponse,
+              emailContext: emailContext
+            }, {
+              withCredentials: true
+            });
+            
+            console.log('[ASTAR-INIT] Backend response:', response.data);
+            
+            if (response.data && response.data.message) {
+              // Add assistant response to chat
+              state.messages.push({
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: response.data.message,
+                timestamp: new Date().toISOString()
+              });
+              render();
+              
+              // Reload goals after a short delay
+              setTimeout(function() {
+                loadGoals();
+              }, 2000);
+            }
+            
+            // Clean URL
+            var cleanUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+            
+          } catch (error) {
+            console.error('[ASTAR-INIT] Error processing email response:', error);
+            state.messages.push({
+              id: (Date.now() + 2).toString(),
+              role: 'assistant',
+              content: '❌ Error al procesar tu respuesta. Por favor intenta de nuevo.',
+              timestamp: new Date().toISOString()
+            });
+            render();
+          }
+        }, 500);
+      }
 
       // Handle hash changes
       window.addEventListener('hashchange', () => {

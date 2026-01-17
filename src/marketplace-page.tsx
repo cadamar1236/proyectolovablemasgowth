@@ -540,11 +540,28 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           </div>
         </div>
         
-        <!-- Suggested Connections -->
-        <div id="connector-results" class="hidden">
+        <!-- All Saved Suggestions -->
+        <div class="mt-6">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-bold text-gray-900">
-              <i class="fas fa-users text-purple-500 mr-2"></i>Suggested Connections
+              <i class="fas fa-bookmark text-purple-500 mr-2"></i>All Saved Suggestions
+            </h3>
+            <span id="all-suggestions-count" class="text-sm text-gray-500"></span>
+          </div>
+          <div id="all-suggestions-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="bg-white rounded-xl p-6 border border-gray-200 text-center text-gray-500 col-span-full">
+              <i class="fas fa-bookmark text-4xl text-gray-300 mb-3"></i>
+              <p class="text-sm">Your saved connection suggestions will appear here</p>
+              <p class="text-xs text-gray-400 mt-2">Use the chat above to find relevant connections</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Suggested Connections (from chat) -->
+        <div id="connector-results" class="hidden mt-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-gray-900">
+              <i class="fas fa-users text-purple-500 mr-2"></i>New Suggested Connections
             </h3>
             <span id="connector-results-count" class="text-sm text-gray-500"></span>
           </div>
@@ -552,18 +569,20 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <!-- Results will be loaded here -->
           </div>
         </div>
-        
-        <!-- Recent Connection Requests -->
-        <div class="mt-6">
-          <h3 class="text-lg font-bold text-gray-900 mb-4">
-            <i class="fas fa-history text-indigo-500 mr-2"></i>Recent Suggestions
-          </h3>
-          <div id="recent-connections" class="space-y-3">
-            <div class="bg-white rounded-xl p-4 border border-gray-200 text-center text-gray-500">
-              <i class="fas fa-search text-3xl text-gray-300 mb-2"></i>
-              <p class="text-sm">Your suggested connections will appear here</p>
-            </div>
-          </div>
+      </div>
+    </div>
+
+    <!-- Connector Suggestion Detail Modal -->
+    <div id="suggestion-detail-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+      <div class="bg-white rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+          <h3 class="text-xl font-bold text-gray-900">Connection Details</h3>
+          <button onclick="closeSuggestionDetail()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">
+            &times;
+          </button>
+        </div>
+        <div id="suggestion-detail-content" class="p-6">
+          <!-- Content will be loaded here -->
         </div>
       </div>
     </div>
@@ -855,6 +874,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         if (!connectorSessionId) {
           connectorSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         }
+        
+        // Load recent suggestions from database
+        loadRecentSuggestions();
       }
       
       async function sendConnectorMessage(event) {
@@ -1091,9 +1113,167 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
       }
       
       // Load recent suggestions on page load
-      function loadRecentSuggestions() {
-        const recent = JSON.parse(localStorage.getItem('recentConnectorSuggestions') || '[]');
-        renderRecentSuggestions(recent);
+      async function loadRecentSuggestions() {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          if (!token) return;
+          
+          const res = await axios.get('/api/connector/suggestions', {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          
+          if (res.data.success && res.data.suggestions.length > 0) {
+            renderAllSuggestions(res.data.suggestions);
+          } else {
+            renderAllSuggestions([]);
+          }
+        } catch (error) {
+          console.error('Error loading suggestions:', error);
+          renderAllSuggestions([]);
+        }
+      }
+
+      // Render all saved suggestions
+      function renderAllSuggestions(suggestions) {
+        const container = document.getElementById('all-suggestions-list');
+        const countEl = document.getElementById('all-suggestions-count');
+        
+        if (!suggestions || suggestions.length === 0) {
+          container.innerHTML = '<div class="bg-white rounded-xl p-6 border border-gray-200 text-center text-gray-500 col-span-full">' +
+            '<i class="fas fa-bookmark text-4xl text-gray-300 mb-3"></i>' +
+            '<p class="text-sm">Your saved connection suggestions will appear here</p>' +
+            '<p class="text-xs text-gray-400 mt-2">Use the chat above to find relevant connections</p>' +
+            '</div>';
+          countEl.textContent = '';
+          return;
+        }
+
+        countEl.textContent = suggestions.length + ' suggestion' + (suggestions.length !== 1 ? 's' : '');
+        
+        container.innerHTML = suggestions.map(s => {
+          const avatar = s.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(s.name || 'User');
+          const name = s.name || 'Unknown';
+          const userType = s.user_type || 'founder';
+          const score = s.score ? (s.score * 100).toFixed(0) : 0;
+          
+          let html = '<div class="bg-white rounded-xl p-4 border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer" onclick="showSuggestionDetail(' + s.id + ')">';
+          html += '<div class="flex items-start gap-3">';
+          html += '<img src="' + avatar + '" alt="' + name + '" class="w-12 h-12 rounded-full object-cover flex-shrink-0">';
+          html += '<div class="flex-1 min-w-0">';
+          html += '<h4 class="font-semibold text-gray-900 truncate">' + name + '</h4>';
+          html += '<p class="text-xs text-gray-500 capitalize">' + userType + '</p>';
+          if (s.industry) html += '<p class="text-xs text-purple-600 mt-1"><i class="fas fa-briefcase mr-1"></i>' + s.industry + '</p>';
+          if (s.country) html += '<p class="text-xs text-gray-500 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>' + s.country + '</p>';
+          html += '</div></div>';
+          
+          if (s.reason) {
+            html += '<div class="mt-3 bg-purple-50 rounded-lg p-2">';
+            html += '<p class="text-xs text-purple-700 line-clamp-2"><i class="fas fa-lightbulb mr-1"></i>' + s.reason + '</p>';
+            html += '</div>';
+          }
+          
+          if (s.score) {
+            html += '<div class="mt-2 flex items-center gap-2">';
+            html += '<div class="flex-1 bg-gray-200 rounded-full h-1.5">';
+            html += '<div class="bg-gradient-to-r from-purple-500 to-indigo-600 h-1.5 rounded-full" style="width: ' + score + '%"></div>';
+            html += '</div><span class="text-xs font-semibold text-gray-600">' + score + '%</span></div>';
+          }
+          
+          html += '<div class="mt-3 flex gap-2">';
+          html += '<button onclick="event.stopPropagation(); startConversation(' + s.id + ')" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-2 px-3 rounded-lg text-xs font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all">';
+          html += '<i class="fas fa-comment-dots mr-1"></i>Connect</button>';
+          html += '<button onclick="event.stopPropagation(); showSuggestionDetail(' + s.id + ')" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all">';
+          html += '<i class="fas fa-eye"></i></button>';
+          html += '</div></div>';
+          
+          return html;
+        }).join('');
+      }
+
+      // Show suggestion detail modal
+      async function showSuggestionDetail(userId) {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          const res = await axios.get('/api/connector/suggestions', {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          
+          const suggestion = res.data.suggestions.find(s => s.id === userId);
+          if (!suggestion) {
+            alert('Suggestion not found');
+            return;
+          }
+
+          const modal = document.getElementById('suggestion-detail-modal');
+          const content = document.getElementById('suggestion-detail-content');
+          
+          const avatar = suggestion.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(suggestion.name || 'User');
+          const name = suggestion.name || 'Unknown';
+          const userType = suggestion.user_type || 'founder';
+          const score = suggestion.score ? (suggestion.score * 100).toFixed(0) : 0;
+          
+          let html = '<div class="flex items-start gap-4 mb-6">';
+          html += '<img src="' + avatar + '" alt="' + name + '" class="w-20 h-20 rounded-full object-cover">';
+          html += '<div class="flex-1">';
+          html += '<h4 class="text-2xl font-bold text-gray-900">' + name + '</h4>';
+          html += '<p class="text-sm text-gray-500 capitalize mt-1">' + userType + '</p>';
+          if (suggestion.industry) html += '<p class="text-sm text-purple-600 mt-2"><i class="fas fa-briefcase mr-2"></i>' + suggestion.industry + '</p>';
+          if (suggestion.country) html += '<p class="text-sm text-gray-600 mt-1"><i class="fas fa-map-marker-alt mr-2"></i>' + suggestion.country + '</p>';
+          html += '</div></div>';
+
+          if (suggestion.score) {
+            html += '<div class="mb-6">';
+            html += '<div class="flex items-center justify-between mb-2">';
+            html += '<span class="text-sm font-semibold text-gray-700">Match Score</span>';
+            html += '<span class="text-lg font-bold text-purple-600">' + score + '%</span>';
+            html += '</div>';
+            html += '<div class="w-full bg-gray-200 rounded-full h-2.5">';
+            html += '<div class="bg-gradient-to-r from-purple-500 to-indigo-600 h-2.5 rounded-full transition-all" style="width: ' + score + '%"></div>';
+            html += '</div></div>';
+          }
+
+          if (suggestion.reason) {
+            html += '<div class="mb-6">';
+            html += '<h5 class="text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>Why Connect</h5>';
+            html += '<div class="bg-purple-50 rounded-lg p-4">';
+            html += '<p class="text-sm text-purple-700">' + suggestion.reason + '</p>';
+            html += '</div></div>';
+          }
+
+          if (suggestion.bio) {
+            html += '<div class="mb-6">';
+            html += '<h5 class="text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-user text-blue-500 mr-2"></i>About</h5>';
+            html += '<p class="text-sm text-gray-600">' + suggestion.bio + '</p>';
+            html += '</div>';
+          }
+
+          if (suggestion.created_at) {
+            html += '<div class="mb-6">';
+            html += '<p class="text-xs text-gray-500"><i class="fas fa-clock mr-2"></i>Suggested ' + new Date(suggestion.created_at).toLocaleDateString() + '</p>';
+            html += '</div>';
+          }
+
+          html += '<div class="flex gap-3">';
+          html += '<button onclick="startConversation(' + suggestion.id + '); closeSuggestionDetail();" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all">';
+          html += '<i class="fas fa-comment-dots mr-2"></i>Start Conversation</button>';
+          html += '<button onclick="viewProfile(' + suggestion.id + '); closeSuggestionDetail();" class="px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-all">';
+          html += '<i class="fas fa-user mr-2"></i>View Profile</button>';
+          html += '</div>';
+          
+          content.innerHTML = html;
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+        } catch (error) {
+          console.error('Error loading suggestion detail:', error);
+          alert('Error loading suggestion details');
+        }
+      }
+
+      // Close suggestion detail modal
+      function closeSuggestionDetail() {
+        const modal = document.getElementById('suggestion-detail-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
       }
       // ============== END AI CONNECTOR FUNCTIONS ==============
       
@@ -2254,6 +2434,46 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         }
       }
 
+      // For Connector suggestions - just needs user ID
+      async function startConversation(userId) {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          // Create or get conversation with this user
+          const res = await axios.post('/api/chat/conversations', {
+            other_user_id: userId
+          }, { headers: { Authorization: 'Bearer ' + token } });
+          
+          if (res.data.conversation_id) {
+            selectConversation(res.data.conversation_id);
+            // Switch to inbox tab and conversations section
+            switchTab('inbox');
+            showInboxSection('conversations');
+            // Reload conversations to update the list
+            loadConversations();
+          }
+        } catch (e) {
+          console.error('Error starting conversation:', e);
+          alert('Error al iniciar conversación. Por favor intenta de nuevo.');
+        }
+      }
+
+      // View user profile in directory
+      function viewProfile(userId) {
+        // Switch to directory tab
+        switchTab('directory');
+        // Scroll to the user if needed
+        setTimeout(() => {
+          const userCard = document.querySelector(\`[data-user-id="\${userId}"]\`);
+          if (userCard) {
+            userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            userCard.classList.add('ring-2', 'ring-purple-500');
+            setTimeout(() => {
+              userCard.classList.remove('ring-2', 'ring-purple-500');
+            }, 2000);
+          }
+        }, 100);
+      }
+
       function renderConversations() {
         const container = document.getElementById('conversations-list');
         if (!conversations.length) {
@@ -2996,6 +3216,8 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
       const currentUserRole = '${userRole || 'founder'}';
       
       window.addEventListener('load', () => {
+        console.log('[MARKETPLACE-LOAD] Page loaded, checking URL params...');
+        
         // Load data only for founders
         if (currentUserRole === 'founder') {
           loadDashboardData();
@@ -3006,10 +3228,67 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         // Check if URL has tab parameter
         const urlParams = new URLSearchParams(window.location.search);
         const tabParam = urlParams.get('tab');
+        const chatContext = urlParams.get('chat');
+        const astarResponse = urlParams.get('astarResponse');
+        
+        console.log('[MARKETPLACE-LOAD] URL params:', { tabParam, chatContext, astarResponse: astarResponse ? astarResponse.substring(0, 50) + '...' : null });
         
         if (tabParam && ['home', 'traction', 'inbox', 'directory', 'aicmo'].includes(tabParam)) {
+          console.log('[MARKETPLACE-LOAD] Valid tab, switching to:', tabParam);
           // Switch to the requested tab
           switchTab(tabParam);
+          
+          // Si viene con contexto de email Y respuesta ASTAR, procesarla
+          if (chatContext && astarResponse) {
+            console.log('[MARKETPLACE-LOAD] ASTAR response detected, will open chat in 500ms');
+            setTimeout(function() {
+              console.log('[MARKETPLACE-LOAD] Opening chat sidebar...');
+              // Abrir el chat sidebar del layout
+              var sidebar = document.getElementById('chat-sidebar');
+              var floatingBtn = document.getElementById('chat-floating-btn');
+              var isMobile = window.innerWidth <= 768;
+              
+              console.log('[MARKETPLACE-LOAD] Sidebar element:', sidebar);
+              
+              if (sidebar) {
+                sidebar.style.width = isMobile ? '100%' : '400px';
+                sidebar.style.maxWidth = '400px';
+                sidebar.style.display = 'flex';
+                if (floatingBtn) floatingBtn.style.display = 'none';
+                console.log('[MARKETPLACE-LOAD] Chat sidebar opened successfully');
+              } else {
+                console.error('[MARKETPLACE-LOAD] ERROR: chat-sidebar element not found!');
+              }
+              
+              // Enviar la respuesta del usuario directamente al chat
+              console.log('[MARKETPLACE-LOAD] Calling processAstarResponse...');
+              if (typeof window.processAstarResponse === 'function') {
+                processAstarResponse(chatContext, decodeURIComponent(astarResponse));
+              } else {
+                console.error('[MARKETPLACE-LOAD] ERROR: processAstarResponse function not defined!');
+              }
+            }, 500);
+          }
+          // Si solo viene con contexto (sin respuesta), mostrar pregunta inicial
+          else if (chatContext) {
+            console.log('[INIT] Email context detected:', chatContext);
+            setTimeout(function() {
+              // Abrir el chat sidebar del layout
+              var sidebar = document.getElementById('chat-sidebar');
+              var floatingBtn = document.getElementById('chat-floating-btn');
+              var isMobile = window.innerWidth <= 768;
+              
+              if (sidebar) {
+                sidebar.style.width = isMobile ? '100%' : '400px';
+                sidebar.style.maxWidth = '400px';
+                sidebar.style.display = 'flex';
+                if (floatingBtn) floatingBtn.style.display = 'none';
+              }
+              
+              // Enviar mensaje inicial con el contexto de email
+              sendEmailContextMessage(chatContext);
+            }, 500);
+          }
         } else if (currentUserRole !== 'founder') {
           // Switch to inbox tab for non-founders if no tab specified
           switchTab('inbox');
@@ -3017,6 +3296,105 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         
         // Initialize AI CMO page renderer
         window.renderAICMOPage = ${renderAICMOPageString()};
+        
+        // Function to send email context to chat
+        window.sendEmailContextMessage = async function(emailContext) {
+          console.log('[EMAIL-CHAT] Sending email context:', emailContext);
+          
+          try {
+            var chatMessages = document.getElementById('chat-messages');
+            
+            // Mostrar loading
+            var loading = document.getElementById('chat-loading');
+            if (loading) loading.classList.remove('hidden');
+            
+            var response = await axios.post('/api/chat-agent/message', { 
+              message: '', // Empty message to trigger initial question
+              emailContext: emailContext 
+            }, { withCredentials: true });
+            
+            // Ocultar loading
+            if (loading) loading.classList.add('hidden');
+            
+            console.log('[EMAIL-CHAT] Response:', response.data);
+            
+            if (response.data && response.data.message && chatMessages) {
+              // Show the initial question in the chat
+              var messageDiv = document.createElement('div');
+              messageDiv.className = 'chat-message flex justify-start';
+              messageDiv.innerHTML = '<div class="bg-gray-100 text-gray-800 rounded-lg px-4 py-2 max-w-[85%] shadow-sm"><p class="text-sm whitespace-pre-wrap">' + response.data.message.replace(/\\n/g, '<br>') + '</p></div>';
+              chatMessages.appendChild(messageDiv);
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+              
+              // Store the email context in a global variable so we can send it with the next message
+              window.currentEmailContext = emailContext;
+            }
+          } catch (error) {
+            console.error('[EMAIL-CHAT] Error:', error);
+            var loading = document.getElementById('chat-loading');
+            if (loading) loading.classList.add('hidden');
+          }
+        };
+        
+        // Function to process ASTAR response directly
+        window.processAstarResponse = async function(emailContext, userResponse) {
+          console.log('[ASTAR-PROCESS] Processing:', { emailContext, userResponse });
+          
+          try {
+            // Primero mostrar el mensaje del usuario en el chat
+            var chatMessages = document.getElementById('chat-messages');
+            console.log('[ASTAR-PROCESS] Chat messages container:', chatMessages);
+            
+            if (chatMessages) {
+              // Mensaje del usuario
+              var userDiv = document.createElement('div');
+              userDiv.className = 'chat-message flex justify-end';
+              userDiv.innerHTML = '<div class="bg-gradient-to-r from-primary to-secondary text-white rounded-lg px-4 py-2 max-w-[85%] shadow-sm"><p class="text-sm whitespace-pre-wrap">' + userResponse.replace(/\\n/g, '<br>') + '</p></div>';
+              chatMessages.appendChild(userDiv);
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Mostrar loading
+            var loading = document.getElementById('chat-loading');
+            if (loading) loading.classList.remove('hidden');
+            
+            // Enviar la respuesta del usuario directamente al chat con contexto
+            var response = await axios.post('/api/chat-agent/message', { 
+              message: userResponse,
+              emailContext: emailContext 
+            }, { withCredentials: true });
+            
+            // Ocultar loading
+            if (loading) loading.classList.add('hidden');
+            
+            console.log('[ASTAR-PROCESS] Response:', response.data);
+            
+            // Mostrar respuesta del asistente
+            if (chatMessages && response.data && response.data.message) {
+              var assistantDiv = document.createElement('div');
+              assistantDiv.className = 'chat-message flex justify-start';
+              assistantDiv.innerHTML = '<div class="bg-gray-100 text-gray-800 rounded-lg px-4 py-2 max-w-[85%] shadow-sm"><p class="text-sm whitespace-pre-wrap">' + response.data.message.replace(/\\n/g, '<br>') + '</p></div>';
+              chatMessages.appendChild(assistantDiv);
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Limpiar URL parameters
+            var newUrl = window.location.pathname + '?tab=home';
+            window.history.replaceState({}, '', newUrl);
+            
+            // Recargar goals después de un momento
+            setTimeout(function() {
+              if (typeof loadDashboardData === 'function') {
+                loadDashboardData();
+              }
+            }, 2000);
+            
+          } catch (error) {
+            console.error('[ASTAR-PROCESS] Error:', error);
+            var loading = document.getElementById('chat-loading');
+            if (loading) loading.classList.add('hidden');
+          }
+        };
       });
     </script>
   `;

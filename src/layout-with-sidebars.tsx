@@ -1639,7 +1639,20 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 if (loading) loading.classList.remove('hidden');
                 
                 try {
-                    const response = await axios.post('/api/chat-agent/message', { message }, { withCredentials: true });
+                    // Check if there's an email context active
+                    const emailContext = window.currentEmailContext || null;
+                    
+                    const response = await axios.post('/api/chat-agent/message', { 
+                      message,
+                      emailContext: emailContext
+                    }, { withCredentials: true });
+                    
+                    // Clear the email context after first user response
+                    if (emailContext) {
+                      console.log('[CHAT] Clearing email context after user response');
+                      window.currentEmailContext = null;
+                    }
+                    
                     if (loading) loading.classList.add('hidden');
                     
                     if (response.data) {
@@ -2089,20 +2102,33 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
           
           if (res.ok) {
             var data = await res.json();
-            console.log('[ASTAR] Response saved:', data);
+            console.log('[ASTAR-SUBMIT] Response saved:', data);
             
             // Cerrar el banner
-            document.getElementById('astar-notification-banner').remove();
+            var banner = document.getElementById('astar-notification-banner');
+            if (banner) banner.remove();
             
-            // Guardar contexto para el chat en sessionStorage
-            if (data.chat_context) {
-              sessionStorage.setItem('astar_chat_context', data.chat_context);
-              sessionStorage.setItem('astar_goal_id', data.created_goal_id);
-              sessionStorage.setItem('astar_category', data.category);
-            }
+            // Redirigir al chat con el contexto del email
+            // Mapear categorías de ASTAR a contextos de chat
+            var contextMap = {
+              'ideas': 'hipotesis',
+              'hypothesis': 'hipotesis',
+              'build': 'construccion',
+              'construction': 'construccion',
+              'measure': 'metricas',
+              'measurement': 'metricas',
+              'feedback': 'metricas',
+              'reflect': 'reflexion',
+              'reflection': 'reflexion',
+              'weekly_review': 'reflexion'
+            };
             
-            // Mostrar mensaje de éxito y abrir chat
-            showAstarSuccessAndOpenChat(data);
+            var chatContext = contextMap[data.category] || 'general';
+            
+            // Redirigir al marketplace con el contexto del chat
+            var redirectUrl = '/marketplace?tab=traction&chat=' + chatContext + '&astarResponse=' + encodeURIComponent(data.response_text);
+            console.log('[ASTAR-SUBMIT] Redirecting to:', redirectUrl);
+            window.location.href = redirectUrl;
             
           } else {
             var err = await res.json();

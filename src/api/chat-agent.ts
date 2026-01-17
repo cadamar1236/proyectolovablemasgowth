@@ -305,8 +305,77 @@ app.post('/message', jwtMiddleware, async (c) => {
     return c.json({ error: 'Invalid JSON' }, 400);
   }
   
-  let { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, goalData } = requestBody;
-  console.log('[CHAT] Flags:', { useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, hasGoalData: !!goalData });
+  let { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, goalData, emailContext } = requestBody;
+  console.log('[CHAT] Flags:', { useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, hasGoalData: !!goalData, emailContext });
+
+  // ============ EMAIL CONTEXT HANDLING ============
+  // Si viene desde un email con contexto, interceptar ANTES de validar el mensaje
+  if (emailContext && !message?.trim()) {
+    console.log('[CHAT] ========== EMAIL CONTEXT DETECTED ==========');
+    console.log('[CHAT] Context:', emailContext);
+    
+    let contextMessage = '';
+    let category = 'ASTAR';
+    
+    switch(emailContext) {
+      case 'hipotesis':
+        contextMessage = '💡 ¡Perfecto! Cuéntame: **¿Qué hipótesis quieres validar esta semana?**\n\n' +
+          'Ejemplos:\n' +
+          '• "Los usuarios necesitan [X característica]"\n' +
+          '• "Si cambio [Y], aumentarán las conversiones"\n' +
+          '• "El problema principal de mis usuarios es [Z]"\n\n' +
+          'Una vez me lo cuentes, lo registraré automáticamente como un objetivo para ti. 📝';
+        category = 'ASTAR';
+        break;
+        
+      case 'construccion':
+        contextMessage = '🛠️ ¡Excelente! Cuéntame: **¿Qué estás construyendo esta semana?**\n\n' +
+          'Puedes contarme:\n' +
+          '• La nueva funcionalidad que estás desarrollando\n' +
+          '• El problema técnico que estás resolviendo\n' +
+          '• La mejora que estás implementando\n\n' +
+          'Lo registraré como un objetivo de construcción automáticamente. ⚙️';
+        category = 'ASTAR';
+        break;
+        
+      case 'metricas':
+        contextMessage = '📊 ¡Genial! Cuéntame: **¿Qué números tienes esta semana?**\n\n' +
+          'Puedes compartir:\n' +
+          '• "Tengo X usuarios activos"\n' +
+          '• "Generé $Y en revenue"\n' +
+          '• "Alcancé Z conversiones"\n\n' +
+          'Registraré tus métricas automáticamente. 📈';
+        category = 'metrics';
+        break;
+        
+      case 'reflexion':
+        contextMessage = '🤔 ¡Perfecto! Es momento de reflexionar: **¿Qué aprendiste esta semana?**\n\n' +
+          'Comparte:\n' +
+          '• Qué funcionó bien\n' +
+          '• Qué no funcionó como esperabas\n' +
+          '• Qué harás diferente la próxima semana\n\n' +
+          'Registraré tus aprendizajes como objetivos de mejora. 💭';
+        category = 'ASTAR';
+        break;
+        
+      default:
+        contextMessage = '👋 ¡Hola! ¿En qué puedo ayudarte hoy?';
+    }
+    
+    // Guardar mensaje del sistema con contexto
+    await c.env.DB.prepare(`
+      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+      VALUES (?, 'assistant', ?, datetime('now'))
+    `).bind(user.userId, contextMessage).run();
+    
+    return c.json({ 
+      message: contextMessage,
+      emailContext: emailContext,
+      category: category,
+      waitingForUserResponse: true
+    });
+  }
+  // ============ END EMAIL CONTEXT HANDLING ============
 
   if (!message?.trim()) {
     console.error('[CHAT] No message provided');
@@ -329,6 +398,209 @@ app.post('/message', jwtMiddleware, async (c) => {
     });
   }
   // ============ END ASTAR TRIGGER ============
+
+  // ============ PROCESS EMAIL CONTEXT RESPONSE ============
+  // Si el usuario está respondiendo a una pregunta de contexto de email
+  if (emailContext && message?.trim()) {
+    console.log('[CHAT] ========== PROCESSING EMAIL CONTEXT RESPONSE ==========');
+    console.log('[CHAT] Context:', emailContext, 'Message:', message);
+    
+    const db = c.env.DB;
+    
+    // Guardar el mensaje del usuario
+    await db.prepare(`
+      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+      VALUES (?, 'user', ?, datetime('now'))
+    `).bind(user.userId, message).run();
+    
+    try {
+      let responseMessage = '';
+      let goalCreated = false;
+      
+      switch(emailContext) {
+        case 'hipotesis': {
+          // Crear goal automáticamente con la hipótesis
+          const result = await db.prepare(`
+            INSERT INTO goals (
+              user_id, category, description, task, priority, priority_label, 
+              cadence, dri, goal_status, week_of, status, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+          `).bind(
+            user.userId,
+            'ASTAR',
+            message, // La hipótesis del usuario
+            'Validar hipótesis',
+            'P1',
+            'High Priority',
+            'One time',
+            null,
+            'To start',
+            null
+          ).run();
+          
+          goalCreated = true;
+          responseMessage = '✅ ¡Perfecto! He registrado tu hipótesis:\n\n' +
+            '💡 "' + message + '"\n\n' +
+            '📋 Lo puedes ver en tu dashboard en la sección de Objetivos.\n' +
+            '🎯 ID del objetivo: ' + result.meta?.last_row_id + '\n\n' +
+            '¿Hay algo más en lo que pueda ayudarte?';
+          break;
+        }
+        
+        case 'construccion': {
+          // Crear goal de construcción
+          const result = await db.prepare(`
+            INSERT INTO goals (
+              user_id, category, description, task, priority, priority_label, 
+              cadence, dri, goal_status, week_of, status, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+          `).bind(
+            user.userId,
+            'ASTAR',
+            message,
+            'Construcción/Desarrollo',
+            'P1',
+            'High Priority',
+            'One time',
+            null,
+            'To start',
+            null
+          ).run();
+          
+          goalCreated = true;
+          responseMessage = '✅ ¡Excelente! He registrado tu tarea de construcción:\n\n' +
+            '🛠️ "' + message + '"\n\n' +
+            '📋 Lo puedes ver en tu dashboard.\n' +
+            '🎯 ID del objetivo: ' + result.meta?.last_row_id + '\n\n' +
+            '¿Necesitas ayuda con algo más?';
+          break;
+        }
+        
+        case 'metricas': {
+          // Extraer números del mensaje y crear métricas
+          // Buscar patrones como "X usuarios", "$Y revenue", "Z conversiones"
+          const userMatch = message.match(/(\d+)\s*(usuarios|users|user)/i);
+          const revenueMatch = message.match(/\$?(\d+(?:\.\d+)?)\s*(revenue|ingresos|dollars?|usd)/i);
+          const conversionMatch = message.match(/(\d+(?:\.\d+)?)\s*(conversiones|conversions?)/i);
+          
+          const metrics = [];
+          if (userMatch) {
+            await db.prepare(`
+              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+              VALUES (?, 'users', ?, date('now'))
+            `).bind(user.userId, parseInt(userMatch[1])).run();
+            metrics.push('👥 ' + userMatch[1] + ' usuarios');
+          }
+          
+          if (revenueMatch) {
+            await db.prepare(`
+              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+              VALUES (?, 'revenue', ?, date('now'))
+            `).bind(user.userId, parseFloat(revenueMatch[1])).run();
+            metrics.push('💰 $' + revenueMatch[1] + ' revenue');
+          }
+          
+          if (conversionMatch) {
+            await db.prepare(`
+              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+              VALUES (?, 'conversions', ?, date('now'))
+            `).bind(user.userId, parseFloat(conversionMatch[1])).run();
+            metrics.push('📈 ' + conversionMatch[1] + ' conversiones');
+          }
+          
+          if (metrics.length > 0) {
+            responseMessage = '✅ ¡Genial! He registrado tus métricas:\n\n' +
+              metrics.join('\n') + '\n\n' +
+              '📊 Puedes verlas en tu timeline de métricas.\n\n' +
+              '¿Algo más que quieras registrar?';
+          } else {
+            // Si no se detectaron métricas, crear un goal con la información
+            const result = await db.prepare(`
+              INSERT INTO goals (
+                user_id, category, description, task, priority, priority_label, 
+                cadence, dri, goal_status, week_of, status, created_at
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+            `).bind(
+              user.userId,
+              'ASTAR',
+              message,
+              'Actualización de métricas',
+              'P2',
+              'Medium Priority',
+              'One time',
+              null,
+              'To start',
+              null
+            ).run();
+            
+            goalCreated = true;
+            responseMessage = '✅ He registrado tu actualización:\n\n' +
+              '📊 "' + message + '"\n\n' +
+              '💡 Tip: Para registrar métricas automáticamente, menciona números específicos como "100 usuarios" o "$500 revenue".\n\n' +
+              '¿Necesitas algo más?';
+          }
+          break;
+        }
+        
+        case 'reflexion': {
+          // Crear goal con los aprendizajes
+          const result = await db.prepare(`
+            INSERT INTO goals (
+              user_id, category, description, task, priority, priority_label, 
+              cadence, dri, goal_status, week_of, status, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+          `).bind(
+            user.userId,
+            'ASTAR',
+            message,
+            'Aprendizaje/Reflexión',
+            'P2',
+            'Medium Priority',
+            'One time',
+            null,
+            'To start',
+            null
+          ).run();
+          
+          goalCreated = true;
+          responseMessage = '✅ ¡Excelente reflexión! He registrado tus aprendizajes:\n\n' +
+            '🤔 "' + message + '"\n\n' +
+            '📋 Lo puedes revisar en tu dashboard.\n' +
+            '🎯 ID: ' + result.meta?.last_row_id + '\n\n' +
+            '¿Hay algo más que quieras compartir?';
+          break;
+        }
+      }
+      
+      // Guardar respuesta del asistente
+      await db.prepare(`
+        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+        VALUES (?, 'assistant', ?, datetime('now'))
+      `).bind(user.userId, responseMessage).run();
+      
+      return c.json({ 
+        message: responseMessage,
+        goalCreated: goalCreated,
+        emailContextProcessed: true
+      });
+      
+    } catch (error) {
+      console.error('[CHAT] Error processing email context response:', error);
+      const errorMessage = '❌ Hubo un error al procesar tu respuesta. Por favor, intenta de nuevo.';
+      
+      await db.prepare(`
+        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
+        VALUES (?, 'assistant', ?, datetime('now'))
+      `).bind(user.userId, errorMessage).run();
+      
+      return c.json({ message: errorMessage });
+    }
+  }
+  // ============ END PROCESS EMAIL CONTEXT RESPONSE ============
 
   // ============ GOAL CREATION FROM FLOW ============
   // Si viene goalData del flujo de creación de goals, crear directamente
