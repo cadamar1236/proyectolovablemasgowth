@@ -13,6 +13,7 @@ from linkedin_connector_agent import (
     LinkedInConnectorTeam,
     get_linkedin_connector_team
 )
+from ai_connector_agent import AIConnectorTeam
 
 # Initialize FastAPI
 app = FastAPI(
@@ -32,16 +33,24 @@ app.add_middleware(
 
 # Initialize LinkedIn Connector Team
 linkedin_team = None
+ai_connector_team = None
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize LinkedIn Connector on startup"""
-    global linkedin_team
+    global linkedin_team, ai_connector_team
     try:
         linkedin_team = get_linkedin_connector_team()
         print("✅ LinkedIn Connector Team initialized successfully")
     except Exception as e:
         print(f"⚠️ Warning: Could not initialize LinkedIn Team: {e}")
+        print("API will continue with limited functionality")
+    
+    try:
+        ai_connector_team = AIConnectorTeam()
+        print("✅ AI Connector Team initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Warning: Could not initialize AI Connector Team: {e}")
         print("API will continue with limited functionality")
 
 # Request Models
@@ -49,6 +58,12 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = "default"
     user_id: Optional[str] = "user"
+
+class ConnectorChatRequest(BaseModel):
+    session_id: str
+    message: str
+    user_data: Dict[str, Any]
+    available_users: List[Dict[str, Any]]
 
 class SearchRequest(BaseModel):
     type: str  # investor, talent, customer, partner
@@ -76,6 +91,7 @@ async def root():
         "service": "LinkedIn Connector API",
         "version": "1.0.0",
         "endpoints": {
+            "connector": "/api/connector/chat",
             "search": "/api/search",
             "analyze": "/api/analyze",
             "generate-message": "/api/generate-message"
@@ -88,11 +104,51 @@ async def health_check():
     return {
         "status": "healthy",
         "linkedin_team": "initialized" if linkedin_team else "not_initialized",
+        "ai_connector_team": "initialized" if ai_connector_team else "not_initialized",
         "environment": {
             "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
             "apify_configured": bool(os.getenv("APIFY_API_TOKEN"))
         }
     }
+
+@app.post("/api/connector/chat")
+async def connector_chat(request: ConnectorChatRequest):
+    """
+    AI Connector Agent - Match entrepreneurs with investors, validators, partners
+    
+    - **session_id**: ID de sesión para contexto
+    - **message**: Mensaje del usuario (búsqueda)
+    - **user_data**: Datos del usuario actual
+    - **available_users**: Lista de usuarios disponibles para matching
+    """
+    print(f"🤖 AI Connector Chat endpoint called - session: {request.session_id}")
+    print(f"📝 User message: {request.message}")
+    print(f"👥 Available users count: {len(request.available_users)}")
+    
+    try:
+        if not ai_connector_team:
+            print("❌ AI Connector Team not initialized")
+            raise HTTPException(status_code=503, detail="AI Connector not initialized")
+        
+        print("✓ Using AI Connector Agent")
+        
+        # Call AI agent
+        result = ai_connector_team.chat(
+            session_id=request.session_id,
+            user_message=request.message,
+            user_data=request.user_data,
+            available_users=request.available_users
+        )
+        
+        print(f"✓ AI Agent returned: {len(result.get('suggestions', []))} matches")
+        
+        return result
+    
+    except Exception as e:
+        print(f"❌ AI Connector Agent error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
