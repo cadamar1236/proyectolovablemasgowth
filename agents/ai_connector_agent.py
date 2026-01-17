@@ -239,43 +239,42 @@ Sort by score descending.
             "timestamp": datetime.now().isoformat()
         })
         
-        # Build context for the agent
-        context = f"""
-CONTEXTO DEL USUARIO:
-{json.dumps(session.get('user_context', {}), indent=2, default=str)}
-
-HISTORIAL DE CONVERSACIÓN:
-{self._format_history(session['history'][-10:])}
-
-MENSAJE ACTUAL: {user_message}
-"""
-        
-        # Check if user is asking for connections
-        search_keywords = ['conectar', 'buscar', 'encontrar', 'match', 'conexión', 
-                          'emprendedor', 'inversor', 'validador', 'partner', 'mentor']
-        is_search_request = any(kw in user_message.lower() for kw in search_keywords)
-        
+        # ALWAYS find matches if users are available
         matches = []
-        if is_search_request and available_users:
+        if available_users:
             # Extract search criteria from the message
             search_criteria = self._extract_search_criteria(user_message)
             session["search_preferences"].update(search_criteria)
             
-            # Find matches
+            print(f"🔍 Searching for matches with criteria: {search_criteria}")
+            
+            # Find matches using real database users
             matches = self.find_matches(
                 current_user=session.get("user_context", {}),
                 potential_matches=available_users,
                 search_criteria=search_criteria
             )
             session["suggested_connections"] = matches
+            
+            print(f"✓ Found {len(matches)} real matches from database")
         
-        # Get AI response
-        try:
-            response = self.main_agent.run(context)
-            ai_message = response.content if hasattr(response, 'content') else str(response)
-        except Exception as e:
-            print(f"Agent error: {e}")
-            ai_message = self._generate_fallback_response(user_message, matches)
+        # Generate SHORT response presenting the real matches
+        if matches:
+            # Build list of real matches to show
+            matches_text = "\n".join([
+                f"- {m.get('name', 'Usuario')} ({m.get('user_type', 'emprendedor')})"
+                for m in matches[:5]
+            ])
+            
+            ai_message = f"""🎯 Encontré {len(matches)} conexiones relevantes para ti:
+
+{matches_text}
+
+💡 Estos son emprendedores reales de nuestra comunidad. ¡Conécta con ellos para hacer networking!"""
+        else:
+            ai_message = """🔍 Estoy analizando perfiles en nuestra comunidad. De momento no encontré matches exactos con esos criterios, pero pronto habrá más usuarios. 
+
+💡 ¡Invita a otros emprendedores a unirse a ASTAR! 🚀"""
         
         # Add response to history
         session["history"].append({
