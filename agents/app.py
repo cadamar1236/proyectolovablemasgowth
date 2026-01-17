@@ -62,7 +62,8 @@ class ChatRequest(BaseModel):
 class ConnectorChatRequest(BaseModel):
     session_id: str
     message: str
-    user_data: Dict[str, Any]
+    user_id: Optional[int] = None
+    user_profile: Optional[Dict[str, Any]] = None
     available_users: List[Dict[str, Any]]
 
 class SearchRequest(BaseModel):
@@ -118,11 +119,13 @@ async def connector_chat(request: ConnectorChatRequest):
     
     - **session_id**: ID de sesión para contexto
     - **message**: Mensaje del usuario (búsqueda)
-    - **user_data**: Datos del usuario actual
+    - **user_id**: ID del usuario actual
+    - **user_profile**: Perfil del usuario actual
     - **available_users**: Lista de usuarios disponibles para matching
     """
     print(f"🤖 AI Connector Chat endpoint called - session: {request.session_id}")
     print(f"📝 User message: {request.message}")
+    print(f"👤 User ID: {request.user_id}")
     print(f"👥 Available users count: {len(request.available_users)}")
     
     try:
@@ -132,11 +135,16 @@ async def connector_chat(request: ConnectorChatRequest):
         
         print("✓ Using AI Connector Agent")
         
+        # Prepare user_data for agent (combining user_id and user_profile)
+        user_data = request.user_profile or {}
+        if request.user_id:
+            user_data['id'] = request.user_id
+        
         # Call AI agent
         result = ai_connector_team.chat(
             session_id=request.session_id,
             user_message=request.message,
-            user_data=request.user_data,
+            user_data=user_data,
             available_users=request.available_users
         )
         
