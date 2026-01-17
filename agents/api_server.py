@@ -11,6 +11,15 @@ from datetime import datetime
 from apify_client import ApifyClient
 import openai
 
+# Import AI agents
+try:
+    from ai_connector_agent import AIConnectorTeam
+    ai_connector_team = AIConnectorTeam()
+    print("✓ AI Connector Agent initialized")
+except Exception as e:
+    print(f"⚠ AI Connector Agent not available: {e}")
+    ai_connector_team = None
+
 app = Flask(__name__)
 CORS(app)
 
@@ -697,10 +706,358 @@ def agents_health_check():
             },
             "orchestrator": {
                 "status": "available" if OPENAI_API_KEY else "unavailable"
+            },
+            "ai_connector": {
+                "status": "available" if OPENAI_API_KEY else "unavailable",
+                "openai_configured": bool(OPENAI_API_KEY)
             }
         }
     }
     return jsonify(health_status)
+
+
+# ==============================================
+# AI CONNECTOR ENDPOINTS
+# ==============================================
+
+# AI Connector session storage
+ai_connector_sessions = {}
+
+@app.route('/api/connector/chat', methods=['POST'])
+def ai_connector_chat():
+    """
+    Chat endpoint for AI Connector
+    Uses AIConnectorTeam agent to analyze profiles and suggest intelligent connections
+    """
+    try:
+        data = request.json
+        session_id = data.get('session_id', f'session_{int(datetime.now().timestamp())}')
+        message = data.get('message', '')
+        user_id = data.get('user_id')
+        user_profile = data.get('user_profile', {})
+        available_users = data.get('available_users', [])  # Get users from frontend
+        
+        if not message:
+            return jsonify({
+                "success": False,
+                "error": "Message is required"
+            }), 400
+        
+        # Use AI Connector agent if available AND we have users
+        if ai_connector_team and available_users:
+            try:
+                print(f"🤖 Using AI Connector Agent with {len(available_users)} users")
+                result = ai_connector_team.chat(
+                    session_id=session_id,
+                    user_message=message,
+                    user_data=user_profile,
+                    available_users=available_users
+                )
+                
+                print(f"✓ AI Agent returned {len(result.get('matches', []))} matches")
+                
+                # Format matches to match expected frontend format
+                formatted_matches = []
+                for match in result.get('matches', [])[:5]:
+                    formatted_matches.append({
+                        "id": match.get('id'),
+                        "name": match.get('name'),
+                        "user_type": match.get('user_type'),
+                        "industry": match.get('industry'),
+                        "country": match.get('country'),
+                        "stage": match.get('stage'),
+                        "avatar": match.get('avatar_url'),
+                        "bio": (match.get('bio') or '')[:200],
+                        "score": match.get('score', 50) / 100.0,  # Convert to 0-1 range
+                        "reason": match.get('reason', 'Conexión potencial interesante')
+                    })
+                
+                return jsonify({
+                    "success": True,
+                    "response": result.get('message', ''),
+                    "matches": formatted_matches,
+                    "session_id": session_id,
+                    "source": "railway_ai"
+                })
+                
+            except Exception as agent_err:
+                print(f"❌ AI Connector Agent error: {agent_err}")
+                import traceback
+                traceback.print_exc()
+                # Fall through to fallback below
+        else:
+            print(f"⚠️ AI Connector not available. Agent: {ai_connector_team is not None}, Users: {len(available_users)}")
+                # Fall through to fallback below
+        
+        # Fallback: Use simple matching
+        print("Using fallback matching...")
+        matches = find_connector_matches(
+            message=message,
+            current_user=user_profile,
+            available_users=available_users
+        )
+        
+        response_text = generate_connector_response(
+            message=message,
+            user_context=user_profile,
+            matches=matches,
+            history=[]
+        )
+        
+        # Format matches
+        formatted_matches = []
+        for match in matches[:5]:
+            formatted_matches.append({
+                "id": match.get('id'),
+                "name": match.get('name'),
+                "user_type": match.get('user_type'),
+                "industry": match.get('industry'),
+                "country": match.get('country'),
+                "stage": match.get('stage'),
+                "avatar": match.get('avatar_url'),
+                "bio": match.get('bio', '')[:200],
+                "score": match.get('score', 50) / 100.0,
+                "reason": match.get('reason', 'Conexión interesante')
+            })
+        
+        return jsonify({
+            "success": True,
+            "response": response_text,
+            "matches": formatted_matches,
+            "session_id": session_id
+        })
+        
+    except Exception as e:
+        print(f"AI Connector endpoint error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+def get_all_users_for_matching(exclude_user_id=None):
+    """
+    Get all users from database for matching
+    Returns list of user dictionaries
+    """
+    try:
+        # Get database URL from environment
+        db_url = os.getenv('DATABASE_URL')
+        if not db_url:
+            print("No DATABASE_URL configured")
+            return []
+        
+        # Make HTTP request to get users (since we're calling from Railway to Cloudflare)
+        # This would need to be implemented in the main app
+        # For now, return empty list - the TypeScript endpoint will handle this
+        return []
+        
+    except Exception as e:
+        print(f"Error getting users: {e}")
+        return []
+
+
+def find_connector_matches(
+    message: str,
+    current_user: dict,
+    available_users: list
+) -> list:
+    """
+    Find matching users based on the request
+    """
+    if not available_users:
+        return []
+    
+    message_lower = message.lower()
+    
+    # Determine target type from message
+    target_type = None
+    if 'inversor' in message_lower or 'investor' in message_lower:
+        target_type = 'investor'
+    elif 'validador' in message_lower:
+        target_type = 'validator'
+    elif 'partner' in message_lower or 'socio' in message_lower:
+        target_type = 'partner'
+    elif 'mentor' in message_lower:
+        target_type = 'mentor'
+    elif 'emprendedor' in message_lower or 'entrepreneur' in message_lower:
+        target_type = 'entrepreneur'
+    
+    # Extract industry keywords
+    industries = ['fintech', 'healthtech', 'edtech', 'saas', 'ecommerce', 
+                 'ai', 'blockchain', 'gaming', 'foodtech', 'proptech', 
+                 'b2b', 'b2c', 'marketplace', 'tech']
+    target_industry = None
+    for ind in industries:
+        if ind in message_lower:
+            target_industry = ind
+            break
+    
+    current_user_id = current_user.get('id')
+    current_industry = (current_user.get('industry') or '').lower()
+    current_country = current_user.get('country')
+    
+    matches = []
+    for user in available_users:
+        if user.get('id') == current_user_id:
+            continue
+        
+        score = 30  # Base score
+        reasons = []
+        
+        user_type = (user.get('user_type') or user.get('type') or '').lower()
+        user_industry = (user.get('industry') or '').lower()
+        user_country = user.get('country')
+        
+        # Type match
+        if target_type and user_type == target_type:
+            score += 30
+            reasons.append(f"Es {target_type}")
+        
+        # Industry match
+        if target_industry and target_industry in user_industry:
+            score += 25
+            reasons.append(f"Trabaja en {user.get('industry')}")
+        elif current_industry and current_industry in user_industry:
+            score += 20
+            reasons.append(f"Misma industria")
+        
+        # Country match
+        if current_country and current_country == user_country:
+            score += 10
+            reasons.append(f"Mismo país")
+        
+        # Stage match for entrepreneurs
+        if user_type == 'entrepreneur':
+            user_stage = (user.get('stage') or '').lower()
+            current_stage = (current_user.get('stage') or '').lower()
+            if user_stage and current_stage and user_stage == current_stage:
+                score += 15
+                reasons.append("Misma etapa de startup")
+        
+        if score >= 40:
+            matches.append({
+                "id": user.get('id'),
+                "name": user.get('name') or user.get('full_name') or 'Usuario',
+                "email": user.get('email'),
+                "score": min(score, 100),
+                "reason": ". ".join(reasons) if reasons else "Perfil interesante",
+                "user_type": user.get('user_type'),
+                "industry": user.get('industry'),
+                "country": user.get('country'),
+                "avatar_url": user.get('avatar_url'),
+                "bio": user.get('bio', '')[:150] + '...' if user.get('bio') and len(user.get('bio', '')) > 150 else user.get('bio', ''),
+                "startup_name": user.get('startup_name'),
+                "linkedin_url": user.get('linkedin_url')
+            })
+    
+    # Sort by score
+    matches.sort(key=lambda x: x['score'], reverse=True)
+    return matches[:10]
+
+
+def generate_connector_response(
+    message: str,
+    user_context: dict,
+    matches: list,
+    history: list
+) -> str:
+    """
+    Generate AI response for the connector chat
+    """
+    try:
+        # Build context
+        history_text = "\n".join([
+            f"{'Usuario' if h['role'] == 'user' else 'Asistente'}: {h['content']}"
+            for h in history[-5:]
+        ])
+        
+        matches_text = ""
+        if matches:
+            matches_text = "\n\nCONEXIONES ENCONTRADAS:\n"
+            for i, m in enumerate(matches[:5], 1):
+                matches_text += f"{i}. {m['name']} ({m.get('user_type', 'usuario')}) - Score: {m['score']}% - {m['reason']}\n"
+        
+        prompt = f"""Eres un AI SuperConnector que ayuda a emprendedores a conectar con otras personas relevantes.
+
+CONTEXTO DEL USUARIO:
+- Nombre: {user_context.get('name', 'Usuario')}
+- Tipo: {user_context.get('user_type', 'emprendedor')}
+- Industria: {user_context.get('industry', 'No especificada')}
+
+HISTORIAL RECIENTE:
+{history_text}
+
+MENSAJE ACTUAL: {message}
+{matches_text}
+
+Responde de forma amigable y profesional EN ESPAÑOL. 
+Si hay conexiones, preséntalalas de forma atractiva explicando por qué son buenas opciones.
+Si no hay conexiones o el usuario saluda, ofrece ayuda explicando qué tipos de conexiones puedes encontrar.
+Usa emojis para hacer la conversación más amigable.
+Mantén las respuestas concisas pero informativas."""
+
+        response = openai.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": "Eres un AI SuperConnector experto en networking empresarial. Respondes siempre en español de forma amigable y profesional."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        print(f"Error generating response: {e}")
+        # Fallback response
+        if matches:
+            return f"""¡Encontré **{len(matches)} conexiones** potenciales para ti! 🎯
+
+Basándome en tu solicitud, estas personas podrían ser un gran match:
+
+{"".join([f"• **{m['name']}** - {m['reason']}\n" for m in matches[:3]])}
+
+¿Te gustaría que te ayude a iniciar contacto con alguno de ellos?"""
+        else:
+            return """¡Hola! 👋 Soy tu AI SuperConnector.
+
+Puedo ayudarte a encontrar:
+• 🚀 **Emprendedores** en tu misma industria
+• 💰 **Inversores** para tu startup
+• ✅ **Validadores** para feedback
+• 🤝 **Partners** para colaborar
+
+Dime, ¿qué tipo de conexiones estás buscando?"""
+
+
+@app.route('/api/connector/session/<session_id>', methods=['GET'])
+def get_connector_session(session_id):
+    """Get session history"""
+    if session_id in ai_connector_sessions:
+        session = ai_connector_sessions[session_id]
+        return jsonify({
+            "success": True,
+            "session": {
+                "history": session["history"],
+                "user_context": session["user_context"],
+                "created_at": session.get("created_at")
+            }
+        })
+    return jsonify({
+        "success": False,
+        "error": "Session not found"
+    }), 404
+
+
+@app.route('/api/connector/session/<session_id>', methods=['DELETE'])
+def clear_connector_session(session_id):
+    """Clear a session"""
+    if session_id in ai_connector_sessions:
+        del ai_connector_sessions[session_id]
+    return jsonify({"success": True})
 
 
 # ==============================================
