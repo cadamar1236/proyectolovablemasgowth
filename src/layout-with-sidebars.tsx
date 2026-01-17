@@ -2108,27 +2108,8 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             var banner = document.getElementById('astar-notification-banner');
             if (banner) banner.remove();
             
-            // Redirigir al chat con el contexto del email
-            // Mapear categorías de ASTAR a contextos de chat
-            var contextMap = {
-              'ideas': 'hipotesis',
-              'hypothesis': 'hipotesis',
-              'build': 'construccion',
-              'construction': 'construccion',
-              'measure': 'metricas',
-              'measurement': 'metricas',
-              'feedback': 'metricas',
-              'reflect': 'reflexion',
-              'reflection': 'reflexion',
-              'weekly_review': 'reflexion'
-            };
-            
-            var chatContext = contextMap[data.category] || 'general';
-            
-            // Redirigir al marketplace con el contexto del chat
-            var redirectUrl = '/marketplace?tab=traction&chat=' + chatContext + '&astarResponse=' + encodeURIComponent(data.response_text);
-            console.log('[ASTAR-SUBMIT] Redirecting to:', redirectUrl);
-            window.location.href = redirectUrl;
+            // Mostrar modal de éxito en lugar de redirigir directamente
+            showAstarSuccessAndOpenChat(data);
             
           } else {
             var err = await res.json();
@@ -2155,15 +2136,15 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         
         successModal.innerHTML = '<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);padding:32px;border-radius:16px;max-width:500px;text-align:center;border:2px solid #8b5cf6;">' +
           '<div style="font-size:64px;margin-bottom:16px;">🎉</div>' +
-          '<h2 style="color:white;font-size:24px;margin-bottom:12px;">Response saved!</h2>' +
-          '<p style="color:#cbd5e1;margin-bottom:8px;">A new goal was created in your dashboard:</p>' +
+          '<h2 style="color:white;font-size:24px;margin-bottom:12px;">¡Respuesta guardada!</h2>' +
+          '<p style="color:#cbd5e1;margin-bottom:8px;">Se creó un nuevo objetivo en tu dashboard:</p>' +
           '<div style="background:#1e293b;padding:12px;border-radius:8px;margin-bottom:20px;border-left:4px solid #8b5cf6;">' +
-            '<p style="color:#e2e8f0;font-size:14px;text-align:left;margin:0;">' + escapeHtml(data.goal_description || 'Goal ASTAR') + '</p>' +
+            '<p style="color:#e2e8f0;font-size:14px;text-align:left;margin:0;">' + escapeHtml(data.goal_description || 'Objetivo ASTAR') + '</p>' +
           '</div>' +
-          '<p style="color:#a5b4fc;font-size:14px;margin-bottom:20px;">The ASTAR assistant will help you define specific steps</p>' +
+          '<p style="color:#a5b4fc;font-size:14px;margin-bottom:20px;">El asistente ASTAR te ayudará a definir pasos específicos</p>' +
           '<div style="display:flex;gap:12px;justify-content:center;">' +
-            '<button onclick="openAstarChat()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:12px 24px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:16px;">💬 Talk to ASTAR</button>' +
-            '<button onclick="closeAstarSuccess()" style="background:#475569;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;">Close</button>' +
+            '<button onclick="openAstarChat()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:12px 24px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:16px;">💬 Ir al Chat con ASTAR</button>' +
+            '<button onclick="closeAstarSuccess()" style="background:#475569;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;">Cerrar</button>' +
           '</div>' +
         '</div>';
         
@@ -2175,48 +2156,29 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         var modal = document.getElementById('astar-success-modal');
         if (modal) modal.remove();
         
-        // Open chat sidebar directly
-        var chatSidebar = document.getElementById('chat-sidebar');
-        var floatingBtn = document.getElementById('chat-floating-btn');
-        var chatOverlay = document.getElementById('chat-overlay');
-        var isMobile = window.innerWidth <= 768;
-        
-        if (chatSidebar) {
-          // Open chat
-          chatSidebar.style.width = isMobile ? '100%' : '400px';
-          chatSidebar.style.maxWidth = '400px';
-          chatSidebar.style.display = 'flex';
-          if (floatingBtn) floatingBtn.style.display = 'none';
-          if (isMobile && chatOverlay) chatOverlay.classList.remove('hidden');
-          console.log('[ASTAR] Chat opened from email notification');
-        }
-        
         // Get response data
         var data = window.astarResponseData || {};
-        var goalDescription = data.goal_description || 'my ASTAR goal';
-        var category = data.category || 'ideas';
         
-        // Create contextual message for chatbot
-        var contextMessage = '🌟 I just answered an ASTAR question from the "' + category + '" category. ' +
-          'My response was saved as a goal: "' + goalDescription + '". ' +
-          'Please help me: 1) Define specific steps to achieve this goal, ' +
-          '2) Establish success metrics, and 3) Create an action plan for this week. ' +
-          '__TRIGGER_GOAL_FLOW__'; // Hidden special marker
+        // Mapear categorías de ASTAR a contextos de chat
+        var contextMap = {
+          'ideas': 'hipotesis',
+          'hypothesis': 'hipotesis',
+          'build': 'construccion',
+          'construction': 'construccion',
+          'measure': 'metricas',
+          'measurement': 'metricas',
+          'feedback': 'metricas',
+          'reflect': 'reflexion',
+          'reflection': 'reflexion',
+          'weekly_review': 'reflexion'
+        };
         
-        // Esperar a que el chat esté visible y enviar el mensaje
-        setTimeout(function() {
-          var chatInput = document.getElementById('chat-input');
-          if (chatInput) {
-            // Mostrar solo el mensaje limpio en el input (sin el marcador)
-            chatInput.value = contextMessage.replace('__TRIGGER_GOAL_FLOW__', '').trim();
-            chatInput.focus();
-            
-            // Guardar el mensaje completo con el marcador para enviarlo
-            window.astarTriggerMessage = contextMessage;
-            
-            // Enviar automáticamente el mensaje
-            setTimeout(function() {
-              if (window.sendChatMessage) {
+        var chatContext = contextMap[data.category] || 'general';
+        
+        // Redirigir al marketplace con el contexto del chat y la respuesta
+        var redirectUrl = '/marketplace?tab=traction&chat=' + chatContext + '&astarResponse=' + encodeURIComponent(data.response_text);
+        console.log('[ASTAR-OPEN-CHAT] Redirecting to:', redirectUrl);
+        window.location.href = redirectUrl;
                 window.sendChatMessage();
               }
             }, 300);
