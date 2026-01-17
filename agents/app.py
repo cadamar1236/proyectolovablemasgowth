@@ -148,9 +148,18 @@ async def connector_chat(request: ConnectorChatRequest):
             available_users=request.available_users
         )
         
-        print(f"✓ AI Agent returned: {len(result.get('suggestions', []))} matches")
+        print(f"✓ AI Agent returned: {len(result.get('matches', []))} matches")
         
-        return result
+        # Map response to match frontend expectations
+        response = {
+            "success": True,
+            "response": result.get("message", ""),
+            "matches": result.get("matches", []),
+            "session_id": result.get("session_id", request.session_id),
+            "has_matches": result.get("has_matches", False)
+        }
+        
+        return response
     
     except Exception as e:
         print(f"❌ AI Connector Agent error: {str(e)}")
