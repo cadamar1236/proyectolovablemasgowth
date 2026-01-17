@@ -70,9 +70,7 @@ class AIConnectorTeam:
                 "Consider: industry, stage, location, interests, goals",
                 "Format your responses with clear sections and emojis for readability"
             ],
-            markdown=True,
-            add_history_to_context=True,
-            add_datetime_to_instructions=True
+            markdown=True
         )
     
     def get_or_create_session(self, session_id: str) -> Dict[str, Any]:
