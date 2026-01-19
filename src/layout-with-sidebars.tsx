@@ -104,14 +104,14 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
         // Goal questions for bootstrap flow handling
         var bootstrapGoalQuestions = [
-            { field: 'category', question: '📂 What category does this goal belong to?', options: ['ASTAR', 'MAGCIENT', 'OTHER'] },
-            { field: 'description', question: '📝 Describe the goal briefly (What do you want to achieve?)', type: 'text' },
-            { field: 'task', question: '🎯 What is the specific task to achieve this goal? (Optional - press Enter to skip)', type: 'text', optional: true },
-            { field: 'priority', question: '⚡ What priority does this goal have?', options: ['P0', 'P1', 'P2', 'P3'] },
-            { field: 'cadence', question: '🔄 Is this a one-time or recurring goal?', options: ['One time', 'Recurrent'] },
-            { field: 'dri', question: '👤 Who is the Directly Responsible Individual (DRI)? (Optional - press Enter to skip)', type: 'text', optional: true },
-            { field: 'goal_status', question: '📊 What is the current status of this goal?', options: ['To start', 'WIP', 'On Hold', 'Delayed', 'Blocked', 'Done'] },
-            { field: 'week_of', question: '📅 For which week is this goal? (Optional - Example: "January 6")', type: 'text', optional: true }
+            { field: 'category', question: 'What category does this goal belong to?', options: ['ASTAR', 'MAGCIENT', 'OTHER'] },
+            { field: 'description', question: 'Describe the goal briefly (What do you want to achieve?)', type: 'text' },
+            { field: 'task', question: 'What is the specific task to achieve this goal? (Optional - press Enter to skip)', type: 'text', optional: true },
+            { field: 'priority', question: 'What priority does this goal have?', options: ['P0', 'P1', 'P2', 'P3'] },
+            { field: 'cadence', question: 'Is this a one-time or recurring goal?', options: ['One time', 'Recurrent'] },
+            { field: 'dri', question: 'Who is the Directly Responsible Individual (DRI)? (Optional - press Enter to skip)', type: 'text', optional: true },
+            { field: 'goal_status', question: 'What is the current status of this goal?', options: ['To start', 'WIP', 'On Hold', 'Delayed', 'Blocked', 'Done'] },
+            { field: 'week_of', question: 'For which week is this goal? (Optional - Example: "January 6")', type: 'text', optional: true }
         ];
 
         // Initialize goalCreationFlow immediately in bootstrap
@@ -216,7 +216,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         function bootstrapCompleteGoalCreation() {
           console.log('[BOOTSTRAP] Completing goal creation with data:', JSON.stringify(window.goalCreationFlow.data));
           
-          bootstrapAddMessageToChat('assistant', '⏳ Creating your goal...');
+          bootstrapAddMessageToChat('assistant', 'Creating your goal...');
           
           var goalData = window.goalCreationFlow.data;
           var authToken = bootstrapGetAuthToken();
@@ -250,9 +250,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             localStorage.removeItem('goalCreationFlow');
             
             if (data.goal || data.success) {
-              bootstrapAddMessageToChat('assistant', '✅ Goal created successfully!\\n\\n📋 ' + goalData.description + '\\n📂 Category: ' + goalData.category + '\\n⚡ Priority: ' + goalData.priority);
+              bootstrapAddMessageToChat('assistant', 'SUCCESS! Goal created successfully!\n\n' + goalData.description + '\nCategory: ' + goalData.category + '\nPriority: ' + goalData.priority);
             } else {
-              bootstrapAddMessageToChat('assistant', '❌ Error creating goal: ' + (data.error || 'Unknown error'));
+              bootstrapAddMessageToChat('assistant', 'ERROR: Error creating goal: ' + (data.error || 'Unknown error'));
             }
           })
           .catch(function(e) {
@@ -260,7 +260,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             window.goalCreationFlow.step = 0;
             window.goalCreationFlow.data = {};
             localStorage.removeItem('goalCreationFlow');
-            bootstrapAddMessageToChat('assistant', '❌ Error creating goal. Please try again.');
+            bootstrapAddMessageToChat('assistant', 'ERROR: Error creating goal. Please try again.');
           });
         }
 
@@ -281,9 +281,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
           // ========== GOAL KEYWORD DETECTION IN BOOTSTRAP ==========
           var goalKeywords = [
-            'crear goal', 'create goal', 'nuevo goal', 'new goal', 'añadir goal',
-            'crear objetivo', 'nuevo objetivo', 'añadir objetivo', 'agregar objetivo',
-            'quiero crear', 'necesito crear', 'me gustaria crear', 'me gustaría crear',
+            'crear goal', 'create goal', 'nuevo goal', 'new goal', 'anadir goal',
+            'crear objetivo', 'nuevo objetivo', 'anadir objetivo', 'agregar objetivo',
+            'quiero crear', 'necesito crear', 'me gustaria crear',
             'agregar goal', 'hacer un goal', 'hacer un objetivo', 'crea un goal',
             'registrar goal', 'definir objetivo', 'establecer goal', 'poner un objetivo'
           ];
@@ -386,7 +386,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
           }
           
           // Show the first question directly with quick reply buttons
-          bootstrapAddMessageToChat('assistant', '✨ Perfect! I will help you create a new goal. I will ask you 8 quick questions.\\n\\n📂 What category does this goal belong to?');
+          bootstrapAddMessageToChat('assistant', 'Perfect! I will help you create a new goal. I will ask you 8 quick questions.\n\nWhat category does this goal belong to?');
           bootstrapShowQuickOptions(['ASTAR', 'MAGCIENT', 'OTHER']);
         }
 
@@ -444,7 +444,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         function bootstrapClearChatHistory() {
           var messagesContainer = safeGet('chat-messages');
           if (messagesContainer) {
-            messagesContainer.innerHTML = '<div class="text-center text-gray-500 text-sm"><span class="text-3xl mb-2 block">⭐</span><p class="font-semibold">Start chatting with your Marketing Agent</p><p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p></div>';
+            messagesContainer.innerHTML = '<div class="text-center text-gray-500 text-sm"><span class="text-3xl mb-2 block">*</span><p class="font-semibold">Start chatting with your Marketing Agent</p><p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p></div>';
           }
         }
 
@@ -802,7 +802,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             class="fixed right-4 bottom-20 md:bottom-4 z-[999] w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full shadow-xl hover:shadow-2xl hover:scale-110 transition-all duration-300 flex items-center justify-center border-2 border-white/30" 
             style="pointer-events: auto; touch-action: manipulation; cursor: pointer;">
             <div class="flex flex-col items-center justify-center">
-                <span class="text-xl">⭐</span>
+                <span class="text-xl">*</span>
             </div>
         </button>
         ` : ''}
@@ -815,7 +815,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
-                            <span class="text-2xl">⭐</span>
+                            <span class="text-2xl">*</span>
                         </div>
                         <div>
                             <h3 class="font-bold text-white">ASTAR Agent</h3>
@@ -874,7 +874,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             <!-- Chat Messages -->
             <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
                 <div class="text-center text-gray-500 text-sm">
-                    <span class="text-3xl mb-2 block">⭐</span>
+                    <span class="text-3xl mb-2 block">*</span>
                     <p class="font-semibold">Start chatting with your Marketing Agent</p>
                     <p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>
                 </div>
@@ -1099,7 +1099,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 if (typeof goalQuestions !== 'undefined' && goalCreationFlow.active) {
                     const currentQuestion = goalQuestions[goalCreationFlow.step];
                     if (currentQuestion) {
-                        addMessageToChat('assistant', '⚡ Continuing with goal creation...\n\n' + currentQuestion.question);
+                        addMessageToChat('assistant', 'Continuing with goal creation...\n\n' + currentQuestion.question);
                         if (currentQuestion.options && typeof showQuickReplyOptions === 'function') {
                             showQuickReplyOptions(currentQuestion.options);
                         }
@@ -1127,9 +1127,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             
             // ========== GOAL KEYWORD DETECTION - FIRST PRIORITY ==========
             const goalKeywords = [
-                'crear goal', 'create goal', 'nuevo goal', 'new goal', 'añadir goal', 'add goal',
-                'crear objetivo', 'nuevo objetivo', 'añadir objetivo', 'agregar objetivo',
-                'quiero crear', 'necesito crear', 'me gustaria crear', 'me gustaría crear',
+                'crear goal', 'create goal', 'nuevo goal', 'new goal', 'anadir goal', 'add goal',
+                'crear objetivo', 'nuevo objetivo', 'anadir objetivo', 'agregar objetivo',
+                'quiero crear', 'necesito crear', 'me gustaria crear',
                 'registrar goal', 'definir objetivo', 'establecer goal', 'poner un objetivo',
                 'agregar goal', 'hacer un goal', 'hacer un objetivo', 'crea un goal', 'crea un objetivo'
             ];
@@ -1143,7 +1143,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             
             // If goal keywords detected AND flow not active, start flow directly (no backend call!)
             if (hasGoalKeyword && typeof goalCreationFlow !== 'undefined' && !goalCreationFlow.active) {
-                console.log('[CHAT] ✅ Goal keyword detected! Starting flow directly...');
+                console.log('[CHAT] [OK] Goal keyword detected! Starting flow directly...');
                 addMessageToChat('user', message);
                 input.value = '';
                 startGoalCreation();
@@ -1176,7 +1176,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     
                     // Check for goal flow trigger FIRST (flag-based detection)
                     if (response.data.triggerGoalFlow === true) {
-                        console.log('[CHAT] ✅ GOAL FLOW TRIGGER detected! Starting goal creation...');
+                        console.log('[CHAT] [OK] GOAL FLOW TRIGGER detected! Starting goal creation...');
                         // NO mostrar nada adicional, el mensaje del usuario ya se mostró antes
                         // Iniciar el flujo directamente
                         startGoalCreation();
@@ -1188,14 +1188,14 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     
                     // Fallback: Also check for text-based TRIGGER (legacy)
                     if (aiMessage && aiMessage.includes('TRIGGER:START_GOAL_FLOW')) {
-                        console.log('[CHAT] ✅ Legacy TRIGGER detected! Starting goal creation flow...');
+                        console.log('[CHAT] [OK] Legacy TRIGGER detected! Starting goal creation flow...');
                         startGoalCreation();
                         return;
                     } 
                     // Check if AI wants to trigger goal edit flow
                     else if (aiMessage.includes('TRIGGER:EDIT_GOAL_FLOW|')) {
                         const goalId = aiMessage.split('TRIGGER:EDIT_GOAL_FLOW|')[1].split('\n')[0].trim();
-                        console.log('[CHAT] ✅ EDIT TRIGGER detected! Starting edit flow for goal:', goalId);
+                        console.log('[CHAT] [OK] EDIT TRIGGER detected! Starting edit flow for goal:', goalId);
                         startGoalCreation(parseInt(goalId));
                         // NO mostrar el mensaje TRIGGER en el chat
                         return;
@@ -1266,7 +1266,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', response.data.analysis || 'Análisis completado.');
+                addMessageToChat('assistant', response.data.analysis || 'Analisis completado.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('Error analyzing goals:', error);
@@ -1387,7 +1387,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.log('[METRICS] Response:', response.data);
-                addMessageToChat('assistant', '✅ Users metric updated: ' + newValue + ' users\n\n📊 This information will help improve recommendations.');
+                addMessageToChat('assistant', '[OK] Users metric updated: ' + newValue + ' users\n\nThis information will help improve recommendations.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('[METRICS] Error updating users:', error);
@@ -1416,7 +1416,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.log('[METRICS] Response:', response.data);
-                addMessageToChat('assistant', '✅ Revenue metric updated: $' + newValue + '\n\n📈 This information will help track your growth.');
+                addMessageToChat('assistant', '[OK] Revenue metric updated: $' + newValue + '\n\nThis information will help track your growth.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('[METRICS] Error updating revenue:', error);
@@ -1430,44 +1430,44 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         const goalQuestions = [
             { 
                 field: 'category', 
-                question: '📂 What category does this goal belong to?\n- ASTAR: Blockchain/ASTAR related projects\n- MAGCIENT: AI/Machine Learning projects\n- OTHER: Other projects', 
+                question: 'What category does this goal belong to?\n- ASTAR: Blockchain/ASTAR related projects\n- MAGCIENT: AI/Machine Learning projects\n- OTHER: Other projects', 
                 options: ['ASTAR', 'MAGCIENT', 'OTHER'] 
             },
             { 
                 field: 'description', 
-                question: '📝 What is the goal description? (Describe what you want to achieve)', 
+                question: 'What is the goal description? (Describe what you want to achieve)', 
                 type: 'text' 
             },
             { 
                 field: 'task', 
-                question: '🎯 What is the specific task to achieve this goal? (Concrete action to take)', 
+                question: 'What is the specific task to achieve this goal? (Concrete action to take)', 
                 type: 'text',
                 optional: true 
             },
             { 
                 field: 'priority', 
-                question: '⚡ What priority does this goal have?\n- P0: Urgent and important\n- P1: Urgent or important\n- P2: Urgent but not important\n- P3: Neither urgent nor important, but interesting', 
+                question: 'What priority does this goal have?\n- P0: Urgent and important\n- P1: Urgent or important\n- P2: Urgent but not important\n- P3: Neither urgent nor important, but interesting', 
                 options: ['P0', 'P1', 'P2', 'P3'] 
             },
             { 
                 field: 'cadence', 
-                question: '🔄 Is this a one-time or recurring goal?\n- One time: Completed once\n- Recurrent: Repeats periodically', 
+                question: 'Is this a one-time or recurring goal?\n- One time: Completed once\n- Recurrent: Repeats periodically', 
                 options: ['One time', 'Recurrent'] 
             },
             { 
                 field: 'dri', 
-                question: '👤 Who is the Directly Responsible Individual (DRI)? Enter the name of the responsible person.', 
+                question: 'Who is the Directly Responsible Individual (DRI)? Enter the name of the responsible person.', 
                 type: 'text',
                 optional: true 
             },
             { 
                 field: 'goal_status', 
-                question: '📊 What is the current status of this goal?\n- To start: Not started yet\n- WIP: Work in progress\n- On Hold: Paused\n- Delayed: Running late\n- Blocked: Cannot proceed\n- Done: Completed', 
+                question: 'What is the current status of this goal?\n- To start: Not started yet\n- WIP: Work in progress\n- On Hold: Paused\n- Delayed: Running late\n- Blocked: Cannot proceed\n- Done: Completed', 
                 options: ['To start', 'WIP', 'On Hold', 'Delayed', 'Blocked', 'Done'] 
             },
             { 
                 field: 'week_of', 
-                question: '📅 For which week is this goal? (Example: "December 30", "January 6", or leave blank)', 
+                question: 'For which week is this goal? (Example: "December 30", "January 6", or leave blank)', 
                 type: 'text', 
                 optional: true 
             }
@@ -1487,7 +1487,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             const firstQuestion = goalQuestions[0];
             console.log('[GOAL-FLOW] First question:', firstQuestion.question);
             
-            addMessageToChat('assistant', '✨ Perfect! I will help you ' + actionText + '. I will ask you ' + goalQuestions.length + ' questions to complete all the necessary information.\\n\\n' + firstQuestion.question);
+            addMessageToChat('assistant', 'Perfect! I will help you ' + actionText + '. I will ask you ' + goalQuestions.length + ' questions to complete all the necessary information.\n\n' + firstQuestion.question);
             
             if (firstQuestion.options) {
                 console.log('[GOAL-FLOW] Showing quick reply options:', firstQuestion.options);
@@ -1578,8 +1578,8 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
                 // Expanded keywords to detect goal creation intent - ALWAYS trigger flow
                 const goalKeywords = [
-                    'crear goal', 'create goal', 'nuevo goal', 'new goal', 'añadir goal', 'add goal',
-                    'crear objetivo', 'create objective', 'nuevo objetivo', 'new objective', 'añadir objetivo', 'add objective',
+                    'crear goal', 'create goal', 'nuevo goal', 'new goal', 'anadir goal', 'add goal',
+                    'crear objetivo', 'create objective', 'nuevo objetivo', 'new objective', 'anadir objetivo', 'add objective',
                     'quiero crear', 'want to create', 'necesito crear', 'need to create',
                     'agregar goal', 'agregar objetivo', 'hacer un goal', 'hacer un objetivo',
                     'registrar goal', 'registrar objetivo', 'definir objetivo', 'definir goal',
@@ -1593,7 +1593,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 
                 // ALWAYS start goal creation flow if keywords detected and flow is not active
                 if (!goalCreationFlow.active && hasGoalKeyword) {
-                    console.log('[CHAT] ✅ Goal creation keyword detected! Starting flow...');
+                    console.log('[CHAT] [OK] Goal creation keyword detected! Starting flow...');
                     input.value = '';
                     addMessageToChat('user', message);
                     startGoalCreation();
@@ -1656,20 +1656,23 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     if (loading) loading.classList.add('hidden');
                     
                     if (response.data) {
-                        console.log('[CHAT] 🔍 Response received:', JSON.stringify(response.data));
+                        console.log('[CHAT] [RESPONSE] Response received:', JSON.stringify(response.data));
                         
                         // Check for goal flow trigger FIRST (highest priority)
-                        if (response.data.triggerGoalFlow === true || response.data.message === '__START_GOAL_FLOW__') {
-                            console.log('[CHAT] ✅ GOAL FLOW TRIGGER detected! Starting flow...');
+                        // BUT ignore if it's from an ASTAR response
+                        if ((response.data.triggerGoalFlow === true || response.data.message === '__START_GOAL_FLOW__') && !window.isAstarResponse) {
+                            console.log('[CHAT] [OK] GOAL FLOW TRIGGER detected! Starting flow...');
                             startGoalCreation();
                             return; // Don't show anything in chat
+                        } else if (window.isAstarResponse) {
+                            console.log('[CHAT] Ignoring goal flow trigger - this is an ASTAR response');
                         }
                         
                         const aiMessage = response.data.message;
                         
                         // Fallback: text-based TRIGGER detection (legacy)
-                        if (aiMessage && aiMessage.includes('TRIGGER:START_GOAL_FLOW')) {
-                            console.log('[CHAT] ✅ Legacy TRIGGER detected!');
+                        if (aiMessage && aiMessage.includes('TRIGGER:START_GOAL_FLOW') && !window.isAstarResponse) {
+                            console.log('[CHAT] [OK] Legacy TRIGGER detected!');
                             startGoalCreation();
                             return;
                         }
@@ -1736,7 +1739,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     document.getElementById('chat-loading').classList.add('hidden');
                     
                     if (response.data.success || response.status === 200) {
-                        addMessageToChat('assistant', '✅ Goal updated successfully!\n\n📋 **' + goalData.description + '**\n🎯 Task: ' + (goalData.task || 'N/A') + '\n🏷️ Category: ' + goalData.category + '\n⚡ Priority: ' + goalData.priority + ' - ' + goalData.priority_label + '\n🔄 Cadence: ' + goalData.cadence + '\n👤 DRI: ' + (goalData.dri || 'Not assigned') + '\n📊 Status: ' + goalData.goal_status + '\n📅 Week: ' + (goalData.week_of || 'Not specified') + '\n\nThe goal is now available in your Founder Hub!');
+                        addMessageToChat('assistant', '[OK] Goal updated successfully!\n\n[GOAL] **' + goalData.description + '**\n[TASK] ' + (goalData.task || 'N/A') + '\n[CATEGORY] ' + goalData.category + '\n[PRIORITY] ' + goalData.priority + ' - ' + goalData.priority_label + '\n[CADENCE] ' + goalData.cadence + '\n[DRI] ' + (goalData.dri || 'Not assigned') + '\n[STATUS] ' + goalData.goal_status + '\n[WEEK] ' + (goalData.week_of || 'Not specified') + '\n\nThe goal is now available in your Founder Hub!');
                         
                         console.log('[GOAL-FLOW] Reloading dashboard data in 2 seconds...');
                         setTimeout(() => {
@@ -1750,7 +1753,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                         }, 2000);
                     } else {
                         console.error('[GOAL-FLOW] Unexpected response:', response);
-                        addMessageToChat('assistant', '❌ There was an error updating the goal. Please try again.');
+                        addMessageToChat('assistant', '[ERROR] There was an error updating the goal. Please try again.');
                     }
                 } else {
                     console.log('[GOAL-FLOW] Creating new goal - sending to chat-agent');
@@ -1785,13 +1788,13 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                             }
                         }, 2000);
                     } else {
-                        addMessageToChat('assistant', '❌ There was an error creating the goal. Please try again.');
+                        addMessageToChat('assistant', '[ERROR] There was an error creating the goal. Please try again.');
                     }
                 }
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('Error creating goal:', error);
-                addMessageToChat('assistant', '❌ Error creating the goal. Please try again or use the "New Goal" button in the Hub.');
+                addMessageToChat('assistant', '[ERROR] Error creating the goal. Please try again or use the "New Goal" button in the Hub.');
             }
         }
 
@@ -1808,7 +1811,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 });
                 
                 document.getElementById('chat-loading').classList.add('hidden');
-                addMessageToChat('assistant', response.data.analysis || 'Análisis completado.');
+                addMessageToChat('assistant', response.data.analysis || 'Analisis completado.');
             } catch (error) {
                 document.getElementById('chat-loading').classList.add('hidden');
                 console.error('Error analyzing competition:', error);
@@ -1820,7 +1823,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             const chatMessages = document.getElementById('chat-messages');
             if (!chatMessages) return; // No chat for guests
             
-            if (!confirm('¿Estás seguro de que quieres limpiar el historial del chat?')) return;
+            if (!confirm('Estas seguro de que quieres limpiar el historial del chat?')) return;
             
             try {
                 await axios.delete('/api/chat-agent/history', {
@@ -1829,13 +1832,13 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 
                 document.getElementById('chat-messages').innerHTML = 
                     '<div class="text-center text-gray-500 text-sm py-8">' +
-                        '<span class="text-3xl mb-2 block">⭐</span>' +
+                        '<span class="text-3xl mb-2 block">*</span>' +
                         '<p class="font-semibold">Start chatting with your ASTAR Agent</p>' +
                         '<p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>' +
                     '</div>';
             } catch (error) {
                 console.error('Error clearing chat:', error);
-                alert('Error al limpiar el historial del chat.');
+                alert('Error clearing chat history.');
             }
         }
 
@@ -1971,7 +1974,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 const messagesContainer = document.getElementById('chat-messages');
                 if (messagesContainer) {
                     messagesContainer.innerHTML = '<div class="text-center text-gray-500 text-sm py-8">' +
-                        '<span class="text-3xl mb-2 block">⭐</span>' +
+                        '<span class="text-3xl mb-2 block">*</span>' +
                         '<p class="font-semibold">Start chatting with your ASTAR Agent</p>' +
                         '<p class="text-xs mt-1">Ask about marketing strategies, content ideas, or competitor analysis</p>' +
                         '</div>';
@@ -1982,6 +1985,15 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
     
     <!-- ASTAR Weekly Messages Notifications -->
     <script>
+    // Función de utilidad global
+    function escapeHtml(text) {
+      if (!text) return '';
+      var div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    window.escapeHtml = escapeHtml;
+    
     (function() {
       console.log('[ASTAR] Initializing notifications system...');
       
@@ -2037,57 +2049,69 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         banner.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:9999;width:90%;max-width:800px;';
         
         var messagesHtml = messages.map(function(msg) {
+          var escapedSubject = escapeHtml(msg.subject);
+          var escapedPrompt = escapeHtml(msg.response_prompt);
+          
           return '<div style="background:rgba(15,23,42,0.9);padding:16px;border-radius:8px;margin-bottom:12px;border-left:4px solid #8b5cf6;">' +
             '<div style="color:white;margin-bottom:12px;">' +
-              '<div style="font-size:18px;font-weight:bold;margin-bottom:8px;">' + escapeHtml(msg.subject) + '</div>' +
-              '<div style="font-size:14px;color:#cbd5e1;margin-bottom:12px;">' + escapeHtml(msg.response_prompt) + '</div>' +
-            '</div>' +
-            '<textarea id="astar-response-' + msg.sent_message_id + '" placeholder="Escribe tu respuesta aquí..." ' +
-              'style="width:100%;min-height:80px;padding:12px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:white;font-size:14px;resize:vertical;margin-bottom:12px;"></textarea>' +
+              '<div style="font-size:18px;font-weight:bold;margin-bottom:8px;">' + escapedSubject + '<\/div>' +
+              '<div style="font-size:14px;color:#cbd5e1;margin-bottom:12px;">' + escapedPrompt + '<\/div>' +
+            '<\/div>' +
+            '<textarea id="astar-response-' + msg.sent_message_id + '" placeholder="Write your response" ' +
+              'style="width:100%;min-height:80px;padding:12px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:white;font-size:14px;resize:vertical;margin-bottom:12px;"><\/textarea>' +
             '<button onclick="window.submitAstarResponse(' + msg.sent_message_id + ')" ' +
               'style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:10px 20px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">' +
-              '📤 Enviar Respuesta</button>' +
-          '</div>';
+              'Send Response<\/button>' +
+          '<\/div>';
         }).join('');
+        
+        var messageCount = messages.length;
+        var messageText = messageCount === 1 ? 'message' : 'messages';
         
         banner.innerHTML = '<div style="background:linear-gradient(135deg,#581c87,#312e81);border-radius:12px;padding:20px;border:2px solid #8b5cf6;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
             '<div style="display:flex;align-items:center;gap:12px;">' +
-              '<span style="font-size:28px;">🌟</span>' +
-              '<h2 style="color:white;font-size:20px;font-weight:bold;margin:0;">ASTAR te pregunta...</h2>' +
-              '<span style="background:#8b5cf6;color:white;padding:4px 12px;border-radius:20px;font-size:14px;font-weight:bold;">' + messages.length + ' mensaje' + (messages.length > 1 ? 's' : '') + '</span>' +
-            '</div>' +
-            '<button onclick="document.getElementById(\\'astar-notification-banner\\').remove()" style="background:transparent;border:none;color:#9ca3af;font-size:24px;cursor:pointer;">✕</button>' +
-          '</div>' +
+              '<span style="font-size:28px;">*<\/span>' +
+              '<h2 style="color:white;font-size:20px;font-weight:bold;margin:0;">ASTAR has a question<\/h2>' +
+              '<span style="background:#8b5cf6;color:white;padding:4px 12px;border-radius:20px;font-size:14px;font-weight:bold;">' + messageCount + ' ' + messageText + '<\/span>' +
+            '<\/div>' +
+            '<button onclick="document.getElementById(' + String.fromCharCode(39) + 'astar-notification-banner' + String.fromCharCode(39) + ').remove()" style="background:transparent;border:none;color:#9ca3af;font-size:24px;cursor:pointer;">X<\/button>' +
+          '<\/div>' +
           messagesHtml +
-        '</div>';
+        '<\/div>';
         
         document.body.appendChild(banner);
         console.log('[ASTAR] Banner displayed');
       }
       
       window.submitAstarResponse = async function(messageId) {
+        console.log('[ASTAR-SUBMIT] Function called with messageId:', messageId);
+        
         var textarea = document.getElementById('astar-response-' + messageId);
+        console.log('[ASTAR-SUBMIT] Textarea found:', !!textarea);
+        
         var response = textarea ? textarea.value.trim() : '';
+        console.log('[ASTAR-SUBMIT] Response text:', response);
         
         if (!response) {
-          alert('Por favor escribe una respuesta');
+          alert('Please write a response');
           return;
         }
         
         var token = getAuthToken();
         if (!token) {
-          alert('Sesión expirada');
+          alert('Session expired');
           return;
         }
         
         // Mostrar indicador de carga
         var btn = event.target;
         var originalText = btn.innerHTML;
-        btn.innerHTML = '⏳ Guardando...';
+        btn.innerHTML = 'Saving...';
         btn.disabled = true;
         
         try {
+          console.log('[ASTAR-SUBMIT] Sending to API...');
           var res = await fetch('/api/astar-messages/respond', {
             method: 'POST',
             headers: {
@@ -2100,98 +2124,187 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             })
           });
           
+          console.log('[ASTAR-SUBMIT] API response status:', res.status);
+          
           if (res.ok) {
             var data = await res.json();
-            console.log('[ASTAR-SUBMIT] Response saved:', data);
+            console.log('[ASTAR-SUBMIT] Response saved, data:', data);
             
             // Cerrar el banner
             var banner = document.getElementById('astar-notification-banner');
-            if (banner) banner.remove();
+            if (banner) {
+              banner.remove();
+              console.log('[ASTAR-SUBMIT] Banner removed');
+            }
             
-            // Mostrar modal de éxito en lugar de redirigir directamente
-            showAstarSuccessAndOpenChat(data);
+            // Guardar datos para el chat
+            window.astarResponseData = data;
+            console.log('[ASTAR-SUBMIT] Data saved to window.astarResponseData');
+            
+            // Redirigir directamente al chat
+            console.log('[ASTAR-SUBMIT] Calling openAstarChat...');
+            if (typeof window.openAstarChat === 'function') {
+              window.openAstarChat();
+            } else {
+              console.error('[ASTAR-SUBMIT] openAstarChat function not found!');
+            }
             
           } else {
             var err = await res.json();
+            console.error('[ASTAR-SUBMIT] API error:', err);
             alert('Error: ' + (err.error || 'No se pudo enviar'));
             btn.innerHTML = originalText;
             btn.disabled = false;
           }
         } catch (error) {
-          console.error('[ASTAR] Error submitting:', error);
+          console.error('[ASTAR-SUBMIT] Error submitting:', error);
           alert('Error al enviar respuesta');
           btn.innerHTML = originalText;
           btn.disabled = false;
         }
       };
       
-      function showAstarSuccessAndOpenChat(data) {
-        // Guardar datos para el chat
-        window.astarResponseData = data;
-        
-        // Crear modal de éxito
-        var successModal = document.createElement('div');
-        successModal.id = 'astar-success-modal';
-        successModal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;display:flex;align-items:center;justify-content:center;';
-        
-        successModal.innerHTML = '<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);padding:32px;border-radius:16px;max-width:500px;text-align:center;border:2px solid #8b5cf6;">' +
-          '<div style="font-size:64px;margin-bottom:16px;">🎉</div>' +
-          '<h2 style="color:white;font-size:24px;margin-bottom:12px;">¡Respuesta guardada!</h2>' +
-          '<p style="color:#cbd5e1;margin-bottom:8px;">Se creó un nuevo objetivo en tu dashboard:</p>' +
-          '<div style="background:#1e293b;padding:12px;border-radius:8px;margin-bottom:20px;border-left:4px solid #8b5cf6;">' +
-            '<p style="color:#e2e8f0;font-size:14px;text-align:left;margin:0;">' + escapeHtml(data.goal_description || 'Objetivo ASTAR') + '</p>' +
-          '</div>' +
-          '<p style="color:#a5b4fc;font-size:14px;margin-bottom:20px;">El asistente ASTAR te ayudará a definir pasos específicos</p>' +
-          '<div style="display:flex;gap:12px;justify-content:center;">' +
-            '<button onclick="openAstarChat()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:12px 24px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:16px;">💬 Ir al Chat con ASTAR</button>' +
-            '<button onclick="closeAstarSuccess()" style="background:#475569;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;">Cerrar</button>' +
-          '</div>' +
-        '</div>';
-        
-        document.body.appendChild(successModal);
-      }
-      
-      // Hacer la función disponible globalmente
-      window.showAstarSuccessAndOpenChat = showAstarSuccessAndOpenChat;
-      
       window.openAstarChat = function() {
-        // Close modal
+        // Close modal if exists
         var modal = document.getElementById('astar-success-modal');
         if (modal) modal.remove();
+        
+        // Cerrar el banner de notificación
+        var banner = document.getElementById('astar-notification-banner');
+        if (banner) banner.remove();
         
         // Get response data
         var data = window.astarResponseData || {};
         
-        // Mapear categorías de ASTAR a contextos de chat
-        var contextMap = {
-          'ideas': 'hipotesis',
-          'hypothesis': 'hipotesis',
-          'build': 'construccion',
-          'construction': 'construccion',
-          'measure': 'metricas',
-          'measurement': 'metricas',
-          'feedback': 'metricas',
-          'reflect': 'reflexion',
-          'reflection': 'reflexion',
-          'weekly_review': 'reflexion'
-        };
+        console.log('[ASTAR-OPEN-CHAT] Opening chat sidebar with response:', data);
+        console.log('[ASTAR-OPEN-CHAT] Has response_text:', !!data.response_text);
+        console.log('[ASTAR-OPEN-CHAT] Response text:', data.response_text);
         
-        var chatContext = contextMap[data.category] || 'general';
+        // Abrir el chat sidebar directamente
+        var sidebar = document.getElementById('chat-sidebar');
+        var floatingBtn = document.getElementById('chat-floating-btn');
+        var overlay = document.getElementById('chat-overlay');
+        var isMobile = window.innerWidth <= 768;
         
-        // Redirigir al marketplace con el contexto del chat y la respuesta
-        var redirectUrl = '/marketplace?tab=traction&chat=' + chatContext + '&astarResponse=' + encodeURIComponent(data.response_text);
-        console.log('[ASTAR-OPEN-CHAT] Redirecting to:', redirectUrl);
-        window.location.href = redirectUrl;
-                window.sendChatMessage();
-              }
-            }, 300);
+        if (sidebar) {
+          sidebar.style.width = isMobile ? '100%' : '400px';
+          sidebar.style.maxWidth = '400px';
+          sidebar.style.display = 'flex';
+          if (floatingBtn) floatingBtn.style.display = 'none';
+          if (isMobile && overlay) overlay.classList.remove('hidden');
+          console.log('[ASTAR-OPEN-CHAT] Chat sidebar opened');
+        } else {
+          console.error('[ASTAR-OPEN-CHAT] Sidebar element not found!');
+        }
+        
+        // Añadir mensaje del usuario al chat
+        var chatMessages = document.getElementById('chat-messages');
+        console.log('[ASTAR-OPEN-CHAT] Chat messages element:', !!chatMessages);
+        
+        if (!chatMessages) {
+          console.error('[ASTAR-OPEN-CHAT] Chat messages container not found!');
+          return;
+        }
+        
+        if (!data.response_text) {
+          console.error('[ASTAR-OPEN-CHAT] No response text in data!');
+          return;
+        }
+        
+        // Mostrar la respuesta del usuario
+        console.log('[ASTAR-OPEN-CHAT] Adding user message to chat...');
+        var userDiv = document.createElement('div');
+        userDiv.className = 'flex justify-end mb-3';
+        userDiv.innerHTML = '<div class="bg-purple-600 text-white rounded-lg px-4 py-2 max-w-[85%] shadow-sm"><p class="text-sm whitespace-pre-wrap">' + escapeHtml(data.response_text) + '<\/p><\/div>';
+        chatMessages.appendChild(userDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        console.log('[ASTAR-OPEN-CHAT] User message added');
+        
+        // Mostrar loading
+        var loading = document.getElementById('chat-loading');
+        if (loading) {
+          loading.classList.remove('hidden');
+          console.log('[ASTAR-OPEN-CHAT] Loading indicator shown');
+        }
+        
+        // Enviar al backend con contexto ASTAR
+        console.log('[ASTAR-OPEN-CHAT] Sending to API...');
+        
+        // Crear mensaje contextual basado en la categoria
+        var contextualMessage = data.response_text;
+        var category = data.category || 'general';
+        var originalQuestion = data.response_prompt || '';
+        
+        // Incluir la pregunta original y la respuesta para dar contexto completo
+        var fullContextMessage = '';
+        
+        if (originalQuestion) {
+          fullContextMessage = '[ASTAR] Question: "' + originalQuestion + '"\n\n';
+          fullContextMessage += '[MY RESPONSE] ' + data.response_text + '\n\n';
+        } else {
+          fullContextMessage = '[MY RESPONSE] ' + data.response_text + '\n\n';
+        }
+        
+        // Add instructions based on category
+        if (category.includes('measure') || category.includes('metricas') || category.includes('resultados')) {
+          fullContextMessage += 'What actions do you recommend? If I need to update metrics, number of users, or create goals, help me do it.';
+        } else if (category.includes('ideas') || category.includes('hipotesis')) {
+          fullContextMessage += 'Could you help me turn this into concrete goals if needed?';
+        } else if (category.includes('build') || category.includes('construccion')) {
+          fullContextMessage += 'What next steps do you recommend to continue building?';
+        } else if (category.includes('reflect') || category.includes('reflexion')) {
+          fullContextMessage += 'What insights and next steps do you suggest?';
+        } else {
+          fullContextMessage += 'What do you recommend I do with this information?';
+        }
+        
+        console.log('[ASTAR-OPEN-CHAT] Full context message:', fullContextMessage);
+        
+        // Marcar que es una respuesta ASTAR para evitar triggers automáticos
+        window.isAstarResponse = true;
+        
+        fetch('/api/chat-agent/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ 
+            message: fullContextMessage
+          })
+        })
+        .then(function(res) { 
+          console.log('[ASTAR-OPEN-CHAT] API response status:', res.status);
+          return res.json(); 
+        })
+        .then(function(responseData) {
+          console.log('[ASTAR-OPEN-CHAT] API response data:', responseData);
+          if (loading) loading.classList.add('hidden');
+          
+          // Limpiar la marca de respuesta ASTAR
+          window.isAstarResponse = false;
+          
+          if (responseData && responseData.message && responseData.message.trim()) {
+            var assistantDiv = document.createElement('div');
+            assistantDiv.className = 'flex justify-start mb-3';
+            var msgText = String(responseData.message).split(String.fromCharCode(92) + 'n').join('<br>').split(String.fromCharCode(10)).join('<br>');
+            assistantDiv.innerHTML = '<div class="bg-gray-100 text-gray-800 rounded-lg px-4 py-2 max-w-[85%] shadow-sm"><p class="text-sm whitespace-pre-wrap">' + msgText + '<\/p><\/div>';
+            chatMessages.appendChild(assistantDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            console.log('[ASTAR-OPEN-CHAT] Assistant message added');
+          } else {
+            console.warn('[ASTAR-OPEN-CHAT] Empty response, message was not generated by AI');
+            
+            // Show friendly error message
+            var errorDiv = document.createElement('div');
+            errorDiv.className = 'flex justify-start mb-3';
+            errorDiv.innerHTML = '<div class="bg-yellow-100 text-yellow-800 rounded-lg px-4 py-2 max-w-[85%] shadow-sm"><p class="text-sm">[!] Could not process your response. Please write your question directly in the chat.<\/p><\/div>';
+            chatMessages.appendChild(errorDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
           }
-        }, 500);
-      };
-      
-      window.closeAstarSuccess = function() {
-        var modal = document.getElementById('astar-success-modal');
-        if (modal) modal.remove();
+        })
+        .catch(function(error) {
+          console.error('[ASTAR-OPEN-CHAT] Error:', error);
+          if (loading) loading.classList.add('hidden');
+        });
       };
       
       // Load notifications after page loads
@@ -2201,15 +2314,6 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         setTimeout(loadAstarNotifications, 500);
       }
     })();
-    
-    // Función de utilidad global
-    function escapeHtml(text) {
-      if (!text) return '';
-      var div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-    window.escapeHtml = escapeHtml;
     </script>
 </body>
 </html>
