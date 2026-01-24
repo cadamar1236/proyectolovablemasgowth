@@ -858,6 +858,7 @@ astarMessages.post('/respond', async (c) => {
       response_id: result.meta.last_row_id,
       category: sentMessage.category,
       response_text: response_text,
+      response_prompt: sentMessage.response_prompt,  // Incluir la pregunta original
       redirect_to_chat: true
     });
 

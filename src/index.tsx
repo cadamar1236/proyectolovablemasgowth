@@ -41,6 +41,7 @@ import aiCMO from './api/ai-cmo';
 import astarMessages from './api/astar-messages';
 import team from './api/team';
 import connector from './api/connector';
+import crm from './api/crm';
 import { renderAICMOPage } from './ai-cmo-page';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -76,6 +77,7 @@ app.route('/api/ai-cmo', aiCMO);
 app.route('/api/astar-messages', astarMessages);
 app.route('/api/team', team);
 app.route('/api/connector', connector);
+app.route('/api/crm', crm);
 
 // Page Routes - Onboarding for new users
 app.get('/onboarding', async (c) => {

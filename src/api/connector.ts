@@ -710,6 +710,8 @@ app.get('/suggestions', async (c) => {
 
     const suggestions = (result.results || []).map((s: any) => ({
       id: s.suggested_user_id,
+      suggestion_id: s.id,
+      suggested_user_id: s.suggested_user_id,
       name: s.name,
       user_type: s.user_type || 'founder',
       avatar: s.avatar,

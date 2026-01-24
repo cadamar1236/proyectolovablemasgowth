@@ -58,6 +58,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           <button onclick="switchTab('connector')" id="tab-connector" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-purple-50 to-indigo-50">
             <i class="fas fa-network-wired mr-1 md:mr-2"></i><span class="hidden sm:inline">AI Connector</span>
           </button>
+          <button onclick="switchTab('crm')" id="tab-crm" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-emerald-50 to-teal-50">
+            <i class="fas fa-users-cog mr-1 md:mr-2"></i><span class="hidden sm:inline">AI CRM</span>
+          </button>
           ${userRole === 'admin' ? `
           <button onclick="window.location.href='/admin'" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-purple-50 to-blue-50">
             <i class="fas fa-shield-alt mr-1 md:mr-2"></i><span class="hidden sm:inline">Admin</span>
@@ -178,6 +181,43 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
                 <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-400 rounded"></span> Heavy (5+)</span>
               </div>
               <span id="busiest-day" class="font-medium"></span>
+            </div>
+          </div>
+          
+          <!-- Goals Filters -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+            <div class="flex flex-wrap gap-3 items-center">
+              <div class="flex-1 min-w-[200px]">
+                <input type="text" id="goals-search" placeholder="Search goals..." class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" onkeyup="filterGoalsTable()">
+              </div>
+              <select id="goals-filter-category" onchange="filterGoalsTable()" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">All Categories</option>
+                <option value="ASTAR">ASTAR</option>
+                <option value="MAGCIENT">MAGCIENT</option>
+                <option value="Personal">Personal</option>
+              </select>
+              <select id="goals-filter-priority" onchange="filterGoalsTable()" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">All Priorities</option>
+                <option value="P0">P0 - Critical</option>
+                <option value="P1">P1 - High</option>
+                <option value="P2">P2 - Medium</option>
+                <option value="P3">P3 - Low</option>
+              </select>
+              <select id="goals-filter-status" onchange="filterGoalsTable()" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">All Status</option>
+                <option value="WIP">WIP</option>
+                <option value="To start">To start</option>
+                <option value="On Hold">On Hold</option>
+                <option value="Delayed">Delayed</option>
+                <option value="Blocked">Blocked</option>
+                <option value="Done">Done</option>
+              </select>
+              <select id="goals-filter-dri" onchange="filterGoalsTable()" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">All DRIs</option>
+              </select>
+              <button onclick="clearGoalsFilters()" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <i class="fas fa-times mr-1"></i>Clear
+              </button>
             </div>
           </div>
           
@@ -506,7 +546,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <div id="connector-chat-messages" class="h-80 overflow-y-auto p-4 space-y-4">
               <div class="flex gap-3">
                 <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
-                  <i class="fas fa-robot text-white text-sm"></i>
+                  <span class="text-lg">🌟</span>
                 </div>
                 <div class="bg-gray-100 rounded-2xl rounded-tl-none px-4 py-3 max-w-[80%]">
                   <p class="text-sm text-gray-800">👋 Hi! I'm your AI SuperConnector. I can help you find:</p>
@@ -570,6 +610,106 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           </div>
         </div>
       </div>
+
+      <!-- AI CRM TAB -->
+      <div id="content-crm" class="tab-content hidden">
+        <div class="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 rounded-2xl p-6 mb-6 border border-emerald-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+                <i class="fas fa-users-cog text-white text-xl"></i>
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-gray-900">AI CRM</h2>
+                <p class="text-sm text-gray-600">Manage your contacts and relationships with AI assistance</p>
+              </div>
+            </div>
+            <button onclick="openAddCRMContactModal()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 py-2 rounded-xl font-semibold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all shadow-md">
+              <i class="fas fa-plus mr-2"></i>Add Contact
+            </button>
+          </div>
+          
+          <!-- CRM Stats -->
+          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+            <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+              <p class="text-xs text-gray-500 uppercase">Total</p>
+              <p class="text-xl font-bold text-gray-900" id="crm-stat-total">0</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+              <p class="text-xs text-gray-500 uppercase">New</p>
+              <p class="text-xl font-bold text-emerald-600" id="crm-stat-new">0</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+              <p class="text-xs text-gray-500 uppercase">Contacted</p>
+              <p class="text-xl font-bold text-blue-600" id="crm-stat-contacted">0</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+              <p class="text-xs text-gray-500 uppercase">Qualified</p>
+              <p class="text-xl font-bold text-purple-600" id="crm-stat-qualified">0</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+              <p class="text-xs text-gray-500 uppercase">Won</p>
+              <p class="text-xl font-bold text-green-600" id="crm-stat-won">0</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+              <p class="text-xs text-gray-500 uppercase">From AI</p>
+              <p class="text-xl font-bold text-indigo-600" id="crm-stat-ai">0</p>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="flex flex-wrap gap-3 mb-4">
+            <select id="crm-filter-status" onchange="filterCRMContacts('status', this.value)" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">All Statuses</option>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="qualified">Qualified</option>
+              <option value="negotiation">Negotiation</option>
+              <option value="won">Won</option>
+              <option value="lost">Lost</option>
+            </select>
+            <select id="crm-filter-type" onchange="filterCRMContacts('type', this.value)" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">All Types</option>
+              <option value="lead">Lead</option>
+              <option value="prospect">Prospect</option>
+              <option value="customer">Customer</option>
+              <option value="partner">Partner</option>
+              <option value="investor">Investor</option>
+              <option value="founder">Founder</option>
+            </select>
+            <select id="crm-filter-source" onchange="filterCRMContacts('source', this.value)" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">All Sources</option>
+              <option value="ai_connector">AI Connector</option>
+              <option value="manual">Manual</option>
+              <option value="import">Import</option>
+              <option value="linkedin">LinkedIn</option>
+            </select>
+            <div class="flex-1 min-w-[200px]">
+              <input type="text" id="crm-search" placeholder="Search contacts..." onkeyup="debounceCRMSearch()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+        </div>
+
+        <!-- Contacts List -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div id="crm-contacts-list" class="divide-y divide-gray-100">
+            <div class="p-8 text-center text-gray-500">
+              <i class="fas fa-users text-4xl text-gray-300 mb-3"></i>
+              <p>No contacts yet. Add your first contact or use AI Connector to find suggestions!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="mt-6">
+          <h3 class="text-lg font-bold text-gray-900 mb-4">
+            <i class="fas fa-history text-emerald-500 mr-2"></i>Recent Activity
+          </h3>
+          <div id="crm-recent-activities" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <p class="text-gray-500 text-sm text-center">No recent activities</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Connector Suggestion Detail Modal -->
@@ -584,6 +724,169 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         <div id="suggestion-detail-content" class="p-6">
           <!-- Content will be loaded here -->
         </div>
+      </div>
+    </div>
+
+    <!-- CRM Add/Edit Contact Modal -->
+    <div id="crm-contact-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+      <div class="bg-white rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+          <h3 class="text-xl font-bold text-gray-900" id="crm-modal-title">Add Contact</h3>
+          <button onclick="closeCRMContactModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <form id="crm-contact-form" onsubmit="saveCRMContact(event)" class="p-6">
+          <input type="hidden" id="crm-contact-id">
+          <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input type="text" id="crm-contact-name" required class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Contact name">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" id="crm-contact-email" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="email@example.com">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                <input type="text" id="crm-contact-company" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Company name">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                <input type="text" id="crm-contact-position" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Job title">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input type="tel" id="crm-contact-phone" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="+1 234 567 890">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">LinkedIn URL</label>
+                <input type="url" id="crm-contact-linkedin" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="https://linkedin.com/in/...">
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select id="crm-contact-type" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                  <option value="lead">Lead</option>
+                  <option value="prospect">Prospect</option>
+                  <option value="customer">Customer</option>
+                  <option value="partner">Partner</option>
+                  <option value="investor">Investor</option>
+                  <option value="validator">Validator</option>
+                  <option value="founder">Founder</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select id="crm-contact-status" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="qualified">Qualified</option>
+                  <option value="negotiation">Negotiation</option>
+                  <option value="won">Won</option>
+                  <option value="lost">Lost</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select id="crm-contact-priority" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea id="crm-contact-notes" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Add notes about this contact..."></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Next Follow-up</label>
+                <input type="date" id="crm-contact-followup" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Deal Value ($)</label>
+                <input type="number" id="crm-contact-value" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="0">
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+            <button type="button" onclick="closeCRMContactModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+            <button type="submit" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-2 rounded-lg font-semibold hover:from-emerald-600 hover:to-teal-700">
+              <i class="fas fa-save mr-2"></i>Save Contact
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- CRM Contact Detail Modal -->
+    <div id="crm-detail-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+      <div class="bg-white rounded-2xl w-full max-w-3xl shadow-xl max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+          <h3 class="text-xl font-bold text-gray-900">Contact Details</h3>
+          <button onclick="closeCRMDetailModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div id="crm-detail-content" class="p-6">
+          <!-- Content loaded dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- CRM Add Activity Modal -->
+    <div id="crm-activity-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+      <div class="bg-white rounded-2xl w-full max-w-md shadow-xl">
+        <div class="border-b border-gray-200 p-6 flex justify-between items-center">
+          <h3 class="text-lg font-bold text-gray-900">Log Activity</h3>
+          <button onclick="closeCRMActivityModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <form id="crm-activity-form" onsubmit="saveCRMActivity(event)" class="p-6">
+          <input type="hidden" id="crm-activity-contact-id">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Activity Type *</label>
+              <select id="crm-activity-type" required class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                <option value="call">Phone Call</option>
+                <option value="email">Email</option>
+                <option value="meeting">Meeting</option>
+                <option value="message">Message</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="note">Note</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+              <input type="text" id="crm-activity-subject" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Brief summary">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea id="crm-activity-description" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Details..."></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Outcome</label>
+              <select id="crm-activity-outcome" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                <option value="">Select outcome</option>
+                <option value="positive">Positive</option>
+                <option value="neutral">Neutral</option>
+                <option value="negative">Negative</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-3 mt-6">
+            <button type="button" onclick="closeCRMActivityModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+            <button type="submit" class="bg-emerald-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-emerald-600">
+              <i class="fas fa-plus mr-2"></i>Log Activity
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -863,11 +1166,13 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         if (tab === 'inbox') loadConversations();
         if (tab === 'directory') { loadProducts(); loadValidators(); }
         if (tab === 'connector') initConnector();
+        if (tab === 'crm') initCRM();
       }
       
       // ============== AI CONNECTOR FUNCTIONS ==============
       let connectorSessionId = null;
       let connectorMessages = [];
+      let allConnectorSuggestions = [];
       
       function initConnector() {
         // Generate session ID if not exists
@@ -929,7 +1234,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           <div class="flex gap-3 \${isUser ? 'justify-end' : ''}">
             \${!isUser ? \`
               <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-robot text-white text-sm"></i>
+                <span class="text-lg">🌟</span>
               </div>
             \` : ''}
             <div class="\${isUser ? 'bg-purple-500 text-white rounded-2xl rounded-tr-none' : 'bg-gray-100 rounded-2xl rounded-tl-none'} px-4 py-3 max-w-[80%]">
@@ -952,7 +1257,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         const loadingHtml = \`
           <div id="\${id}" class="flex gap-3">
             <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
-              <i class="fas fa-robot text-white text-sm"></i>
+              <span class="text-lg">🌟</span>
             </div>
             <div class="bg-gray-100 rounded-2xl rounded-tl-none px-4 py-3">
               <div class="flex items-center gap-2">
@@ -976,6 +1281,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         const container = document.getElementById('connector-results');
         const grid = document.getElementById('connector-results-grid');
         const countEl = document.getElementById('connector-results-count');
+        
+        // Store matches for later use (e.g., adding to CRM)
+        allConnectorSuggestions = matches;
         
         container.classList.remove('hidden');
         countEl.textContent = \`\${matches.length} match\${matches.length !== 1 ? 'es' : ''} found\`;
@@ -1033,11 +1341,14 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
                 </div>
               \` : ''}
               <div class="flex gap-2">
-                <button onclick="startConversation(\${match.id})" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all">
-                  <i class="fas fa-comment-dots mr-1"></i>Connect
+                <button onclick="startConversation(\${match.id})" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all shadow-sm">
+                  <i class="fas fa-comment-dots mr-2"></i>Chat
                 </button>
-                <button onclick="viewProfile(\${match.id})" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all">
-                  <i class="fas fa-user"></i>
+                <button onclick="addSuggestionToCRM(\${match.id})" class="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition-all" title="Add to CRM">
+                  <i class="fas fa-user-plus"></i>
+                </button>
+                <button onclick="viewProfile(\${match.id})" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all" title="View Profile">
+                  <i class="fas fa-eye"></i>
                 </button>
               </div>
             </div>
@@ -1154,7 +1465,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           const avatar = s.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(s.name || 'User');
           const name = s.name || 'Unknown';
           const userType = s.user_type || 'founder';
-          const score = s.score ? (s.score * 100).toFixed(0) : 0;
+          const score = s.score ? Math.round(s.score) : 0;
           
           let html = '<div class="bg-white rounded-xl p-4 border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer" onclick="showSuggestionDetail(' + s.id + ')">';
           html += '<div class="flex items-start gap-3">';
@@ -1180,10 +1491,12 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           }
           
           html += '<div class="mt-3 flex gap-2">';
-          html += '<button onclick="event.stopPropagation(); startConversation(' + s.id + ')" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-2 px-3 rounded-lg text-xs font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all">';
-          html += '<i class="fas fa-comment-dots mr-1"></i>Connect</button>';
-          html += '<button onclick="event.stopPropagation(); showSuggestionDetail(' + s.id + ')" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all">';
-          html += '<i class="fas fa-eye"></i></button>';
+          html += '<button onclick="event.stopPropagation(); startConversation(' + s.id + ')" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-2 px-3 rounded-lg text-xs font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all shadow-sm">';
+          html += '<i class="fas fa-comment-dots mr-1"></i>Chat</button>';
+          html += '<button onclick="event.stopPropagation(); addSuggestionToCRM(' + s.id + ')" class="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition-all" title="Add to CRM">';
+          html += '<i class="fas fa-user-plus"></i></button>';
+          html += '<button onclick="event.stopPropagation(); showSuggestionDetail(' + s.id + ')" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all" title="View Details">';
+          html += '<i class="fas fa-info-circle"></i></button>';
           html += '</div></div>';
           
           return html;
@@ -1210,7 +1523,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           const avatar = suggestion.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(suggestion.name || 'User');
           const name = suggestion.name || 'Unknown';
           const userType = suggestion.user_type || 'founder';
-          const score = suggestion.score ? (suggestion.score * 100).toFixed(0) : 0;
+          const score = suggestion.score ? Math.round(suggestion.score) : 0;
           
           let html = '<div class="flex items-start gap-4 mb-6">';
           html += '<img src="' + avatar + '" alt="' + name + '" class="w-20 h-20 rounded-full object-cover">';
@@ -1254,10 +1567,12 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           }
 
           html += '<div class="flex gap-3">';
-          html += '<button onclick="startConversation(' + suggestion.id + '); closeSuggestionDetail();" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all">';
-          html += '<i class="fas fa-comment-dots mr-2"></i>Start Conversation</button>';
+          html += '<button onclick="startConversation(' + suggestion.id + '); closeSuggestionDetail();" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all shadow-md">';
+          html += '<i class="fas fa-comment-dots mr-2"></i>Start Chat</button>';
+          html += '<button onclick="addSuggestionToCRM(' + suggestion.id + '); closeSuggestionDetail();" class="px-4 py-3 bg-emerald-50 text-emerald-700 rounded-lg font-semibold hover:bg-emerald-100 transition-all">';
+          html += '<i class="fas fa-user-plus mr-2"></i>Add to CRM</button>';
           html += '<button onclick="viewProfile(' + suggestion.id + '); closeSuggestionDetail();" class="px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-all">';
-          html += '<i class="fas fa-user mr-2"></i>View Profile</button>';
+          html += '<i class="fas fa-eye mr-2"></i>Profile</button>';
           html += '</div>';
           
           content.innerHTML = html;
@@ -1276,6 +1591,468 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         modal.classList.remove('flex');
       }
       // ============== END AI CONNECTOR FUNCTIONS ==============
+
+      // ============== AI CRM FUNCTIONS ==============
+      let crmContacts = [];
+      let crmStats = {};
+      let currentCRMFilters = { status: '', type: '', source: '' };
+      let crmSearchTimeout = null;
+
+      async function initCRM() {
+        await Promise.all([loadCRMContacts(), loadCRMStats()]);
+      }
+
+      async function loadCRMContacts() {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          if (!token) return;
+          
+          let url = '/api/crm/contacts?';
+          if (currentCRMFilters.status) url += 'status=' + currentCRMFilters.status + '&';
+          if (currentCRMFilters.type) url += 'contact_type=' + currentCRMFilters.type + '&';
+          if (currentCRMFilters.source) url += 'source=' + currentCRMFilters.source + '&';
+          
+          const searchInput = document.getElementById('crm-search');
+          if (searchInput && searchInput.value) url += 'search=' + encodeURIComponent(searchInput.value) + '&';
+          
+          const res = await axios.get(url, {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          
+          crmContacts = res.data.contacts || [];
+          renderCRMContacts();
+        } catch (error) {
+          console.error('Error loading CRM contacts:', error);
+        }
+      }
+
+      async function loadCRMStats() {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          if (!token) return;
+          
+          const res = await axios.get('/api/crm/stats', {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          
+          crmStats = res.data;
+          updateCRMStatsUI();
+        } catch (error) {
+          console.error('Error loading CRM stats:', error);
+        }
+      }
+
+      function updateCRMStatsUI() {
+        const elements = {
+          'crm-stat-total': crmStats.total || 0,
+          'crm-stat-new': crmStats.by_status?.new || 0,
+          'crm-stat-contacted': crmStats.by_status?.contacted || 0,
+          'crm-stat-qualified': crmStats.by_status?.qualified || 0,
+          'crm-stat-won': crmStats.by_status?.won || 0,
+          'crm-stat-ai': crmStats.from_ai_connector || 0
+        };
+        
+        Object.entries(elements).forEach(([id, value]) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = value;
+        });
+      }
+
+      function renderCRMContacts() {
+        const container = document.getElementById('crm-contacts-list');
+        if (!container) return;
+        
+        if (!crmContacts || crmContacts.length === 0) {
+          container.innerHTML = '<div class="bg-white rounded-xl p-8 text-center text-gray-500 col-span-full">' +
+            '<i class="fas fa-address-book text-5xl text-gray-300 mb-4"></i>' +
+            '<p class="font-medium">No contacts found</p>' +
+            '<p class="text-sm mt-2">Add your first contact or use AI Connector to find suggestions!</p>' +
+            '</div>';
+          return;
+        }
+        
+        container.innerHTML = crmContacts.map(contact => {
+          const initials = (contact.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          const avatarColors = ['bg-emerald-500', 'bg-blue-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500'];
+          const colorIndex = (contact.name || 'U').charCodeAt(0) % avatarColors.length;
+          
+          const statusColors = {
+            'new': 'bg-blue-100 text-blue-700',
+            'contacted': 'bg-yellow-100 text-yellow-700',
+            'qualified': 'bg-purple-100 text-purple-700',
+            'negotiation': 'bg-orange-100 text-orange-700',
+            'won': 'bg-green-100 text-green-700',
+            'lost': 'bg-red-100 text-red-700'
+          };
+          
+          const typeColors = {
+            'lead': 'bg-gray-100 text-gray-700',
+            'prospect': 'bg-blue-100 text-blue-700',
+            'customer': 'bg-green-100 text-green-700',
+            'partner': 'bg-orange-100 text-orange-700',
+            'investor': 'bg-purple-100 text-purple-700',
+            'validator': 'bg-pink-100 text-pink-700',
+            'founder': 'bg-indigo-100 text-indigo-700'
+          };
+          
+          const statusClass = statusColors[contact.status] || 'bg-gray-100 text-gray-700';
+          const typeClass = typeColors[contact.contact_type] || 'bg-gray-100 text-gray-700';
+          
+          let html = '<div class="bg-white rounded-xl p-4 border border-gray-200 hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer" onclick="openCRMContactDetail(' + contact.id + ')">';
+          html += '<div class="flex items-start gap-3 mb-3">';
+          html += '<div class="w-12 h-12 ' + avatarColors[colorIndex] + ' rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">' + initials + '</div>';
+          html += '<div class="flex-1 min-w-0">';
+          html += '<h4 class="font-semibold text-gray-900 truncate">' + (contact.name || 'Unknown') + '</h4>';
+          if (contact.company) html += '<p class="text-sm text-gray-600 truncate">' + contact.company + '</p>';
+          if (contact.position) html += '<p class="text-xs text-gray-500 truncate">' + contact.position + '</p>';
+          html += '</div></div>';
+          
+          html += '<div class="flex flex-wrap gap-1 mb-3">';
+          html += '<span class="px-2 py-0.5 text-xs font-medium rounded-full ' + statusClass + '">' + (contact.status || 'new') + '</span>';
+          html += '<span class="px-2 py-0.5 text-xs font-medium rounded-full ' + typeClass + '">' + (contact.contact_type || 'lead') + '</span>';
+          if (contact.source === 'ai_connector') html += '<span class="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700"><i class="fas fa-robot mr-1"></i>AI</span>';
+          html += '</div>';
+          
+          if (contact.email || contact.phone) {
+            html += '<div class="space-y-1 mb-3 text-xs text-gray-600">';
+            if (contact.email) html += '<p class="truncate"><i class="fas fa-envelope mr-2 text-gray-400"></i>' + contact.email + '</p>';
+            if (contact.phone) html += '<p><i class="fas fa-phone mr-2 text-gray-400"></i>' + contact.phone + '</p>';
+            html += '</div>';
+          }
+          
+          if (contact.next_follow_up) {
+            const followupDate = new Date(contact.next_follow_up);
+            const isOverdue = followupDate < new Date();
+            html += '<div class="bg-' + (isOverdue ? 'red' : 'emerald') + '-50 rounded-lg p-2 mb-3">';
+            html += '<p class="text-xs text-' + (isOverdue ? 'red' : 'emerald') + '-700"><i class="fas fa-calendar mr-1"></i> Follow-up: ' + followupDate.toLocaleDateString() + '</p>';
+            html += '</div>';
+          }
+          
+          html += '<div class="flex gap-2">';
+          html += '<button onclick="event.stopPropagation(); openCRMActivityModal(' + contact.id + ')" class="flex-1 bg-emerald-50 text-emerald-700 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition-all"><i class="fas fa-plus mr-1"></i>Log Activity</button>';
+          html += '<button onclick="event.stopPropagation(); editCRMContact(' + contact.id + ')" class="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50"><i class="fas fa-edit"></i></button>';
+          html += '</div></div>';
+          
+          return html;
+        }).join('');
+      }
+
+      function openAddCRMContactModal() {
+        document.getElementById('crm-modal-title').textContent = 'Add Contact';
+        document.getElementById('crm-contact-form').reset();
+        document.getElementById('crm-contact-id').value = '';
+        const modal = document.getElementById('crm-contact-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      function closeCRMContactModal() {
+        const modal = document.getElementById('crm-contact-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+
+      async function editCRMContact(contactId) {
+        const contact = crmContacts.find(c => c.id === contactId);
+        if (!contact) return;
+        
+        document.getElementById('crm-modal-title').textContent = 'Edit Contact';
+        document.getElementById('crm-contact-id').value = contact.id;
+        document.getElementById('crm-contact-name').value = contact.name || '';
+        document.getElementById('crm-contact-email').value = contact.email || '';
+        document.getElementById('crm-contact-company').value = contact.company || '';
+        document.getElementById('crm-contact-position').value = contact.position || '';
+        document.getElementById('crm-contact-phone').value = contact.phone || '';
+        document.getElementById('crm-contact-linkedin').value = contact.linkedin_url || '';
+        document.getElementById('crm-contact-type').value = contact.contact_type || 'lead';
+        document.getElementById('crm-contact-status').value = contact.status || 'new';
+        document.getElementById('crm-contact-priority').value = contact.priority || 'medium';
+        document.getElementById('crm-contact-notes').value = contact.notes || '';
+        document.getElementById('crm-contact-followup').value = contact.next_follow_up ? contact.next_follow_up.split('T')[0] : '';
+        document.getElementById('crm-contact-value').value = contact.deal_value || '';
+        
+        const modal = document.getElementById('crm-contact-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      async function saveCRMContact(event) {
+        event.preventDefault();
+        
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          if (!token) {
+            console.error('[CRM] No auth token found');
+            return;
+          }
+          
+          const contactId = document.getElementById('crm-contact-id').value;
+          console.log('[CRM] Saving contact:', contactId ? 'Update ID=' + contactId : 'New');
+          
+          const contactData = {
+            name: document.getElementById('crm-contact-name').value,
+            email: document.getElementById('crm-contact-email').value || null,
+            company: document.getElementById('crm-contact-company').value || null,
+            position: document.getElementById('crm-contact-position').value || null,
+            phone: document.getElementById('crm-contact-phone').value || null,
+            linkedin_url: document.getElementById('crm-contact-linkedin').value || null,
+            contact_type: document.getElementById('crm-contact-type').value,
+            status: document.getElementById('crm-contact-status').value,
+            priority: document.getElementById('crm-contact-priority').value,
+            notes: document.getElementById('crm-contact-notes').value || null,
+            next_follow_up: document.getElementById('crm-contact-followup').value || null,
+            deal_value: document.getElementById('crm-contact-value').value ? parseFloat(document.getElementById('crm-contact-value').value) : null
+          };
+          
+          const url = contactId ? '/api/crm/contacts/' + contactId : '/api/crm/contacts';
+          const method = contactId ? 'PUT' : 'POST';
+          
+          console.log('[CRM] Sending request:', method, url, contactData);
+          const response = await axios({ method, url, data: contactData, headers: { Authorization: 'Bearer ' + token } });
+          console.log('[CRM] Contact saved successfully:', response.data);
+          
+          closeCRMContactModal();
+          await Promise.all([loadCRMContacts(), loadCRMStats()]);
+        } catch (error) {
+          console.error('[CRM] Error saving contact:', error);
+          console.error('[CRM] Error details:', error.response?.data);
+          alert('Error saving contact: ' + (error.response?.data?.error || error.message));
+        }
+      }
+
+      async function openCRMContactDetail(contactId) {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          if (!token) return;
+          
+          const contact = crmContacts.find(c => c.id === contactId);
+          if (!contact) return;
+          
+          // Fetch activities for this contact
+          const activitiesRes = await axios.get('/api/crm/contacts/' + contactId + '/activities', {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          const activities = activitiesRes.data.activities || [];
+          
+          const modal = document.getElementById('crm-detail-modal');
+          const content = document.getElementById('crm-detail-content');
+          
+          const initials = (contact.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          
+          let html = '<div class="flex items-start gap-4 mb-6">';
+          html += '<div class="w-20 h-20 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">' + initials + '</div>';
+          html += '<div class="flex-1">';
+          html += '<h3 class="text-2xl font-bold text-gray-900">' + (contact.name || 'Unknown') + '</h3>';
+          if (contact.position && contact.company) html += '<p class="text-gray-600">' + contact.position + ' at ' + contact.company + '</p>';
+          else if (contact.company) html += '<p class="text-gray-600">' + contact.company + '</p>';
+          html += '<div class="flex gap-2 mt-2">';
+          html += '<span class="px-2 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">' + (contact.status || 'new') + '</span>';
+          html += '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">' + (contact.contact_type || 'lead') + '</span>';
+          html += '</div></div>';
+          html += '<button onclick="editCRMContact(' + contact.id + '); closeCRMDetailModal();" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"><i class="fas fa-edit mr-2"></i>Edit</button>';
+          html += '</div>';
+          
+          // Contact info grid
+          html += '<div class="grid grid-cols-2 gap-4 mb-6">';
+          if (contact.email) html += '<div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-500 mb-1">Email</p><a href="mailto:' + contact.email + '" class="text-sm text-emerald-600 hover:underline">' + contact.email + '</a></div>';
+          if (contact.phone) html += '<div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-500 mb-1">Phone</p><a href="tel:' + contact.phone + '" class="text-sm text-emerald-600 hover:underline">' + contact.phone + '</a></div>';
+          if (contact.linkedin_url) html += '<div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-500 mb-1">LinkedIn</p><a href="' + contact.linkedin_url + '" target="_blank" class="text-sm text-blue-600 hover:underline">View Profile</a></div>';
+          if (contact.deal_value) html += '<div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-500 mb-1">Deal Value</p><p class="text-sm font-semibold text-green-600">$' + contact.deal_value.toLocaleString() + '</p></div>';
+          if (contact.next_follow_up) html += '<div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-500 mb-1">Next Follow-up</p><p class="text-sm text-gray-900">' + new Date(contact.next_follow_up).toLocaleDateString() + '</p></div>';
+          html += '</div>';
+          
+          if (contact.notes) {
+            html += '<div class="mb-6"><h4 class="text-sm font-semibold text-gray-700 mb-2">Notes</h4>';
+            html += '<div class="bg-gray-50 rounded-lg p-3"><p class="text-sm text-gray-600 whitespace-pre-wrap">' + contact.notes + '</p></div></div>';
+          }
+          
+          // Activities
+          html += '<div class="mb-4"><div class="flex items-center justify-between mb-3">';
+          html += '<h4 class="text-sm font-semibold text-gray-700">Activity Log</h4>';
+          html += '<button onclick="openCRMActivityModal(' + contact.id + ')" class="text-sm text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1"></i>Add Activity</button>';
+          html += '</div>';
+          
+          if (activities.length === 0) {
+            html += '<div class="bg-gray-50 rounded-lg p-4 text-center text-gray-500"><i class="fas fa-history text-2xl mb-2"></i><p class="text-sm">No activities logged yet</p></div>';
+          } else {
+            html += '<div class="space-y-3 max-h-60 overflow-y-auto">';
+            activities.forEach(act => {
+              const actIcons = { call: 'fa-phone', email: 'fa-envelope', meeting: 'fa-users', message: 'fa-comment', linkedin: 'fa-linkedin', note: 'fa-sticky-note' };
+              const actIcon = actIcons[act.activity_type] || 'fa-circle';
+              html += '<div class="flex gap-3 p-3 bg-gray-50 rounded-lg">';
+              html += '<div class="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas ' + actIcon + ' text-emerald-600 text-sm"></i></div>';
+              html += '<div class="flex-1 min-w-0">';
+              html += '<p class="text-sm font-medium text-gray-900">' + (act.subject || act.activity_type) + '</p>';
+              if (act.description) html += '<p class="text-xs text-gray-600 mt-1">' + act.description + '</p>';
+              html += '<p class="text-xs text-gray-400 mt-1">' + new Date(act.created_at).toLocaleString() + '</p>';
+              html += '</div></div>';
+            });
+            html += '</div>';
+          }
+          html += '</div>';
+          
+          // Actions
+          html += '<div class="flex gap-3 pt-4 border-t border-gray-200">';
+          html += '<button onclick="openCRMActivityModal(' + contact.id + ')" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-teal-700"><i class="fas fa-plus mr-2"></i>Log Activity</button>';
+          if (contact.email) html += '<a href="mailto:' + contact.email + '" class="px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50"><i class="fas fa-envelope"></i></a>';
+          if (contact.phone) html += '<a href="tel:' + contact.phone + '" class="px-4 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50"><i class="fas fa-phone"></i></a>';
+          html += '</div>';
+          
+          content.innerHTML = html;
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+        } catch (error) {
+          console.error('Error loading contact detail:', error);
+        }
+      }
+
+      function closeCRMDetailModal() {
+        const modal = document.getElementById('crm-detail-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+
+      function openCRMActivityModal(contactId) {
+        document.getElementById('crm-activity-form').reset();
+        document.getElementById('crm-activity-contact-id').value = contactId;
+        const modal = document.getElementById('crm-activity-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      function closeCRMActivityModal() {
+        const modal = document.getElementById('crm-activity-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+
+      async function saveCRMActivity(event) {
+        event.preventDefault();
+        
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          if (!token) {
+            console.error('[CRM] No auth token found');
+            return;
+          }
+          
+          const contactId = document.getElementById('crm-activity-contact-id').value;
+          console.log('[CRM] Saving activity for contact:', contactId);
+          
+          const activityData = {
+            activity_type: document.getElementById('crm-activity-type').value,
+            subject: document.getElementById('crm-activity-subject').value || null,
+            description: document.getElementById('crm-activity-description').value || null,
+            outcome: document.getElementById('crm-activity-outcome').value || null
+          };
+          
+          console.log('[CRM] Activity data:', activityData);
+          const response = await axios.post('/api/crm/contacts/' + contactId + '/activities', activityData, {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          console.log('[CRM] Activity saved successfully:', response.data);
+          
+          closeCRMActivityModal();
+          // Refresh detail modal if open
+          const detailModal = document.getElementById('crm-detail-modal');
+          if (!detailModal.classList.contains('hidden')) {
+            await openCRMContactDetail(parseInt(contactId));
+          }
+        } catch (error) {
+          console.error('[CRM] Error saving activity:', error);
+          console.error('[CRM] Error details:', error.response?.data);
+          alert('Error saving activity: ' + (error.response?.data?.error || error.message));
+        }
+      }
+
+      function filterCRMContacts(filterType, value) {
+        console.log('[CRM] Applying filter:', filterType, '=', value);
+        if (value === '' || value === 'all') {
+          delete currentCRMFilters[filterType];
+        } else {
+          currentCRMFilters[filterType] = value;
+        }
+        console.log('[CRM] Current filters:', currentCRMFilters);
+        loadCRMContacts();
+      }
+
+      function debounceCRMSearch() {
+        clearTimeout(crmSearchTimeout);
+        crmSearchTimeout = setTimeout(loadCRMContacts, 300);
+      }
+
+      // Add contact from AI Connector suggestion
+      // userId = The suggested user's ID (from matches or saved suggestions)
+      async function addSuggestionToCRM(userId, suggestionData) {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          if (!token) return;
+          
+          // If no suggestionData provided, fetch it first
+          let data = suggestionData;
+          if (!data) {
+            // Find in allConnectorSuggestions (fresh matches from AI)
+            data = allConnectorSuggestions.find(s => s.id === userId);
+            if (!data) {
+              // Try to get from saved suggestions
+              const savedRes = await axios.get('/api/connector/suggestions', {
+                headers: { Authorization: 'Bearer ' + token }
+              });
+              const saved = savedRes.data.suggestions || [];
+              data = saved.find(s => s.id === userId || s.suggested_user_id === userId);
+            }
+          }
+          
+          // Build request with all available data
+          // Note: userId is the suggested user's ID, suggestion_id is the DB record ID (if saved)
+          const requestBody = {
+            suggestion_id: data?.suggestion_id || null,
+            suggested_user_id: userId,
+            name: data?.name || 'Unknown Contact',
+            email: data?.email || null,
+            company: data?.industry || data?.company || null,
+            reason: data?.reason || null,
+            avatar_url: data?.avatar || data?.avatar_url || null
+          };
+          
+          console.log('[CRM] Adding contact from connector:', requestBody);
+          
+          const res = await axios.post('/api/crm/from-connector', requestBody, {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          
+          if (res.data.success) {
+            const msg = res.data.already_exists ? 'Contact already in CRM!' : 'Contact added to CRM!';
+            alert(msg);
+            // If CRM tab is active, refresh
+            if (!document.getElementById('content-crm').classList.contains('hidden')) {
+              await Promise.all([loadCRMContacts(), loadCRMStats()]);
+            }
+          }
+        } catch (error) {
+          console.error('Error adding to CRM:', error);
+          alert('Error adding to CRM: ' + (error.response?.data?.error || error.message));
+        }
+      }
+
+      // Expose CRM functions globally
+      window.openAddCRMContactModal = openAddCRMContactModal;
+      window.closeCRMContactModal = closeCRMContactModal;
+      window.saveCRMContact = saveCRMContact;
+      window.editCRMContact = editCRMContact;
+      window.openCRMContactDetail = openCRMContactDetail;
+      window.closeCRMDetailModal = closeCRMDetailModal;
+      window.openCRMActivityModal = openCRMActivityModal;
+      window.closeCRMActivityModal = closeCRMActivityModal;
+      window.saveCRMActivity = saveCRMActivity;
+      window.filterCRMContacts = filterCRMContacts;
+      window.debounceCRMSearch = debounceCRMSearch;
+      window.addSuggestionToCRM = addSuggestionToCRM;
+      // ============== END AI CRM FUNCTIONS ==============
+      
+      // Expose Goals filter functions globally
+      window.filterGoalsTable = filterGoalsTable;
+      window.clearGoalsFilters = clearGoalsFilters;
       
       // Function to render Team To-Do List based on goals
       function renderTeamTodoList() {
@@ -1740,22 +2517,40 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
 
       function renderGoalsTable() {
         const tbody = document.getElementById('goals-table-body');
-        if (!allGoals.length) {
+        
+        // Apply filters
+        let filteredGoals = filterGoalsList();
+        
+        if (!filteredGoals.length) {
           tbody.innerHTML = \`
             <tr>
-              <td colspan="15" class="px-4 py-8 text-center text-gray-500">
+              <td colspan="9" class="px-4 py-8 text-center text-gray-500">
                 <i class="fas fa-bullseye text-4xl mb-2 text-gray-300"></i>
-                <p>No goals yet</p>
-                <button onclick="openGoalModal()" class="text-purple-600 text-sm mt-2 hover:underline">Create your first goal</button>
+                <p>No goals found matching filters</p>
+                <button onclick="clearGoalsFilters()" class="text-purple-600 text-sm mt-2 hover:underline">Clear filters</button>
               </td>
             </tr>
           \`;
           return;
         }
 
-        // Group goals by category
+        // Populate DRI filter with unique DRIs
+        const driSet = new Set();
+        allGoals.forEach(g => {
+          if (g.dri && g.dri !== '-') driSet.add(g.dri);
+        });
+        const driFilter = document.getElementById('goals-filter-dri');
+        if (driFilter) {
+          const currentValue = driFilter.value;
+          driFilter.innerHTML = '<option value="">All DRIs</option>' + 
+            Array.from(driSet).sort().map(dri => 
+              '<option value="' + dri + '" ' + (dri === currentValue ? 'selected' : '') + '>' + dri + '</option>'
+            ).join('');
+        }
+
+        // Group goals by category and sort by priority
         const categories = {};
-        allGoals.forEach(goal => {
+        filteredGoals.forEach(goal => {
           const cat = goal.category || 'ASTAR';
           if (!categories[cat]) categories[cat] = [];
           categories[cat].push(goal);
@@ -1763,6 +2558,8 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
 
         tbody.innerHTML = Object.entries(categories).map(([category, goals]) => {
           const categoryColor = category === 'ASTAR' ? 'bg-blue-50' : category === 'MAGCIENT' ? 'bg-red-50' : 'bg-gray-50';
+          
+          // Sort by priority (P0 > P1 > P2 > P3) then by order_index
           const categoryRows = goals.sort((a, b) => {
             const priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };
             return (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99) || (a.order_index || 0) - (b.order_index || 0);
@@ -1840,6 +2637,50 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         
         // Update timeline overview after rendering table
         updateCalendarOverview();
+      }
+      
+      // Goals filtering functions
+      function filterGoalsList() {
+        const searchTerm = document.getElementById('goals-search')?.value.toLowerCase() || '';
+        const categoryFilter = document.getElementById('goals-filter-category')?.value || '';
+        const priorityFilter = document.getElementById('goals-filter-priority')?.value || '';
+        const statusFilter = document.getElementById('goals-filter-status')?.value || '';
+        const driFilter = document.getElementById('goals-filter-dri')?.value || '';
+        
+        return allGoals.filter(goal => {
+          // Search filter
+          if (searchTerm) {
+            const searchable = (goal.description || '') + ' ' + (goal.task || '') + ' ' + (goal.dri || '');
+            if (!searchable.toLowerCase().includes(searchTerm)) return false;
+          }
+          
+          // Category filter
+          if (categoryFilter && goal.category !== categoryFilter) return false;
+          
+          // Priority filter
+          if (priorityFilter && goal.priority !== priorityFilter) return false;
+          
+          // Status filter
+          if (statusFilter && goal.goal_status !== statusFilter) return false;
+          
+          // DRI filter
+          if (driFilter && goal.dri !== driFilter) return false;
+          
+          return true;
+        });
+      }
+      
+      function filterGoalsTable() {
+        renderGoalsTable();
+      }
+      
+      function clearGoalsFilters() {
+        document.getElementById('goals-search').value = '';
+        document.getElementById('goals-filter-category').value = '';
+        document.getElementById('goals-filter-priority').value = '';
+        document.getElementById('goals-filter-status').value = '';
+        document.getElementById('goals-filter-dri').value = '';
+        renderGoalsTable();
       }
       
       // Calendar state
@@ -1975,8 +2816,84 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           return;
         }
         
-        const taskList = tasksForDay.map(g => '• ' + (g.task || g.description)).join('\\n');
-        alert('Tasks for ' + dateStr + ':\\n\\n' + taskList);
+        // Create modal content with checkboxes
+        const formatDate = new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const taskListHTML = tasksForDay.map(g => {
+          const isDone = g.goal_status === 'Done';
+          const isWIP = g.goal_status === 'WIP';
+          return \`
+            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all">
+              <input type="checkbox" 
+                     id="task-check-\${g.id}" 
+                     \${isDone ? 'checked' : ''} 
+                     onchange="toggleTaskStatus(\${g.id}, this.checked)" 
+                     class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500">
+              <label for="task-check-\${g.id}" class="flex-1 cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium \${isDone ? 'text-gray-400 line-through' : 'text-gray-900'}">\${g.task || g.description}</span>
+                  \${isDone ? '<span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">Done</span>' : ''}
+                  \${isWIP ? '<span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">WIP</span>' : ''}
+                </div>
+                \${g.dri ? '<p class="text-xs text-gray-500 mt-1">DRI: ' + g.dri + '</p>' : ''}
+              </label>
+            </div>
+          \`;
+        }).join('');
+        
+        // Show modal
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center';
+        modal.innerHTML = \`
+          <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 flex justify-between items-center">
+              <div>
+                <h3 class="font-bold text-lg">Tasks for \${formatDate}</h3>
+                <p class="text-sm text-purple-100">\${tasksForDay.length} task\${tasksForDay.length !== 1 ? 's' : ''} scheduled</p>
+              </div>
+              <button onclick="this.closest('.fixed').remove()" class="text-white/70 hover:text-white transition-colors">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+            <div class="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+              <div class="space-y-2">
+                \${taskListHTML}
+              </div>
+            </div>
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-all">
+                Close
+              </button>
+            </div>
+          </div>
+        \`;
+        document.body.appendChild(modal);
+        
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) modal.remove();
+        });
+      };
+      
+      window.toggleTaskStatus = async function(goalId, isChecked) {
+        try {
+          const newStatus = isChecked ? 'Done' : 'WIP';
+          await axios.put('/api/dashboard/goals/' + goalId, { goal_status: newStatus });
+          
+          // Update in local array
+          const goal = allGoals.find(g => g.id === goalId);
+          if (goal) {
+            goal.goal_status = newStatus;
+          }
+          
+          // Update UI
+          renderGoalsTable();
+          updateCalendarOverview();
+          
+          console.log('[GOAL] Status updated:', { goalId, newStatus });
+        } catch (e) {
+          console.error('Error updating task status:', e);
+          alert('Failed to update task status');
+        }
       };
       
       window.openGoalCalendar = function(goalId) {

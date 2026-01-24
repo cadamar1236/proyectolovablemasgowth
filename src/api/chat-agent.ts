@@ -169,30 +169,7 @@ async function generateAIResponse(apiKey: string, systemPrompt: string, userMess
   const recentHistory = chatHistory.slice(-10);
   console.log('[AI] Using conversation history:', recentHistory.length, 'messages');
   
-  // Try Cloudflare AI first if available
-  if (cloudflareAI) {
-    try {
-      console.log('[AI] Using Cloudflare Workers AI');
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...recentHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
-        { role: 'user', content: `Contexto: ${JSON.stringify(simplifiedContext)}\n\nPregunta: ${userMessage}` }
-      ];
-      
-      const response = await cloudflareAI.run('@cf/meta/llama-3.1-8b-instruct', {
-        messages,
-        max_tokens: 1500,
-        temperature: 0.7
-      });
-      
-      return response.response || 'No pude generar una respuesta.';
-    } catch (error) {
-      console.error('[AI] Cloudflare AI error:', error);
-      // Fall through to Groq
-    }
-  }
-  
-  // Try Groq with retry logic
+  // Try Groq FIRST (primary AI)
   if (apiKey) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -208,7 +185,7 @@ async function generateAIResponse(apiKey: string, systemPrompt: string, userMess
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'llama-3.1-70b-versatile',
+            model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
             messages: [
               { role: 'system', content: systemPrompt },
               ...recentHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
@@ -257,6 +234,28 @@ async function generateAIResponse(apiKey: string, systemPrompt: string, userMess
         // Wait before retry
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
+    }
+  }
+  
+  // Fallback to Cloudflare AI if Groq failed
+  if (cloudflareAI) {
+    try {
+      console.log('[AI] Groq failed, using Cloudflare Workers AI as fallback');
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...recentHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
+        { role: 'user', content: `Contexto: ${JSON.stringify(simplifiedContext)}\n\nPregunta: ${userMessage}` }
+      ];
+      
+      const response = await cloudflareAI.run('@cf/meta/llama-3.2-3b-instruct', {
+        messages,
+        max_tokens: 1500,
+        temperature: 0.7
+      });
+      
+      return response.response || 'No pude generar una respuesta.';
+    } catch (error) {
+      console.error('[AI] Cloudflare AI error:', error);
     }
   }
   
@@ -1088,33 +1087,53 @@ You: "New Goal created: ID: 177..." ← NEVER DO THIS!
 
 📊 COMMANDS FOR METRICS (USERS AND REVENUE):
 
-ACTION:SET_USERS|value - Set number of users
-ACTION:SET_REVENUE|value - Set revenue (in dollars)
-ACTION:ADD_USERS|value - Add users to current total
-ACTION:ADD_REVENUE|value - Add revenue to current total
+🔴 IMPORTANT: The context provides current metrics from database:
+- Current users: ${context.metrics.current.users}
+- Current revenue: $${context.metrics.current.revenue}
 
-📝 METRIC EXAMPLES:
+USE THESE DATABASE VALUES when responding about metrics!
+
+ACTION:SET_USERS|value - Set ABSOLUTE number of users (use when user says "I have X users", "update to X", "we are at X")
+ACTION:SET_REVENUE|value - Set ABSOLUTE revenue (use when user says "revenue is X", "update to $X")
+ACTION:ADD_USERS|value - Add users to current total (ONLY when user says "got X NEW users", "X MORE users", "gained X")
+ACTION:ADD_REVENUE|value - Add revenue to current total (ONLY when user says "made $X today", "X MORE in sales", "gained $X")
+
+📝 METRIC EXAMPLES (ALWAYS include ACTION first, then response):
 
 User: "we have 500 users"
 You: ACTION:SET_USERS|500
-👥 Updated! You now have 500 registered users.
+👥 Set to 500 users!
+
+User: "actualiza a 15 usuarios" or "update users to 15"
+You: ACTION:SET_USERS|15
+👥 Set to 15 users!
+
+User: "tengo 100 usuarios" or "I have 100 users"
+You: ACTION:SET_USERS|100
+👥 Set to 100 users!
 
 User: "update revenue to 15000"
 You: ACTION:SET_REVENUE|15000
-💰 Revenue updated to $15,000!
+💰 Revenue set to $15,000!
 
-User: "we got 50 new users"
+User: "we got 50 NEW users" or "50 MORE users" (current DB: ${context.metrics.current.users})
 You: ACTION:ADD_USERS|50
-🎉 +50 users! Total: \${context.metrics.current.users + 50}
+🎉 +50 users! Now you have ${context.metrics.current.users + 50} total.
 
-User: "we made 2000 in sales today"
+User: "gained 30 users today" (current DB: ${context.metrics.current.users})
+You: ACTION:ADD_USERS|30
+🎉 +30 users! Now you have ${context.metrics.current.users + 30} total.
+
+User: "we made 2000 in sales today" (current DB: $${context.metrics.current.revenue})
 You: ACTION:ADD_REVENUE|2000
-💵 +$2,000! Total revenue: $\${context.metrics.current.revenue + 2000}
+💵 +$2,000! Total revenue: $${context.metrics.current.revenue + 2000}
 
 User: "we now have 1200 users and $8000 revenue"
 You: ACTION:SET_USERS|1200
 ACTION:SET_REVENUE|8000
-📊 Metrics updated! 1,200 users and $8,000 revenue.
+📊 Metrics set! 1,200 users and $8,000 revenue.
+
+⚠️ CRITICAL: ALWAYS output ACTION: commands on their own lines BEFORE your response text!
 
 🔧 COMMANDS TO EDIT EXISTING GOALS:
 
@@ -1147,7 +1166,6 @@ REMEMBER:
 - Respond in English`;
 
       const aiResponse = await generateAIResponse(groqKey || '', systemPrompt, message, context, c.env.AI, chatHistory);
-      assistantMessage = await processAIActions(c.env.DB, user.userId, aiResponse, context);
       assistantMessage = await processAIActions(c.env.DB, user.userId, aiResponse, context);
     } catch (error) {
       console.error('[CHAT] AI error:', error);
@@ -1228,7 +1246,7 @@ app.post('/determine-category', jwtMiddleware, async (c) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-70b-versatile',
+        model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
         messages: [
           { 
             role: 'system', 

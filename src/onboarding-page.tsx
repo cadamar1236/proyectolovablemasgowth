@@ -76,16 +76,6 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
                   </span>
                 </button>
               </div>
-              
-              <!-- Skip Button -->
-              <div class="text-center">
-                <button 
-                  onclick="skipOnboarding()" 
-                  class="text-gray-500 hover:text-gray-700 text-sm underline"
-                >
-                  Skip for now (you can complete this later)
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -577,12 +567,6 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
           }, 2000);
         }
       }
-
-      window.skipOnboarding = function() {
-        if (confirm('Are you sure you want to skip? You can complete your profile later from settings.')) {
-          window.location.href = '/dashboard';
-        }
-      };
     </script>
 
     <style>
