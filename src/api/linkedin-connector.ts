@@ -7,7 +7,14 @@ import { Hono } from 'hono';
 import { verify } from 'hono/jwt';
 import type { Bindings } from '../types';
 
-const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
+// SECURITY: No hardcoded fallback - JWT_SECRET must be configured in environment
+function getJWTSecret(env: Bindings): string {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is not configured');
+  }
+  return env.JWT_SECRET;
+}
+
 const RAILWAY_API_URL = 'https://proyectolovablemasgowth-production.up.railway.app';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -23,7 +30,7 @@ app.use('/*', async (c, next) => {
   const token = authHeader.substring(7);
   
   try {
-    const decoded = await verify(token, JWT_SECRET);
+    const decoded = await verify(token, getJWTSecret(c.env));
     c.set('userId', decoded.userId as number);
     await next();
   } catch (error) {

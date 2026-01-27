@@ -75,6 +75,9 @@ export function getAdminDashboard(props: AdminDashboardProps): string {
             <button onclick="showAdminTab('users')" id="users-tab" class="admin-tab py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs md:text-sm border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
               <i class="fas fa-users mr-1 md:mr-2"></i>Users
             </button>
+            <button onclick="showAdminTab('activity')" id="activity-tab" class="admin-tab py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs md:text-sm border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+              <i class="fas fa-comments mr-1 md:mr-2"></i><span class="hidden sm:inline">Activity</span><span class="sm:hidden">Chat</span>
+            </button>
             <button onclick="showAdminTab('reports')" id="reports-tab" class="admin-tab py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs md:text-sm border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
               <i class="fas fa-file-alt mr-1 md:mr-2"></i>Reports
             </button>
@@ -177,6 +180,115 @@ export function getAdminDashboard(props: AdminDashboardProps): string {
 
           <div id="users-list" class="space-y-2">
             <p class="text-gray-500 text-center py-8">Loading users...</p>
+          </div>
+        </div>
+
+        <!-- Activity Tab (Chat & AI Monitoring) -->
+        <div id="activity-content" class="admin-tab-content p-3 md:p-6 hidden">
+          <h2 class="text-lg md:text-xl font-bold mb-4">Chat & Activity Monitoring</h2>
+          
+          <!-- Chat Stats Overview -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-3 md:p-4 text-white">
+              <div class="flex items-center justify-between">
+                <i class="fas fa-comments text-xl md:text-2xl opacity-80"></i>
+                <span id="total-user-chats" class="text-xl md:text-2xl font-bold">0</span>
+              </div>
+              <p class="text-xs md:text-sm text-blue-100 mt-1">User Conversations</p>
+            </div>
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-3 md:p-4 text-white">
+              <div class="flex items-center justify-between">
+                <i class="fas fa-envelope text-xl md:text-2xl opacity-80"></i>
+                <span id="total-messages" class="text-xl md:text-2xl font-bold">0</span>
+              </div>
+              <p class="text-xs md:text-sm text-green-100 mt-1">Total Messages</p>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 md:p-4 text-white">
+              <div class="flex items-center justify-between">
+                <i class="fas fa-robot text-xl md:text-2xl opacity-80"></i>
+                <span id="total-ai-chats" class="text-xl md:text-2xl font-bold">0</span>
+              </div>
+              <p class="text-xs md:text-sm text-purple-100 mt-1">AI Conversations</p>
+            </div>
+            <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-3 md:p-4 text-white">
+              <div class="flex items-center justify-between">
+                <i class="fas fa-user-clock text-xl md:text-2xl opacity-80"></i>
+                <span id="ai-unique-users" class="text-xl md:text-2xl font-bold">0</span>
+              </div>
+              <p class="text-xs md:text-sm text-orange-100 mt-1">AI Users</p>
+            </div>
+          </div>
+
+          <!-- Engagement Chart -->
+          <div class="border rounded-lg p-4 mb-6">
+            <h3 class="font-semibold mb-3">Engagement Over Time (30 Days)</h3>
+            <canvas id="engagement-chart" height="150"></canvas>
+          </div>
+
+          <!-- Activity Sub-tabs -->
+          <div class="border-b border-gray-200 mb-4">
+            <nav class="flex space-x-4">
+              <button onclick="showActivitySubTab('user-chats')" id="user-chats-subtab" class="activity-subtab py-2 px-3 border-b-2 font-medium text-sm border-primary text-primary">
+                <i class="fas fa-comments mr-1"></i>User Chats
+              </button>
+              <button onclick="showActivitySubTab('ai-chats')" id="ai-chats-subtab" class="activity-subtab py-2 px-3 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700">
+                <i class="fas fa-robot mr-1"></i>AI Agent Chats
+              </button>
+              <button onclick="showActivitySubTab('active-users')" id="active-users-subtab" class="activity-subtab py-2 px-3 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700">
+                <i class="fas fa-user-clock mr-1"></i>Active Users
+              </button>
+            </nav>
+          </div>
+
+          <!-- User Chats Content -->
+          <div id="user-chats-content" class="activity-subtab-content">
+            <div id="user-conversations-list" class="space-y-3">
+              <p class="text-gray-500 text-center py-8">Loading conversations...</p>
+            </div>
+          </div>
+
+          <!-- AI Chats Content -->
+          <div id="ai-chats-content" class="activity-subtab-content hidden">
+            <div id="ai-conversations-list" class="space-y-3">
+              <p class="text-gray-500 text-center py-8">Loading AI conversations...</p>
+            </div>
+          </div>
+
+          <!-- Active Users Content -->
+          <div id="active-users-content" class="activity-subtab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 class="font-semibold mb-3"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Top Messagers</h4>
+                <div id="top-messagers-list" class="space-y-2">
+                  <p class="text-gray-500 text-center py-4">Loading...</p>
+                </div>
+              </div>
+              <div>
+                <h4 class="font-semibold mb-3"><i class="fas fa-clock text-green-500 mr-2"></i>Recently Active (7 days)</h4>
+                <div id="recent-active-list" class="space-y-2">
+                  <p class="text-gray-500 text-center py-4">Loading...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversation Messages Modal -->
+        <div id="conversation-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">
+          <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-4 md:p-6 text-white sticky top-0 z-10">
+              <div class="flex items-center justify-between">
+                <h2 id="conversation-modal-title" class="text-lg md:text-xl font-bold">
+                  <i class="fas fa-comments mr-2"></i>Conversation
+                </h2>
+                <button onclick="closeConversationModal()" class="text-white hover:text-gray-200 text-xl md:text-2xl">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+            <div id="conversation-messages" class="p-4 md:p-6 space-y-4">
+              <p class="text-gray-500 text-center py-8">Loading messages...</p>
+            </div>
           </div>
         </div>
 
@@ -480,6 +592,8 @@ export function getAdminDashboard(props: AdminDashboardProps): string {
           loadRecentActivity();
         } else if (tab === 'startups') {
           loadStartupsList();
+        } else if (tab === 'activity') {
+          loadActivityData();
         }
       }
 
@@ -1176,6 +1290,337 @@ export function getAdminDashboard(props: AdminDashboardProps): string {
 
       function closeStartupDetailModal() {
         document.getElementById('startup-detail-modal').style.display = 'none';
+      }
+
+      // =====================================================
+      // ACTIVITY TAB FUNCTIONS
+      // =====================================================
+      
+      let engagementChart = null;
+
+      async function loadActivityData() {
+        await Promise.all([
+          loadChatStats(),
+          loadEngagementTimeline(),
+          loadUserConversations(),
+          loadActiveUsers()
+        ]);
+      }
+
+      async function loadChatStats() {
+        try {
+          const token = getAuthToken();
+          const response = await axios.get('/api/admin/stats/chat', {
+            headers: { Authorization: \`Bearer \${token}\` }
+          });
+
+          const data = response.data;
+          document.getElementById('total-user-chats').textContent = data.userChats?.totalConversations || 0;
+          document.getElementById('total-messages').textContent = data.userChats?.totalMessages || 0;
+          document.getElementById('total-ai-chats').textContent = data.aiChats?.totalMessages || 0;
+          document.getElementById('ai-unique-users').textContent = data.aiChats?.uniqueUsers || 0;
+        } catch (error) {
+          console.error('Failed to load chat stats:', error);
+        }
+      }
+
+      async function loadEngagementTimeline() {
+        try {
+          const token = getAuthToken();
+          const response = await axios.get('/api/admin/stats/engagement-timeline?days=30', {
+            headers: { Authorization: \`Bearer \${token}\` }
+          });
+
+          const data = response.data;
+          renderEngagementChart(data);
+        } catch (error) {
+          console.error('Failed to load engagement timeline:', error);
+        }
+      }
+
+      function renderEngagementChart(data) {
+        const ctx = document.getElementById('engagement-chart');
+        if (!ctx) return;
+
+        // Destroy existing chart
+        if (engagementChart) {
+          engagementChart.destroy();
+        }
+
+        // Prepare data - merge dates from both sources
+        const allDates = new Set();
+        (data.messages || []).forEach(m => allDates.add(m.date));
+        (data.aiChats || []).forEach(a => allDates.add(a.date));
+        
+        const sortedDates = Array.from(allDates).sort();
+        
+        const messagesMap = new Map((data.messages || []).map(m => [m.date, m.count]));
+        const aiChatsMap = new Map((data.aiChats || []).map(a => [a.date, a.count]));
+
+        engagementChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: sortedDates.map(d => new Date(d).toLocaleDateString('es', { month: 'short', day: 'numeric' })),
+            datasets: [
+              {
+                label: 'User Messages',
+                data: sortedDates.map(d => messagesMap.get(d) || 0),
+                borderColor: '#3B82F6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.3
+              },
+              {
+                label: 'AI Conversations',
+                data: sortedDates.map(d => aiChatsMap.get(d) || 0),
+                borderColor: '#8B5CF6',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                fill: true,
+                tension: 0.3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: 'top' }
+            },
+            scales: {
+              y: { beginAtZero: true }
+            }
+          }
+        });
+      }
+
+      async function loadUserConversations() {
+        try {
+          const token = getAuthToken();
+          const response = await axios.get('/api/admin/conversations?limit=20', {
+            headers: { Authorization: \`Bearer \${token}\` }
+          });
+
+          const conversations = response.data.conversations || [];
+          
+          if (conversations.length === 0) {
+            document.getElementById('user-conversations-list').innerHTML = '<p class="text-gray-500 text-center py-8">No conversations yet</p>';
+            return;
+          }
+
+          const html = conversations.map(c => \`
+            <div class="border rounded-lg p-4 hover:shadow-md transition cursor-pointer" onclick="viewConversation(\${c.id}, 'user')">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="flex -space-x-2">
+                    <img src="\${c.user1_avatar || '/default-avatar.png'}" alt="\${c.user1_name}" class="w-8 h-8 rounded-full border-2 border-white">
+                    <img src="\${c.user2_avatar || '/default-avatar.png'}" alt="\${c.user2_name}" class="w-8 h-8 rounded-full border-2 border-white">
+                  </div>
+                  <div>
+                    <p class="font-medium text-sm">\${c.user1_name} <i class="fas fa-exchange-alt text-gray-400 mx-1"></i> \${c.user2_name}</p>
+                    <p class="text-xs text-gray-500">\${c.message_count} messages</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-xs px-2 py-1 rounded-full \${c.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">\${c.status}</span>
+                  <p class="text-xs text-gray-500 mt-1">\${c.last_message_at ? new Date(c.last_message_at).toLocaleDateString() : ''}</p>
+                </div>
+              </div>
+              \${c.last_message ? \`<p class="text-xs text-gray-600 mt-2 truncate"><i class="fas fa-quote-left text-gray-300 mr-1"></i>\${c.last_message}</p>\` : ''}
+            </div>
+          \`).join('');
+
+          document.getElementById('user-conversations-list').innerHTML = html;
+        } catch (error) {
+          console.error('Failed to load user conversations:', error);
+          document.getElementById('user-conversations-list').innerHTML = '<p class="text-red-500 text-center py-8">Error loading conversations</p>';
+        }
+      }
+
+      async function loadAgentConversations() {
+        try {
+          const token = getAuthToken();
+          const response = await axios.get('/api/admin/agent-conversations?limit=20', {
+            headers: { Authorization: \`Bearer \${token}\` }
+          });
+
+          const conversations = response.data.conversations || [];
+          
+          if (conversations.length === 0) {
+            document.getElementById('ai-conversations-list').innerHTML = '<p class="text-gray-500 text-center py-8">No AI conversations yet</p>';
+            return;
+          }
+
+          const html = conversations.map(c => \`
+            <div class="border rounded-lg p-4 hover:shadow-md transition cursor-pointer" onclick="viewConversation(\${c.user_id}, 'ai')">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <img src="\${c.user_avatar || '/default-avatar.png'}" alt="\${c.user_name}" class="w-10 h-10 rounded-full">
+                  <div>
+                    <p class="font-medium">\${c.user_name}</p>
+                    <p class="text-xs text-gray-500">\${c.user_email}</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                    <i class="fas fa-robot mr-1"></i>\${c.message_count} messages
+                  </span>
+                </div>
+              </div>
+              <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
+                <span><i class="fas fa-clock mr-1"></i>\${c.last_message_at ? new Date(c.last_message_at).toLocaleString() : ''}</span>
+                \${c.last_message ? \`<span class="truncate max-w-xs"><i class="fas fa-quote-left text-gray-300 mr-1"></i>\${c.last_message.substring(0, 80)}...</span>\` : ''}
+              </div>
+            </div>
+          \`).join('');
+
+          document.getElementById('ai-conversations-list').innerHTML = html;
+        } catch (error) {
+          console.error('Failed to load AI conversations:', error);
+          document.getElementById('ai-conversations-list').innerHTML = '<p class="text-red-500 text-center py-8">Error loading AI conversations</p>';
+        }
+      }
+
+      async function loadActiveUsers() {
+        try {
+          const token = getAuthToken();
+          const response = await axios.get('/api/admin/stats/active-users', {
+            headers: { Authorization: \`Bearer \${token}\` }
+          });
+
+          const { topMessagers, recentActive } = response.data;
+
+          // Top messagers
+          const topHtml = (topMessagers || []).map((u, i) => \`
+            <div class="flex items-center justify-between p-2 border rounded-lg hover:bg-gray-50">
+              <div class="flex items-center space-x-2">
+                <span class="text-sm font-bold text-gray-400 w-5">#\${i + 1}</span>
+                <img src="\${u.avatar_url || '/default-avatar.png'}" alt="\${u.name}" class="w-8 h-8 rounded-full">
+                <div>
+                  <p class="text-sm font-medium">\${u.name}</p>
+                  <p class="text-xs text-gray-500">\${u.email}</p>
+                </div>
+              </div>
+              <div class="text-right text-xs">
+                <span class="text-blue-600">\${u.message_count} msgs</span>
+                <span class="text-purple-600 ml-2">\${u.ai_chat_count} AI</span>
+              </div>
+            </div>
+          \`).join('') || '<p class="text-gray-500 text-center py-4">No data</p>';
+
+          // Recent active
+          const recentHtml = (recentActive || []).map(u => \`
+            <div class="flex items-center justify-between p-2 border rounded-lg hover:bg-gray-50">
+              <div class="flex items-center space-x-2">
+                <img src="\${u.avatar_url || '/default-avatar.png'}" alt="\${u.name}" class="w-8 h-8 rounded-full">
+                <div>
+                  <p class="text-sm font-medium">\${u.name}</p>
+                  <p class="text-xs text-gray-500">\${u.email}</p>
+                </div>
+              </div>
+              <span class="text-xs text-gray-500">\${u.last_activity ? new Date(u.last_activity).toLocaleString() : ''}</span>
+            </div>
+          \`).join('') || '<p class="text-gray-500 text-center py-4">No recent activity</p>';
+
+          document.getElementById('top-messagers-list').innerHTML = topHtml;
+          document.getElementById('recent-active-list').innerHTML = recentHtml;
+        } catch (error) {
+          console.error('Failed to load active users:', error);
+        }
+      }
+
+      function showActivitySubTab(subtab) {
+        // Update subtab buttons
+        document.querySelectorAll('.activity-subtab').forEach(t => {
+          t.classList.remove('text-primary', 'border-primary');
+          t.classList.add('text-gray-500', 'border-transparent');
+        });
+        document.getElementById(subtab + '-subtab').classList.remove('text-gray-500', 'border-transparent');
+        document.getElementById(subtab + '-subtab').classList.add('text-primary', 'border-primary');
+
+        // Show/hide content
+        document.querySelectorAll('.activity-subtab-content').forEach(c => c.classList.add('hidden'));
+        document.getElementById(subtab + '-content').classList.remove('hidden');
+
+        // Load data
+        if (subtab === 'user-chats') {
+          loadUserConversations();
+        } else if (subtab === 'ai-chats') {
+          loadAgentConversations();
+        } else if (subtab === 'active-users') {
+          loadActiveUsers();
+        }
+      }
+
+      async function viewConversation(id, type) {
+        try {
+          const token = getAuthToken();
+          
+          if (type === 'user') {
+            const response = await axios.get(\`/api/admin/conversations/\${id}/messages\`, {
+              headers: { Authorization: \`Bearer \${token}\` }
+            });
+
+            const messages = response.data.messages || [];
+            
+            document.getElementById('conversation-modal-title').innerHTML = '<i class="fas fa-comments mr-2"></i>User Conversation';
+            
+            const html = messages.map(m => \`
+              <div class="flex \${m.sender_id % 2 === 0 ? 'justify-start' : 'justify-end'}">
+                <div class="max-w-[80%] \${m.sender_id % 2 === 0 ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-3">
+                  <div class="flex items-center space-x-2 mb-1">
+                    <img src="\${m.sender_avatar || '/default-avatar.png'}" alt="\${m.sender_name}" class="w-6 h-6 rounded-full">
+                    <span class="text-xs font-medium">\${m.sender_name}</span>
+                    <span class="text-xs text-gray-500">\${new Date(m.created_at).toLocaleString()}</span>
+                  </div>
+                  <p class="text-sm">\${m.message}</p>
+                </div>
+              </div>
+            \`).join('') || '<p class="text-gray-500 text-center py-4">No messages</p>';
+
+            document.getElementById('conversation-messages').innerHTML = html;
+          } else {
+            // AI conversation - id is actually user_id
+            const response = await axios.get(\`/api/admin/agent-conversations/\${id}\`, {
+              headers: { Authorization: \`Bearer \${token}\` }
+            });
+
+            const conv = response.data.conversation;
+            const messages = conv.messages || [];
+            
+            document.getElementById('conversation-modal-title').innerHTML = \`<i class="fas fa-robot mr-2"></i>AI Conversation with \${conv.user_name}\`;
+            
+            const html = \`
+              <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p class="text-sm"><strong>User:</strong> \${conv.user_name} (\${conv.user_email})</p>
+                <p class="text-xs text-gray-500">Total messages: \${messages.length}</p>
+              </div>
+              <div class="space-y-4">
+                \${messages.map(m => \`
+                  <div class="flex \${m.role === 'user' ? 'justify-end' : 'justify-start'}">
+                    <div class="max-w-[80%] \${m.role === 'user' ? 'bg-blue-100' : 'bg-purple-100'} rounded-lg p-3">
+                      <div class="flex items-center space-x-2 mb-1">
+                        <i class="fas \${m.role === 'user' ? 'fa-user' : 'fa-robot'} text-xs"></i>
+                        <span class="text-xs font-medium capitalize">\${m.role}</span>
+                        <span class="text-xs text-gray-500">\${new Date(m.created_at).toLocaleString()}</span>
+                      </div>
+                      <p class="text-sm whitespace-pre-wrap">\${m.content || ''}</p>
+                    </div>
+                  </div>
+                \`).join('')}
+              </div>
+            \`;
+
+            document.getElementById('conversation-messages').innerHTML = html || '<p class="text-gray-500 text-center py-4">No messages</p>';
+          }
+
+          document.getElementById('conversation-modal').style.display = 'flex';
+        } catch (error) {
+          console.error('Failed to load conversation:', error);
+          alert('Failed to load conversation: ' + error.message);
+        }
+      }
+
+      function closeConversationModal() {
+        document.getElementById('conversation-modal').style.display = 'none';
       }
     </script>
   `;

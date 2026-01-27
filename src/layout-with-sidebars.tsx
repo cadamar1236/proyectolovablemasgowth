@@ -79,24 +79,51 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         
         console.log('[Chat Bootstrap] toggleChatSidebar defined');
 
+        // Simple markdown parser for chat messages - make global
+        window.parseMarkdown = function(text) {
+          if (!text) return '';
+          var html = String(text);
+          // Bold: **text** - use split/join approach
+          while (html.indexOf('**') !== -1) {
+            var start = html.indexOf('**');
+            var end = html.indexOf('**', start + 2);
+            if (end === -1) break;
+            var boldText = html.substring(start + 2, end);
+            html = html.substring(0, start) + '<strong class="font-semibold">' + boldText + '</strong>' + html.substring(end + 2);
+          }
+          // Horizontal rule: ---
+          html = html.split('\\n---\\n').join('<hr class="my-3 border-gray-300">');
+          // Line breaks
+          html = html.split('\\n').join('<br>');
+          html = html.split(String.fromCharCode(10)).join('<br>');
+          return html;
+        };
+        var parseMarkdown = window.parseMarkdown;
+
         function bootstrapAddMessageToChat(role, content) {
           var messagesContainer = safeGet('chat-messages');
           if (!messagesContainer) return;
 
           var messageDiv = document.createElement('div');
-          messageDiv.className = 'chat-message flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
+          messageDiv.className = 'chat-message flex ' + (role === 'user' ? 'justify-end' : 'justify-start') + ' mb-3';
 
           var bubbleClass = role === 'user'
             ? 'bg-gradient-to-r from-primary to-secondary text-white'
             : 'bg-gray-100 text-gray-800';
 
+          // Parse markdown for assistant messages
+          var formattedContent = role === 'user' ? String(content || '') : parseMarkdown(content);
+
           messageDiv.innerHTML =
-            '<div class="' + bubbleClass + ' rounded-lg px-4 py-2 max-w-[85%] shadow-sm">' +
-              '<p class="text-sm whitespace-pre-wrap"></p>' +
+            '<div class="' + bubbleClass + ' rounded-xl px-4 py-3 max-w-[85%] shadow-md">' +
+              '<div class="text-sm leading-relaxed">' + (role === 'user' ? '' : formattedContent) + '</div>' +
             '</div>';
 
-          var p = messageDiv.querySelector('p');
-          if (p) p.textContent = String(content || '');
+          // For user messages, use textContent to prevent XSS
+          if (role === 'user') {
+            var textDiv = messageDiv.querySelector('div > div');
+            if (textDiv) textDiv.textContent = String(content || '');
+          }
 
           messagesContainer.appendChild(messageDiv);
           messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -270,7 +297,65 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
           var message = input.value ? String(input.value).trim() : '';
           if (!message) return;
 
-          // ========== CHECK IF FLOW IS ACTIVE - PROCESS LOCALLY ==========
+          // ========== CHECK IF EMAIL FLOW IS ACTIVE - HANDLE DIRECTLY ==========
+          if (window.emailFlowState && window.emailFlowState.emailContext) {
+            console.log('[BOOTSTRAP] Email flow is active - sending to API with flow state');
+            
+            // Clear input
+            input.value = '';
+            
+            // Add user message to chat
+            bootstrapAddMessageToChat('user', message);
+            
+            // Show loading
+            var loadingEl = safeGet('chat-loading');
+            if (loadingEl) loadingEl.classList.remove('hidden');
+            
+            // Send to API with email context
+            fetch('/api/chat-agent/message', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                message: message,
+                emailContext: window.emailFlowState.emailContext,
+                flowState: window.emailFlowState.flowState
+              })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (loadingEl) loadingEl.classList.add('hidden');
+              
+              console.log('[BOOTSTRAP] Email flow API response:', data);
+              
+              // Update flow state
+              if (data.flowState && data.emailContext) {
+                window.emailFlowState = {
+                  flowState: data.flowState,
+                  emailContext: data.emailContext
+                };
+                console.log('[BOOTSTRAP] Updated email flow state:', window.emailFlowState);
+              } else if (data.flowState === 'complete') {
+                window.emailFlowState = null;
+                console.log('[BOOTSTRAP] Email flow completed, cleared state');
+              }
+              
+              // Show response
+              if (data.message) {
+                bootstrapAddMessageToChat('assistant', data.message);
+              }
+            })
+            .catch(function(err) {
+              if (loadingEl) loadingEl.classList.add('hidden');
+              console.error('[BOOTSTRAP] Email flow API error:', err);
+              bootstrapAddMessageToChat('assistant', 'Error processing your response. Please try again.');
+            });
+            
+            return; // IMPORTANT: Exit here, don't continue to goal flow
+          }
+          // ========== END EMAIL FLOW CHECK ==========
+
+          // ========== CHECK IF GOAL FLOW IS ACTIVE - PROCESS LOCALLY ==========
           if (window.goalCreationFlow && window.goalCreationFlow.active) {
             console.log('[BOOTSTRAP] Flow is active, processing answer locally');
             input.value = '';
@@ -1160,14 +1245,33 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             if (loading) loading.classList.remove('hidden');
 
             try {
-                const response = await axios.post('/api/chat-agent/message', {
-                    message: message
-                }, {
+                // Include emailContext and flowState if in a flow
+                const requestBody: any = { message: message };
+                
+                if (window.emailFlowState) {
+                  requestBody.emailContext = window.emailFlowState.emailContext;
+                  requestBody.flowState = window.emailFlowState.flowState;
+                  console.log('[CHAT] Continuing email flow:', window.emailFlowState);
+                }
+                
+                const response = await axios.post('/api/chat-agent/message', requestBody, {
                     withCredentials: true
                 });
 
                 // Hide loading
                 if (loading) loading.classList.add('hidden');
+                
+                // Update flow state if present in response
+                if (response.data.flowState && response.data.emailContext) {
+                  window.emailFlowState = {
+                    flowState: response.data.flowState,
+                    emailContext: response.data.emailContext
+                  };
+                  console.log('[CHAT] Updated flow state:', window.emailFlowState);
+                } else if (response.data.flowState === 'complete') {
+                  window.emailFlowState = null;
+                  console.log('[CHAT] Flow completed, cleared state');
+                }
 
                 // Add assistant response
                 if (response.data) {
@@ -2291,6 +2395,24 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         
         console.log('[ASTAR-OPEN-CHAT] Full context message:', fullContextMessage);
         
+        // Map category to emailContext
+        let emailContext = '';
+        if (category.includes('hipotesis') || category.includes('hypothesis') || category.includes('ideas')) {
+          emailContext = 'hipotesis';
+        } else if (category.includes('construccion') || category.includes('build')) {
+          emailContext = 'construccion';
+        } else if (category.includes('usuarios') || category.includes('users') || category.includes('user_learning')) {
+          emailContext = 'usuarios';
+        } else if (category.includes('metricas') || category.includes('measure') || category.includes('insight')) {
+          emailContext = 'metricas';
+        } else if (category.includes('traction') || category.includes('resultados')) {
+          emailContext = 'traction';
+        } else if (category.includes('reflexion') || category.includes('reflect')) {
+          emailContext = 'reflexion';
+        }
+        
+        console.log('[ASTAR-OPEN-CHAT] Email context:', emailContext);
+        
         // Marcar que es una respuesta ASTAR para evitar triggers automáticos
         window.isAstarResponse = true;
         
@@ -2299,7 +2421,8 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ 
-            message: fullContextMessage
+            message: data.response_text, // Send user response directly, not with context wrapper
+            emailContext: emailContext || undefined // Send structured emailContext parameter
           })
         })
         .then(function(res) { 
@@ -2312,6 +2435,19 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
           
           // Limpiar la marca de respuesta ASTAR
           window.isAstarResponse = false;
+          
+          // Si hay flowState, guardarlo para la siguiente pregunta
+          if (responseData.flowState && responseData.emailContext) {
+            window.emailFlowState = {
+              flowState: responseData.flowState,
+              emailContext: responseData.emailContext
+            };
+            console.log('[ASTAR-OPEN-CHAT] Saved flow state:', window.emailFlowState);
+          } else if (responseData.flowState === 'complete') {
+            // Limpiar el estado cuando el flujo se completa
+            window.emailFlowState = null;
+            console.log('[ASTAR-OPEN-CHAT] Flow completed, cleared state');
+          }
           
           if (responseData && responseData.message && responseData.message.trim()) {
             var aiMessage = responseData.message.trim();
@@ -2342,11 +2478,17 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
               }
             }
             
-            // Mostrar mensaje normal del asistente
+            // Mostrar mensaje normal del asistente con markdown parsing
             var assistantDiv = document.createElement('div');
             assistantDiv.className = 'flex justify-start mb-3';
-            var msgText = String(aiMessage).split(String.fromCharCode(92) + 'n').join('<br>').split(String.fromCharCode(10)).join('<br>');
-            assistantDiv.innerHTML = '<div class="bg-gray-100 text-gray-800 rounded-lg px-4 py-2 max-w-[85%] shadow-sm"><p class="text-sm whitespace-pre-wrap">' + msgText + '<\/p><\/div>';
+            
+            // Parse markdown
+            var msgText = String(aiMessage);
+            // Bold: **text**
+            // Parse markdown using parseMarkdown function
+            var msgText = parseMarkdown(aiMessage);
+            
+            assistantDiv.innerHTML = '<div class="bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 rounded-xl px-4 py-3 max-w-[85%] shadow-md border border-gray-200"><div class="text-sm leading-relaxed">' + msgText + '<\/div><\/div>';
             chatMessages.appendChild(assistantDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
             console.log('[ASTAR-OPEN-CHAT] Assistant message added');

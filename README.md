@@ -1,481 +1,398 @@
-# 🚀 LovableGrowth - Plataforma de Validación y Crecimiento de Startups
+# 🚀 LovableGrowth - Plataforma de Startups
 
-[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-orange)](https://webapp-46s.pages.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
-[![Hono](https://img.shields.io/badge/Hono-4.10-red)](https://hono.dev/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+> Plataforma para conectar founders, inversores, validadores y talento.
 
-Plataforma integral que conecta founders, validadores, inversores y talento para impulsar el crecimiento de startups mediante validación colaborativa, marketplace unificado y agentes de IA especializados.
+## 📌 ¿Qué es esto?
 
-## 📋 Tabla de Contenidos
+Una aplicación web que permite a startups:
+- Publicar y promocionar sus productos
+- Conectar con inversores y mentores
+- Obtener validación de expertos
+- Gestionar objetivos de crecimiento
+- Usar agentes de IA para marketing
 
-- [Características Principales](#-características-principales)
-- [Arquitectura](#-arquitectura)
-- [Instalación](#-instalación)
-- [Configuración](#-configuración)
-- [Uso](#-uso)
-- [API Reference](#-api-reference)
-- [Base de Datos](#-base-de-datos)
-- [Despliegue](#-despliegue)
-- [Contribuir](#-contribuir)
+---
 
-## ✨ Características Principales
+## 🏗️ Arquitectura Simple
 
-### 🎯 Marketplace Unificado
-- **7 tipos de usuarios**: Productos, Founders, Inversores, Validadores, Scouts, Partners, Talento
-- Sistema de votación universal para todos los usuarios autenticados
-- Perfiles detallados con información de contacto y redes sociales
-- Filtrado y búsqueda avanzada por tipo de usuario
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        FRONTEND (HTML/JS)                       │
+│                    TailwindCSS + JavaScript                     │
+└─────────────────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      BACKEND (Hono + TypeScript)                │
+│                      Cloudflare Workers                         │
+│                                                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+│  │   Auth   │  │   Chat   │  │Dashboard │  │Marketing │        │
+│  │   API    │  │   API    │  │   API    │  │  AI API  │        │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
+└─────────────────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    BASE DE DATOS (Cloudflare D1)                │
+│                         SQLite distribuido                      │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### 💬 Sistema de Chat Universal
-- Chat en tiempo real entre cualquier tipo de usuario
-- Historial de conversaciones persistente
-- Notificaciones de mensajes no leídos
-- Interfaz integrada en el marketplace
+---
 
-### 📊 Dashboard Interactivo
-- Gestión de objetivos (goals) con seguimiento de progreso
-- Análisis de datos con gráficos interactivos (Chart.js)
-- Sistema de notificaciones
-- Integración con chat y marketplace
-
-### 🤖 Agentes de IA
-
-#### Marketing AI Agent
-- **Market Research Agent**: Análisis de mercado con Apify
-- **Content Creation Agent**: Generación de contenido multi-plataforma
-- **Marketing Strategy Agent**: Estrategias de marketing completas
-- **Social Media Agent**: Análisis de TikTok y generación de videos
-
-#### Chat Agent
-- Asistente conversacional para dudas y soporte
-- Integración con dashboard para respuestas contextualizadas
-
-### 🎨 Generador de MVPs
-- Generación automática de MVPs con IA (Groq)
-- Templates pre-configurados para diferentes tipos de negocio
-- Exportación de código y documentación
-
-### 💳 Sistema de Pagos
-- Integración con Stripe
-- Planes de suscripción: Free, Starter, Pro, Enterprise
-- Gestión de billing y subscriptions
-
-### 📱 Integración WhatsApp
-- Gestión de goals vía WhatsApp con Twilio
-- Sistema de verificación de códigos
-- Agente conversacional por WhatsApp
-
-### ⚡ Quick Pitch
-- Sistema de pitch rápido para startups
-- Generación de presentaciones con IA
-- Exportación a PDF con QR codes
-
-## 🏗️ Arquitectura
-
-### Stack Tecnológico
-
-**Frontend:**
-- HTML5 + TailwindCSS
-- JavaScript vanilla con TypeScript
-- Chart.js para visualizaciones
-- Axios para peticiones HTTP
-
-**Backend:**
-- Hono (Framework web para Cloudflare Workers)
-- Cloudflare Workers (Serverless)
-- Cloudflare D1 (SQLite distribuido)
-- TypeScript
-
-**Servicios Externos:**
-- Google OAuth 2.0
-- Stripe (pagos)
-- Groq (generación de MVPs con IA)
-- Apify (web scraping para marketing agent)
-- ModelsLab (generación de videos)
-- Twilio (WhatsApp integration)
-
-### Estructura del Proyecto
+## 📁 Estructura del Proyecto
 
 ```
 proyectolovablemasgowth/
-├── src/
-│   ├── api/                      # Endpoints de la API
-│   │   ├── auth.ts              # Autenticación y OAuth
-│   │   ├── marketplace.ts       # Marketplace y productos
-│   │   ├── chat.ts              # Sistema de chat
-│   │   ├── dashboard.ts         # Dashboard y goals
-│   │   ├── projects.ts          # Proyectos y votación
-│   │   ├── stripe.ts            # Integración de pagos
-│   │   ├── marketing-ai.ts      # Agente de marketing IA
-│   │   ├── chat-agent.ts        # Agente conversacional
-│   │   ├── whatsapp.ts          # Integración WhatsApp
-│   │   ├── quick-pitch.ts       # Sistema de pitch
-│   │   ├── mvp-generator.ts     # Generador de MVPs
+│
+├── src/                          # 📦 CÓDIGO PRINCIPAL
+│   │
+│   ├── api/                      # 🔌 ENDPOINTS API (Backend)
+│   │   ├── auth.ts              # Login, registro, JWT, Google OAuth
+│   │   ├── marketplace.ts       # Productos, votación, perfiles
+│   │   ├── chat.ts              # Mensajes entre usuarios
+│   │   ├── dashboard.ts         # Objetivos (goals) del usuario
+│   │   ├── crm.ts               # Gestión de contactos CRM
+│   │   ├── connector.ts         # Conexiones AI entre usuarios
+│   │   ├── projects.ts          # Proyectos y leaderboard
+│   │   ├── competitions.ts      # Competiciones de startups
+│   │   ├── stripe.ts            # Pagos con Stripe
+│   │   ├── marketing-ai.ts      # Chat con agente de marketing
+│   │   ├── chat-agent.ts        # Asistente ASTAR (IA)
+│   │   ├── ai-cmo.ts            # CMO virtual con IA
 │   │   ├── notifications.ts     # Sistema de notificaciones
-│   │   ├── plans.ts             # Planes de suscripción
-│   │   ├── validation.ts        # Validación de proyectos
-│   │   └── validator-requests.ts # Solicitudes de validación
+│   │   ├── team.ts              # Gestión de equipos
+│   │   ├── admin.ts             # Panel de administración
+│   │   ├── whatsapp.ts          # Integración WhatsApp
+│   │   └── rateLimit.ts         # Protección contra spam
 │   │
-│   ├── dashboard/               # Componentes de dashboard
-│   │   └── Dashboard.tsx        # Dashboard React
+│   ├── utils/                    # 🛠️ UTILIDADES
+│   │   ├── groq.ts              # Cliente para API de Groq (IA)
+│   │   ├── groq-mvp-generator.ts # Generador de MVPs con IA
+│   │   └── marketing-agent.ts   # Lógica del agente de marketing
 │   │
-│   ├── utils/                   # Utilidades
-│   │   ├── groq.ts             # Cliente Groq
-│   │   ├── groq-mvp-generator.ts
-│   │   ├── intelligent-mvp-generator.ts
-│   │   └── mvp-templates.ts
-│   │
-│   ├── index.tsx               # Entry point principal
-│   ├── marketplace-page.tsx    # Página de marketplace
-│   ├── dashboard-page.tsx      # Página de dashboard
-│   ├── layout-with-sidebars.tsx # Layout principal
-│   ├── html-templates.tsx      # Templates HTML
-│   └── types.ts                # Tipos TypeScript
+│   ├── index.tsx                # 🚪 ENTRY POINT - Rutas principales
+│   ├── marketplace-page.tsx     # Página del marketplace
+│   ├── dashboard-page.tsx       # Página del dashboard
+│   ├── onboarding-page.tsx      # Onboarding nuevos usuarios
+│   ├── competitions-page.tsx    # Página de competiciones
+│   ├── layout-with-sidebars.tsx # Layout con sidebar y chat ASTAR
+│   ├── admin-dashboard.tsx      # Panel de admin
+│   └── types.ts                 # Tipos TypeScript compartidos
 │
-├── agents/                      # Agentes de IA Python
-│   ├── marketing_agent.py      # Agente de marketing
-│   └── README.md               # Documentación de agentes
+├── agents/                       # 🤖 AGENTES IA (Python/Railway)
+│   ├── marketing_agent.py       # Agente de marketing principal
+│   ├── api_server.py            # Servidor FastAPI
+│   └── README.md                # Documentación de agentes
 │
-├── migrations/                  # Migraciones de base de datos
-│   ├── 0001_initial_schema.sql
-│   ├── 0002_marketplace.sql
-│   ├── 0025_user_conversations.sql
-│   ├── 0027_marketing_ai.sql
-│   └── ...
+├── migrations/                   # 📊 MIGRACIONES SQL
+│   ├── 0001_initial_schema.sql  # Esquema inicial
+│   └── ...                      # Migraciones incrementales
 │
-├── public/                      # Archivos estáticos
-│   └── static/
-│       ├── style.css           # Estilos globales
-│       ├── app.js              # JavaScript principal
-│       ├── marketplace.js      # Lógica del marketplace
-│       ├── mvp-generator.js    # Generador de MVPs
-│       ├── project-detail.js   # Detalle de proyectos
-│       └── quick-pitch.js      # Quick pitch
+├── public/static/               # 📄 ARCHIVOS ESTÁTICOS
+│   ├── style.css               # Estilos CSS
+│   └── app.js                  # JavaScript del frontend
 │
-├── package.json                 # Dependencias Node.js
-├── requirements.txt             # Dependencias Python
-├── tsconfig.json               # Configuración TypeScript
-├── vite.config.ts              # Configuración Vite
-├── wrangler.jsonc              # Configuración Cloudflare
-├── deploy-cloudflare.sh        # Script de despliegue
-└── README.md                   # Este archivo
+├── workers/                     # ⚙️ WORKERS ADICIONALES
+│   └── astar-cron/             # Cron jobs (mensajes programados)
+│
+└── Archivos de configuración:
+    ├── package.json             # Dependencias Node.js
+    ├── tsconfig.json           # Configuración TypeScript
+    ├── vite.config.ts          # Configuración de build
+    └── wrangler.jsonc          # Configuración Cloudflare
 ```
 
-## 🚀 Instalación
+---
 
-### Requisitos Previos
+## 🔑 Conceptos Clave para Entender el Código
 
-- Node.js 18+ y npm
-- Python 3.9+ (para agentes de IA)
-- Cuenta de Cloudflare (para despliegue)
-- Wrangler CLI
+### 1. **Hono** - Framework Backend
+```typescript
+// Así se crea un endpoint en Hono
+import { Hono } from 'hono';
 
-### 1. Clonar el Repositorio
+const app = new Hono();
 
-```bash
-git clone https://github.com/cadamar1236/proyectolovablemasgowth.git
-cd proyectolovablemasgowth
+app.get('/api/users', async (c) => {
+  // c = contexto (tiene request, response, env)
+  const users = await c.env.DB.prepare('SELECT * FROM users').all();
+  return c.json(users);  // Responde con JSON
+});
 ```
 
-### 2. Instalar Dependencias Node.js
+### 2. **Cloudflare D1** - Base de Datos
+```typescript
+// Así se hacen queries a la base de datos
+const result = await c.env.DB.prepare(`
+  SELECT * FROM users WHERE id = ?
+`).bind(userId).first();  // .bind() previene SQL injection
+```
 
+### 3. **JWT** - Autenticación
+```typescript
+// El token JWT contiene info del usuario
+const token = await sign({ userId: 1, email: 'user@mail.com' }, JWT_SECRET);
+
+// Para verificar el token
+const payload = await verify(token, JWT_SECRET);
+// payload = { userId: 1, email: 'user@mail.com' }
+```
+
+### 4. **Middleware** - Funciones que se ejecutan antes de cada request
+```typescript
+// Middleware de autenticación
+const requireAuth = async (c, next) => {
+  const token = c.req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return c.json({ error: 'No autorizado' }, 401);
+  
+  const payload = await verify(token, JWT_SECRET);
+  c.set('userId', payload.userId);  // Guarda el userId para usarlo después
+  await next();  // Continúa al siguiente handler
+};
+
+// Uso del middleware
+app.get('/api/profile', requireAuth, async (c) => {
+  const userId = c.get('userId');  // Ya verificado por el middleware
+  // ...
+});
+```
+
+---
+
+## 🔐 Seguridad Implementada
+
+| Característica | Descripción |
+|----------------|-------------|
+| **PBKDF2** | Contraseñas hasheadas con 100,000 iteraciones |
+| **JWT Seguro** | Token secreto en variables de entorno (no hardcodeado) |
+| **Rate Limiting** | Máximo 5 intentos de login por minuto |
+| **Prepared Statements** | Previene SQL Injection usando `.bind()` |
+| **Cookie Secure** | Flag Secure en producción (solo HTTPS) |
+
+---
+
+## 🚀 Cómo Ejecutar el Proyecto
+
+### 1. Instalar dependencias
 ```bash
 npm install
 ```
 
-### 3. Instalar Dependencias Python (Opcional - para Marketing Agent)
-
+### 2. Desarrollo local
 ```bash
-pip install -r requirements.txt
+npm run dev          # Servidor de desarrollo
+# Abre http://localhost:5173
 ```
 
-## ⚙️ Configuración
-
-### 1. Variables de Entorno
-
-Crear archivo `.env` en la raíz:
-
-```env
-# JWT Secret (cambiar en producción)
-JWT_SECRET=your-super-secret-jwt-key-change-me
-
-# Google OAuth
-GOOGLE_CLIENT_ID=tu-google-client-id
-GOOGLE_CLIENT_SECRET=tu-google-client-secret
-GOOGLE_REDIRECT_URI=https://tu-dominio.pages.dev/api/auth/google/callback
-
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-
-# Groq (para MVP Generator)
-GROQ_API_KEY=gsk_...
-
-# Twilio (para WhatsApp)
-TWILIO_ACCOUNT_SID=AC...
-TWILIO_AUTH_TOKEN=...
-TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
-
-# Marketing AI Agent
-OPENAI_API_KEY=sk-...
-APIFY_API_TOKEN=apify_api_...
-MODELSLAB_API_KEY=...
-```
-
-### 2. Configurar Base de Datos
-
+### 3. Build para producción
 ```bash
-# Crear base de datos local
-wrangler d1 create lovable-growth-db
-
-# Aplicar migraciones
-wrangler d1 migrations apply lovable-growth-db --local
-
-# Para producción
-wrangler d1 migrations apply lovable-growth-db --remote
+npm run build        # Compila el proyecto
+npm run deploy       # Despliega a Cloudflare
 ```
 
-### 3. Configurar wrangler.jsonc
-
-Actualizar el archivo `wrangler.jsonc` con tu configuración:
-
-```json
-{
-  "name": "webapp",
-  "compatibility_date": "2024-01-01",
-  "pages_build_output_dir": "dist",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "lovable-growth-db",
-      "database_id": "tu-database-id"
-    }
-  ]
-}
-```
-
-## 💻 Uso
-
-### Desarrollo Local
-
+### 4. Base de datos
 ```bash
-# Compilar y servir con Vite
-npm run dev
+# Aplicar migraciones localmente
+wrangler d1 migrations apply DB --local
 
-# Servir con Wrangler (con D1 local)
-npm run dev:sandbox
-
-# Ejecutar en http://localhost:3000
+# Aplicar en producción
+wrangler d1 migrations apply DB --remote
 ```
-
-### Build para Producción
-
-```bash
-npm run build
-```
-
-### Ejecutar Migraciones
-
-```bash
-# Local
-npm run db:migrate:local
-
-# Producción
-npm run db:migrate:prod
-```
-
-### Scripts Útiles
-
-```bash
-# Resetear base de datos local
-npm run db:reset
-
-# Preview local
-npm run preview
-
-# Limpiar puerto 3000
-npm run clean-port
-
-# Test endpoint
-npm run test
-```
-
-## 📡 API Reference
-
-### Autenticación
-
-#### POST `/api/auth/google`
-Iniciar sesión con Google OAuth
-
-**Request:**
-```json
-{
-  "code": "google-oauth-code",
-  "role": "founder" | "validator" | "investor" | "scout" | "partner" | "talent"
-}
-```
-
-**Response:**
-```json
-{
-  "token": "jwt-token",
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "name": "User Name",
-    "role": "founder"
-  }
-}
-```
-
-### Marketplace
-
-#### GET `/api/marketplace/products`
-Obtener lista de productos
-
-**Query Params:**
-- `type`: Filtrar por tipo de usuario (opcional)
-
-#### POST `/api/marketplace/products`
-Crear nuevo producto
-
-#### POST `/api/marketplace/products/:id/vote`
-Votar por un producto (requiere autenticación)
-
-### Chat
-
-#### GET `/api/chat/conversations`
-Obtener conversaciones del usuario autenticado
-
-#### POST `/api/chat/conversations`
-Crear nueva conversación
-
-#### GET `/api/chat/conversations/:id/messages`
-Obtener mensajes de una conversación
-
-#### POST `/api/chat/conversations/:id/messages`
-Enviar mensaje
-
-### Dashboard
-
-#### GET `/api/dashboard/goals`
-Obtener goals del usuario
-
-#### POST `/api/dashboard/goals`
-Crear nuevo goal
-
-#### PUT `/api/dashboard/goals/:id`
-Actualizar goal
-
-### Marketing AI
-
-#### POST `/api/marketing-ai/chat`
-Chat con el agente de marketing
-
-#### POST `/api/marketing-ai/analyze-business`
-Análisis completo de negocio
-
-#### POST `/api/marketing-ai/generate-campaign`
-Generar campaña de contenido
-
-#### POST `/api/marketing-ai/analyze-competition`
-Análisis competitivo
-
-Ver [MARKETING_AI_README.md](MARKETING_AI_README.md) para documentación completa.
-
-## 🗄️ Base de Datos
-
-### Tablas Principales
-
-- **users**: Usuarios del sistema
-- **beta_products**: Productos en el marketplace
-- **projects**: Proyectos de startups
-- **user_conversations**: Conversaciones entre usuarios
-- **user_messages**: Mensajes del chat
-- **dashboard_goals**: Objetivos del dashboard
-- **pricing_plans**: Planes de suscripción
-- **stripe_customers**: Clientes de Stripe
-- **marketing_ai_conversations**: Conversaciones con marketing AI
-- **whatsapp_users**: Usuarios de WhatsApp
-
-### Esquema Completo
-
-Ver archivos en `migrations/` para el esquema completo de la base de datos.
-
-## 🚢 Despliegue
-
-### Cloudflare Pages
-
-1. **Conectar repositorio:**
-```bash
-wrangler pages project create webapp
-```
-
-2. **Desplegar:**
-```bash
-npm run deploy
-```
-
-3. **Configurar variables de entorno** en el dashboard de Cloudflare Pages
-
-4. **Ejecutar migraciones en producción:**
-```bash
-npm run db:migrate:prod
-```
-
-### Script de Despliegue Automático
-
-```bash
-bash deploy-cloudflare.sh
-```
-
-## 🛠️ Tecnologías Utilizadas
-
-- **Hono** - Framework web ultrarrápido
-- **Cloudflare Workers** - Serverless computing
-- **Cloudflare D1** - Base de datos SQLite distribuida
-- **TypeScript** - Type safety
-- **Vite** - Build tool moderno
-- **TailwindCSS** - Utility-first CSS
-- **Chart.js** - Gráficos interactivos
-- **Stripe** - Procesamiento de pagos
-- **Google OAuth** - Autenticación
-- **Groq** - Modelos de IA rápidos
-- **Agno** - Framework de agentes de IA
-- **Apify** - Web scraping
-- **ModelsLab** - Generación de contenido multimedia
-
-## 🤝 Contribuir
-
-Las contribuciones son bienvenidas! Por favor:
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
-
-## 👥 Autores
-
-- **Carlos** - *Desarrollo Principal* - [cadamar1236](https://github.com/cadamar1236)
-
-## 🙏 Agradecimientos
-
-- Cloudflare por su excelente plataforma
-- Comunidad de Hono
-- Todos los contribuidores
-
-## 📞 Contacto
-
-- Website: [webapp-46s.pages.dev](https://webapp-46s.pages.dev)
-- GitHub: [@cadamar1236](https://github.com/cadamar1236)
 
 ---
 
-⭐ Si este proyecto te ha sido útil, considera darle una estrella en GitHub!
+## 📡 Endpoints API Principales
+
+### Autenticación (`/api/auth/`)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/register` | Registrar nuevo usuario |
+| POST | `/login` | Iniciar sesión |
+| GET | `/me` | Obtener perfil actual |
+| POST | `/google` | Login con Google OAuth |
+
+### Marketplace (`/api/marketplace/`)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/products` | Listar productos |
+| POST | `/products` | Crear producto |
+| POST | `/products/:id/vote` | Votar producto |
+
+### Dashboard (`/api/dashboard/`)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/goals` | Listar objetivos |
+| POST | `/goals` | Crear objetivo |
+| PUT | `/goals/:id` | Actualizar objetivo |
+| DELETE | `/goals/:id` | Eliminar objetivo |
+
+### Chat (`/api/chat/`)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/conversations` | Listar conversaciones |
+| POST | `/conversations` | Crear conversación |
+| GET | `/conversations/:id/messages` | Ver mensajes |
+| POST | `/conversations/:id/messages` | Enviar mensaje |
+
+### CRM (`/api/crm/`)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/contacts` | Listar contactos |
+| POST | `/contacts` | Crear contacto |
+| GET | `/activities` | Ver actividades |
+
+---
+
+## 🗃️ Tablas de Base de Datos Principales
+
+```sql
+-- Usuarios del sistema
+users (id, email, password, name, role, plan, avatar_url, bio, company)
+
+-- Productos en el marketplace
+beta_products (id, title, description, company_user_id, category, votes, status)
+
+-- Conversaciones de chat
+user_conversations (id, user1_id, user2_id, status, created_at)
+
+-- Mensajes
+user_messages (id, conversation_id, sender_id, content, is_read, created_at)
+
+-- Objetivos del dashboard
+dashboard_goals (id, user_id, title, description, target_value, current_value, status)
+
+-- Contactos CRM
+crm_contacts (id, user_id, name, email, company, status, source)
+```
+
+---
+
+## 🔄 Flujo de Autenticación
+
+```
+1. Usuario hace login → POST /api/auth/login
+                              │
+2. Backend verifica password → PBKDF2 hash comparison
+                              │
+3. Si es válido → Genera JWT token
+                              │
+4. Frontend guarda token → Cookie o localStorage
+                              │
+5. Cada request incluye → Authorization: Bearer <token>
+                              │
+6. Middleware verifica → Si válido, extrae userId
+                              │
+7. Handler usa userId → Filtra datos por usuario
+```
+
+---
+
+## 🛠️ Variables de Entorno Necesarias
+
+```bash
+# En Cloudflare Dashboard > Pages > Settings > Variables
+
+JWT_SECRET=clave-secreta-muy-larga-y-aleatoria
+
+# Google OAuth (opcional)
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxx
+
+# Stripe (para pagos)
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_PUBLISHABLE_KEY=pk_live_xxx
+
+# Groq (para IA)
+GROQ_API_KEY=gsk_xxx
+```
+
+### Configurar JWT_SECRET en producción:
+```bash
+npx wrangler pages secret put JWT_SECRET --project-name webapp
+# Ingresa una clave aleatoria de 64+ caracteres
+```
+
+---
+
+## 📝 Guía Rápida para Añadir Features
+
+### Añadir nuevo endpoint API:
+
+1. Crear archivo en `src/api/mi-feature.ts`:
+```typescript
+import { Hono } from 'hono';
+import type { Bindings } from '../types';
+
+const app = new Hono<{ Bindings: Bindings }>();
+
+app.get('/hello', (c) => c.json({ message: 'Hola!' }));
+
+export default app;
+```
+
+2. Registrar en `src/index.tsx`:
+```typescript
+import miFeature from './api/mi-feature';
+app.route('/api/mi-feature', miFeature);
+```
+
+### Añadir nueva tabla:
+
+1. Crear migración en `migrations/00XX_mi_tabla.sql`:
+```sql
+CREATE TABLE mi_tabla (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+2. Ejecutar migración:
+```bash
+wrangler d1 migrations apply DB --local
+```
+
+---
+
+## 🐛 Debugging Tips
+
+```typescript
+// Ver logs en desarrollo
+console.log('[DEBUG] Variable:', variable);
+
+// Ver request completo
+console.log('[REQUEST]', {
+  method: c.req.method,
+  url: c.req.url,
+  headers: Object.fromEntries(c.req.raw.headers)
+});
+
+// Ver errores SQL
+try {
+  await c.env.DB.prepare('...').run();
+} catch (error) {
+  console.error('[DB ERROR]', error);
+}
+```
+
+---
+
+## 📚 Recursos de Aprendizaje
+
+- [Hono Documentation](https://hono.dev/)
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/)
+- [Cloudflare D1](https://developers.cloudflare.com/d1/)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+
+---
+
+## 👤 Contacto
+
+- **GitHub**: [@cadamar1236](https://github.com/cadamar1236)
+- **Website**: [webapp-46s.pages.dev](https://webapp-46s.pages.dev)
+
+---
+
+⭐ ¿Te fue útil? ¡Dale una estrella al repo!

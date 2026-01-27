@@ -1038,7 +1038,10 @@ marketplace.get('/dashboard/debug', async (c) => {
 
   try {
     const { verify } = await import('hono/jwt');
-    const payload = await verify(token, 'your-secret-key-change-in-production-use-env-var') as any;
+    if (!c.env.JWT_SECRET) {
+      return c.json({ error: 'JWT_SECRET not configured' }, 500);
+    }
+    const payload = await verify(token, c.env.JWT_SECRET) as any;
     console.log('Token payload:', payload);
 
     return c.json({

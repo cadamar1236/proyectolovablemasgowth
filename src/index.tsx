@@ -13,7 +13,7 @@ import { getAdminDashboard } from './admin-dashboard';
 import { getCompetitionLeaderboard } from './competition-leaderboard';
 
 // JWT Secret for token verification
-const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
+// JWT_SECRET is now loaded from environment variable c.env.JWT_SECRET
 
 // Import API routes
 import projects from './api/projects';
@@ -42,6 +42,7 @@ import astarMessages from './api/astar-messages';
 import team from './api/team';
 import connector from './api/connector';
 import crm from './api/crm';
+import traction from './api/traction';
 import { renderAICMOPage } from './ai-cmo-page';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -78,6 +79,7 @@ app.route('/api/astar-messages', astarMessages);
 app.route('/api/team', team);
 app.route('/api/connector', connector);
 app.route('/api/crm', crm);
+app.route('/api/traction', traction);
 
 // Page Routes - Onboarding for new users
 app.get('/onboarding', async (c) => {
@@ -93,7 +95,7 @@ app.get('/onboarding', async (c) => {
   
   if (tokenToVerify) {
     try {
-      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+      payload = await verify(tokenToVerify, c.env.JWT_SECRET) as any;
     } catch (error) {
       return c.redirect('/');
     }
@@ -124,7 +126,7 @@ app.get('/dashboard', async (c) => {
   
   if (tokenToVerify) {
     try {
-      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+      payload = await verify(tokenToVerify, c.env.JWT_SECRET) as any;
     } catch (error) {
       // Invalid token, continue as guest
     }
@@ -169,7 +171,7 @@ app.get('/competitions', async (c) => {
   
   if (tokenToVerify) {
     try {
-      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+      payload = await verify(tokenToVerify, c.env.JWT_SECRET) as any;
     } catch (error) {
       // Invalid token, continue as guest
     }
@@ -203,7 +205,7 @@ app.get('/team', async (c) => {
   
   if (tokenToVerify) {
     try {
-      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+      payload = await verify(tokenToVerify, c.env.JWT_SECRET) as any;
     } catch (error) {
       return c.redirect('/');
     }
@@ -241,7 +243,7 @@ app.get('/admin', async (c) => {
   
   if (tokenToVerify) {
     try {
-      payload = await verify(tokenToVerify, JWT_SECRET) as any;
+      payload = await verify(tokenToVerify, c.env.JWT_SECRET) as any;
     } catch (error) {
       return c.redirect('/');
     }
@@ -332,7 +334,7 @@ app.get('/vote/:projectId', async (c) => {
 
   // Verify token
   try {
-    const payload = await verify(authToken, JWT_SECRET) as any;
+    const payload = await verify(authToken, c.env.JWT_SECRET) as any;
     if (!payload || payload.role !== 'validator') {
       // Not a validator, redirect to become one
       return c.redirect(`/api/auth/google?role=validator&redirect=/vote/${projectId}`);
@@ -2481,7 +2483,7 @@ app.get('/marketplace', async (c) => {
   }
 
   try {
-    const payload = await verify(authToken, c.env.JWT_SECRET || JWT_SECRET) as any;
+    const payload = await verify(authToken, c.env.JWT_SECRET) as any;
     const userName = payload.userName || payload.email || 'Usuario';
     const userAvatar = payload.avatar_url;
     const userRole = payload.role || 'founder';
@@ -2507,7 +2509,7 @@ app.get('/leaderboard', async (c) => {
 
     if (authCookie) {
       try {
-        const decoded = await verify(authCookie, JWT_SECRET);
+        const decoded = await verify(authCookie, c.env.JWT_SECRET);
         if (decoded && decoded.email) {
           const db = c.env.DB;
           const user = await db

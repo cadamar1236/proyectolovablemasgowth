@@ -20,9 +20,18 @@ interface AuthContext {
 
 type Variables = {
   user: AuthContext;
+  teamId: number | null;
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+// Helper function to get user's team ID
+async function getUserTeamId(db: D1Database, userId: number): Promise<number | null> {
+  const result = await db.prepare(`
+    SELECT team_id FROM startup_team_members WHERE user_id = ? LIMIT 1
+  `).bind(userId).first();
+  return result ? (result as any).team_id : null;
+}
 
 // Enable CORS
 app.use('*', cors({
@@ -32,6 +41,14 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
   exposeHeaders: ['Set-Cookie']
 }));
+
+// SECURITY: No hardcoded fallback - JWT_SECRET must be configured in environment
+function getJWTSecret(env: Bindings): string {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is not configured');
+  }
+  return env.JWT_SECRET;
+}
 
 // JWT middleware
 const jwtMiddleware = async (c: any, next: any) => {
@@ -44,8 +61,13 @@ const jwtMiddleware = async (c: any, next: any) => {
   }
 
   try {
-    const payload = await verify(authToken, c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var') as AuthContext;
+    const payload = await verify(authToken, getJWTSecret(c.env)) as AuthContext;
     c.set('user', payload);
+    
+    // Get user's team ID for team-based CRM access
+    const teamId = await getUserTeamId(c.env.DB, payload.userId);
+    c.set('teamId', teamId);
+    
     await next();
   } catch (error) {
     return c.json({ error: 'Invalid authentication token' }, 401);
@@ -54,9 +76,10 @@ const jwtMiddleware = async (c: any, next: any) => {
 
 // ============== CONTACTS ==============
 
-// Get all contacts for user
+// Get all contacts for team (shared across team members)
 app.get('/contacts', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const status = c.req.query('status');
   const type = c.req.query('type');
   const source = c.req.query('source');
@@ -65,18 +88,23 @@ app.get('/contacts', jwtMiddleware, async (c) => {
   const offset = parseInt(c.req.query('offset') || '0');
 
   try {
+    // Filter by team_id if user has a team, otherwise fall back to user_id
+    const useTeamFilter = teamId !== null;
+    
     let query = `
       SELECT 
         c.*,
         u.name as linked_user_name,
         u.avatar_url as linked_user_avatar,
+        creator.name as created_by_name,
         (SELECT COUNT(*) FROM crm_activities WHERE contact_id = c.id) as activity_count,
         (SELECT activity_date FROM crm_activities WHERE contact_id = c.id ORDER BY activity_date DESC LIMIT 1) as last_activity
       FROM crm_contacts c
       LEFT JOIN users u ON c.linked_user_id = u.id
-      WHERE c.user_id = ?
+      LEFT JOIN users creator ON c.user_id = creator.id
+      WHERE ${useTeamFilter ? 'c.team_id = ?' : 'c.user_id = ?'}
     `;
-    const params: any[] = [user.userId];
+    const params: any[] = [useTeamFilter ? teamId : user.userId];
 
     if (status) {
       query += ` AND c.status = ?`;
@@ -100,9 +128,9 @@ app.get('/contacts', jwtMiddleware, async (c) => {
 
     const contacts = await c.env.DB.prepare(query).bind(...params).all();
 
-    // Get total count
-    let countQuery = `SELECT COUNT(*) as total FROM crm_contacts WHERE user_id = ?`;
-    const countParams: any[] = [user.userId];
+    // Get total count with same team/user filter
+    let countQuery = `SELECT COUNT(*) as total FROM crm_contacts WHERE ${useTeamFilter ? 'team_id = ?' : 'user_id = ?'}`;
+    const countParams: any[] = [useTeamFilter ? teamId : user.userId];
     if (status) {
       countQuery += ` AND status = ?`;
       countParams.push(status);
@@ -129,22 +157,26 @@ app.get('/contacts', jwtMiddleware, async (c) => {
   }
 });
 
-// Get single contact
+// Get single contact (accessible by team members)
 app.get('/contacts/:id', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const contactId = c.req.param('id');
 
   try {
+    const useTeamFilter = teamId !== null;
     const contact = await c.env.DB.prepare(`
       SELECT 
         c.*,
         u.name as linked_user_name,
         u.avatar_url as linked_user_avatar,
-        u.email as linked_user_email
+        u.email as linked_user_email,
+        creator.name as created_by_name
       FROM crm_contacts c
       LEFT JOIN users u ON c.linked_user_id = u.id
-      WHERE c.id = ? AND c.user_id = ?
-    `).bind(contactId, user.userId).first();
+      LEFT JOIN users creator ON c.user_id = creator.id
+      WHERE c.id = ? AND ${useTeamFilter ? 'c.team_id = ?' : 'c.user_id = ?'}
+    `).bind(contactId, useTeamFilter ? teamId : user.userId).first();
 
     if (!contact) {
       return c.json({ error: 'Contact not found' }, 404);
@@ -176,9 +208,10 @@ app.get('/contacts/:id', jwtMiddleware, async (c) => {
   }
 });
 
-// Create contact
+// Create contact (assigned to team)
 app.post('/contacts', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const body = await c.req.json();
 
   const {
@@ -208,13 +241,14 @@ app.post('/contacts', jwtMiddleware, async (c) => {
   try {
     const result = await c.env.DB.prepare(`
       INSERT INTO crm_contacts (
-        user_id, name, email, phone, company, position, linkedin_url, website, avatar_url,
+        user_id, team_id, name, email, phone, company, position, linkedin_url, website, avatar_url,
         contact_type, status, source, priority, linked_user_id, connector_suggestion_id,
         notes, tags, custom_fields
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       user.userId,
+      teamId, // Assign to team
       name,
       email || null,
       phone || null,
@@ -253,17 +287,19 @@ app.post('/contacts', jwtMiddleware, async (c) => {
   }
 });
 
-// Update contact
+// Update contact (team members can update)
 app.put('/contacts/:id', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const contactId = c.req.param('id');
   const body = await c.req.json();
 
   try {
-    // Verify ownership
+    // Verify team access
+    const useTeamFilter = teamId !== null;
     const existing = await c.env.DB.prepare(
-      `SELECT id FROM crm_contacts WHERE id = ? AND user_id = ?`
-    ).bind(contactId, user.userId).first();
+      `SELECT id FROM crm_contacts WHERE id = ? AND ${useTeamFilter ? 'team_id = ?' : 'user_id = ?'}`
+    ).bind(contactId, useTeamFilter ? teamId : user.userId).first();
 
     if (!existing) {
       return c.json({ error: 'Contact not found' }, 404);
@@ -295,7 +331,7 @@ app.put('/contacts/:id', jwtMiddleware, async (c) => {
         tags = ?,
         custom_fields = ?,
         updated_at = datetime('now')
-      WHERE id = ? AND user_id = ?
+      WHERE id = ?
     `).bind(
       name || null,
       email || null,
@@ -314,8 +350,7 @@ app.put('/contacts/:id', jwtMiddleware, async (c) => {
       notes || null,
       tags ? JSON.stringify(tags) : null,
       custom_fields ? JSON.stringify(custom_fields) : null,
-      contactId,
-      user.userId
+      contactId
     ).run();
 
     return c.json({ success: true, message: 'Contact updated successfully' });
@@ -325,15 +360,17 @@ app.put('/contacts/:id', jwtMiddleware, async (c) => {
   }
 });
 
-// Delete contact
+// Delete contact (team members can delete)
 app.delete('/contacts/:id', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const contactId = c.req.param('id');
 
   try {
+    const useTeamFilter = teamId !== null;
     const result = await c.env.DB.prepare(
-      `DELETE FROM crm_contacts WHERE id = ? AND user_id = ?`
-    ).bind(contactId, user.userId).run();
+      `DELETE FROM crm_contacts WHERE id = ? AND ${useTeamFilter ? 'team_id = ?' : 'user_id = ?'}`
+    ).bind(contactId, useTeamFilter ? teamId : user.userId).run();
 
     if (result.meta?.changes === 0) {
       return c.json({ error: 'Contact not found' }, 404);
@@ -348,25 +385,29 @@ app.delete('/contacts/:id', jwtMiddleware, async (c) => {
 
 // ============== ACTIVITIES ==============
 
-// Get activities for a contact
+// Get activities for a contact (team members can view)
 app.get('/contacts/:id/activities', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const contactId = c.req.param('id');
 
   try {
-    // Verify ownership
+    // Verify team access
+    const useTeamFilter = teamId !== null;
     const contact = await c.env.DB.prepare(
-      `SELECT id FROM crm_contacts WHERE id = ? AND user_id = ?`
-    ).bind(contactId, user.userId).first();
+      `SELECT id FROM crm_contacts WHERE id = ? AND ${useTeamFilter ? 'team_id = ?' : 'user_id = ?'}`
+    ).bind(contactId, useTeamFilter ? teamId : user.userId).first();
 
     if (!contact) {
       return c.json({ error: 'Contact not found' }, 404);
     }
 
     const activities = await c.env.DB.prepare(`
-      SELECT * FROM crm_activities
-      WHERE contact_id = ?
-      ORDER BY activity_date DESC, created_at DESC
+      SELECT a.*, u.name as created_by_name
+      FROM crm_activities a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE a.contact_id = ?
+      ORDER BY a.activity_date DESC, a.created_at DESC
     `).bind(contactId).all();
 
     return c.json({
@@ -379,9 +420,10 @@ app.get('/contacts/:id/activities', jwtMiddleware, async (c) => {
   }
 });
 
-// Add activity to contact
+// Add activity to contact (team members can add)
 app.post('/contacts/:id/activities', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const contactId = c.req.param('id');
   const body = await c.req.json();
 
@@ -392,10 +434,11 @@ app.post('/contacts/:id/activities', jwtMiddleware, async (c) => {
   }
 
   try {
-    // Verify ownership
+    // Verify team access
+    const useTeamFilter = teamId !== null;
     const contact = await c.env.DB.prepare(
-      `SELECT id FROM crm_contacts WHERE id = ? AND user_id = ?`
-    ).bind(contactId, user.userId).first();
+      `SELECT id FROM crm_contacts WHERE id = ? AND ${useTeamFilter ? 'team_id = ?' : 'user_id = ?'}`
+    ).bind(contactId, useTeamFilter ? teamId : user.userId).first();
 
     if (!contact) {
       return c.json({ error: 'Contact not found' }, 404);
@@ -433,9 +476,10 @@ app.post('/contacts/:id/activities', jwtMiddleware, async (c) => {
 
 // ============== FROM AI CONNECTOR ==============
 
-// Add contact from AI Connector suggestion
+// Add contact from AI Connector suggestion (team-shared)
 app.post('/from-connector', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const body = await c.req.json();
 
   const { suggestion_id, suggested_user_id, name, email, company, reason, avatar_url } = body;
@@ -444,13 +488,15 @@ app.post('/from-connector', jwtMiddleware, async (c) => {
     return c.json({ error: 'Either suggested_user_id or name is required' }, 400);
   }
 
+  const useTeamFilter = teamId !== null;
+
   try {
-    // Check if contact already exists from this suggestion
+    // Check if contact already exists from this suggestion (in team)
     if (suggestion_id) {
       const existing = await c.env.DB.prepare(`
         SELECT id FROM crm_contacts 
-        WHERE user_id = ? AND connector_suggestion_id = ?
-      `).bind(user.userId, suggestion_id).first();
+        WHERE ${useTeamFilter ? 'team_id = ?' : 'user_id = ?'} AND connector_suggestion_id = ?
+      `).bind(useTeamFilter ? teamId : user.userId, suggestion_id).first();
 
       if (existing) {
         return c.json({ 
@@ -462,12 +508,12 @@ app.post('/from-connector', jwtMiddleware, async (c) => {
       }
     }
 
-    // Check if contact already exists by linked_user_id
+    // Check if contact already exists by linked_user_id (in team)
     if (suggested_user_id) {
       const existingByUser = await c.env.DB.prepare(`
         SELECT id FROM crm_contacts 
-        WHERE user_id = ? AND linked_user_id = ?
-      `).bind(user.userId, suggested_user_id).first();
+        WHERE ${useTeamFilter ? 'team_id = ?' : 'user_id = ?'} AND linked_user_id = ?
+      `).bind(useTeamFilter ? teamId : user.userId, suggested_user_id).first();
 
       if (existingByUser) {
         // Update the existing contact with suggestion info
@@ -505,16 +551,17 @@ app.post('/from-connector', jwtMiddleware, async (c) => {
       }
     }
 
-    // Create new contact
+    // Create new contact (with team)
     const result = await c.env.DB.prepare(`
       INSERT INTO crm_contacts (
-        user_id, name, email, company, avatar_url,
+        user_id, team_id, name, email, company, avatar_url,
         contact_type, status, source, priority,
         linked_user_id, connector_suggestion_id, notes
       )
-      VALUES (?, ?, ?, ?, ?, 'lead', 'new', 'ai_connector', 'medium', ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, 'lead', 'new', 'ai_connector', 'medium', ?, ?, ?)
     `).bind(
       user.userId,
+      teamId, // Assign to team
       contactName,
       contactEmail || null,
       contactCompany || null,
@@ -558,9 +605,13 @@ app.post('/from-connector', jwtMiddleware, async (c) => {
 
 // ============== STATS ==============
 
-// Get CRM statistics
+// Get CRM statistics (team-wide)
 app.get('/stats', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
+  const useTeamFilter = teamId !== null;
+  const filterValue = useTeamFilter ? teamId : user.userId;
+  const filterColumn = useTeamFilter ? 'team_id' : 'user_id';
 
   try {
     const stats = await c.env.DB.prepare(`
@@ -580,31 +631,33 @@ app.get('/stats', jwtMiddleware, async (c) => {
         COUNT(CASE WHEN contact_type = 'partner' THEN 1 END) as partners,
         SUM(deal_value) as total_deal_value
       FROM crm_contacts
-      WHERE user_id = ?
-    `).bind(user.userId).first();
+      WHERE ${filterColumn} = ?
+    `).bind(filterValue).first();
 
-    // Recent activities
+    // Recent activities (team-wide)
     const recentActivities = await c.env.DB.prepare(`
       SELECT 
         a.*,
         c.name as contact_name,
-        c.avatar_url as contact_avatar
+        c.avatar_url as contact_avatar,
+        u.name as created_by_name
       FROM crm_activities a
       JOIN crm_contacts c ON a.contact_id = c.id
-      WHERE c.user_id = ?
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE c.${filterColumn} = ?
       ORDER BY a.activity_date DESC
       LIMIT 10
-    `).bind(user.userId).all();
+    `).bind(filterValue).all();
 
-    // Follow-ups due
+    // Follow-ups due (team-wide)
     const followUpsDue = await c.env.DB.prepare(`
       SELECT * FROM crm_contacts
-      WHERE user_id = ? 
+      WHERE ${filterColumn} = ? 
         AND next_follow_up IS NOT NULL 
         AND next_follow_up <= datetime('now', '+7 days')
       ORDER BY next_follow_up ASC
       LIMIT 10
-    `).bind(user.userId).all();
+    `).bind(filterValue).all();
 
     return c.json({
       total: (stats as any).total_contacts || 0,
@@ -636,9 +689,10 @@ app.get('/stats', jwtMiddleware, async (c) => {
 
 // ============== BULK OPERATIONS ==============
 
-// Import contacts from CSV/JSON
+// Import contacts from CSV/JSON (team-shared)
 app.post('/import', jwtMiddleware, async (c) => {
   const user = c.get('user') as AuthContext;
+  const teamId = c.get('teamId');
   const body = await c.req.json();
   const { contacts } = body;
 
@@ -659,12 +713,13 @@ app.post('/import', jwtMiddleware, async (c) => {
       try {
         await c.env.DB.prepare(`
           INSERT INTO crm_contacts (
-            user_id, name, email, phone, company, position, 
+            user_id, team_id, name, email, phone, company, position, 
             contact_type, status, source, notes, tags
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'new', 'import', ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', 'import', ?, ?)
         `).bind(
           user.userId,
+          teamId, // Assign to team
           contact.name,
           contact.email || null,
           contact.phone || null,

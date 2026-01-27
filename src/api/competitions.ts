@@ -9,7 +9,13 @@ import type { Bindings } from '../types';
 
 const competitions = new Hono<{ Bindings: Bindings }>();
 
-const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
+// SECURITY: No hardcoded fallback - JWT_SECRET must be configured in environment
+function getJWTSecret(env: Bindings): string {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is not configured');
+  }
+  return env.JWT_SECRET;
+}
 
 // JWT middleware
 const jwtMiddleware = async (c: any, next: any) => {
@@ -22,7 +28,7 @@ const jwtMiddleware = async (c: any, next: any) => {
   }
 
   try {
-    const payload = await verify(authToken, c.env.JWT_SECRET || JWT_SECRET) as any;
+    const payload = await verify(authToken, getJWTSecret(c.env)) as any;
     c.set('user', payload);
     await next();
   } catch (error) {

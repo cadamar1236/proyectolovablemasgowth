@@ -1,6 +1,7 @@
 /**
  * Authentication API
  * Handles user registration, login, and JWT token management
+ * SECURITY: Uses PBKDF2 for password hashing and rate limiting for brute force protection
  */
 
 import { Hono } from 'hono';
@@ -9,29 +10,135 @@ import type { Bindings } from '../types';
 
 const auth = new Hono<{ Bindings: Bindings }>();
 
-const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
+// SECURITY: No hardcoded fallback - JWT_SECRET must be configured in environment
+function getJWTSecret(env: Bindings): string {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is not configured');
+  }
+  return env.JWT_SECRET;
+}
 
-// Helper: Hash password (in production, use bcrypt)
-function hashPassword(password: string): string {
-  // TODO: In production, use bcrypt or Argon2
-  // For now, simple implementation (NOT SECURE FOR PRODUCTION)
-  // Using base64 encoding for compatibility with existing passwords
+// SECURITY: Rate limiting for authentication endpoints
+const AUTH_RATE_LIMIT_SECONDS = 60; // 5 attempts per minute
+const AUTH_RATE_LIMIT_MAX_ATTEMPTS = 5;
+
+async function checkAuthRateLimit(
+  cache: KVNamespace | undefined,
+  identifier: string,
+  action: string
+): Promise<{ allowed: boolean; retryAfter?: number; attempts?: number }> {
+  if (!cache) {
+    return { allowed: true };
+  }
+
+  const rateLimitKey = `auth_rate_limit:${action}:${identifier}`;
+  
   try {
-    // For Cloudflare Workers, use btoa if available, otherwise fallback
-    if (typeof btoa !== 'undefined') {
-      return btoa(password);
+    const data = await cache.get(rateLimitKey);
+    const attempts = data ? parseInt(data) : 0;
+    
+    if (attempts >= AUTH_RATE_LIMIT_MAX_ATTEMPTS) {
+      return {
+        allowed: false,
+        retryAfter: AUTH_RATE_LIMIT_SECONDS,
+        attempts
+      };
     }
-    // Fallback for environments without btoa
-    return Buffer.from(password, 'utf-8').toString('base64');
-  } catch (e) {
-    // Ultimate fallback
-    return password.split('').map(c => c.charCodeAt(0).toString(16)).join('');
+    
+    await cache.put(rateLimitKey, (attempts + 1).toString(), {
+      expirationTtl: AUTH_RATE_LIMIT_SECONDS
+    });
+    
+    return { allowed: true, attempts: attempts + 1 };
+  } catch (error) {
+    console.error('Rate limit check failed:', error);
+    return { allowed: true };
   }
 }
 
-// Helper: Verify password
-function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash;
+// SECURITY: PBKDF2 password hashing using Web Crypto API
+const PBKDF2_ITERATIONS = 100000;
+const SALT_LENGTH = 16;
+const KEY_LENGTH = 32;
+
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: PBKDF2_ITERATIONS,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    KEY_LENGTH * 8
+  );
+  
+  const hashArray = new Uint8Array(derivedBits);
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return `pbkdf2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`;
+}
+
+// SECURITY: Verify password with timing-safe comparison
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  // Support legacy base64 passwords for migration
+  if (!storedHash.startsWith('pbkdf2:')) {
+    // Legacy base64 comparison (for existing users)
+    try {
+      const legacyHash = typeof btoa !== 'undefined' ? btoa(password) : Buffer.from(password, 'utf-8').toString('base64');
+      return legacyHash === storedHash;
+    } catch {
+      return false;
+    }
+  }
+  
+  const [, iterations, saltHex, hashHex] = storedHash.split(':');
+  const encoder = new TextEncoder();
+  
+  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(byte => parseInt(byte, 16)));
+  
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: parseInt(iterations),
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    KEY_LENGTH * 8
+  );
+  
+  const computedHashHex = Array.from(new Uint8Array(derivedBits))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  // Timing-safe comparison
+  if (computedHashHex.length !== hashHex.length) return false;
+  let result = 0;
+  for (let i = 0; i < computedHashHex.length; i++) {
+    result |= computedHashHex.charCodeAt(i) ^ hashHex.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 // Register new user
@@ -41,6 +148,15 @@ auth.post('/register', async (c) => {
     
     if (!email || !password || !name) {
       return c.json({ error: 'Email, password and name are required' }, 400);
+    }
+    
+    // SECURITY: Rate limiting - prevent registration abuse
+    const clientIP = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    const rateLimitCheck = await checkAuthRateLimit(c.env.CACHE, clientIP, 'register');
+    if (!rateLimitCheck.allowed) {
+      return c.json({ 
+        error: `Too many registration attempts. Please try again in ${rateLimitCheck.retryAfter} seconds.` 
+      }, 429);
     }
     
     // Validate role
@@ -58,8 +174,8 @@ auth.post('/register', async (c) => {
       return c.json({ error: 'Email already registered' }, 400);
     }
     
-    // Hash password
-    const hashedPassword = hashPassword(password);
+    // SECURITY: Hash password with PBKDF2
+    const hashedPassword = await hashPassword(password);
     
     // Create user
     const result = await c.env.DB.prepare(`
@@ -123,7 +239,7 @@ auth.post('/register', async (c) => {
         role: finalRole,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
-      c.env.JWT_SECRET || JWT_SECRET
+      getJWTSecret(c.env)
     );
     
     return c.json({
@@ -152,6 +268,16 @@ auth.post('/login', async (c) => {
       return c.json({ error: 'Email and password are required' }, 400);
     }
     
+    // SECURITY: Rate limiting - prevent brute force attacks
+    const clientIP = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    const rateLimitCheck = await checkAuthRateLimit(c.env.CACHE, `${clientIP}:${email}`, 'login');
+    if (!rateLimitCheck.allowed) {
+      console.warn(`[SECURITY] Rate limit exceeded for login: IP=${clientIP}, email=${email}`);
+      return c.json({ 
+        error: `Too many login attempts. Please try again in ${rateLimitCheck.retryAfter} seconds.` 
+      }, 429);
+    }
+    
     // Find user
     const user = await c.env.DB.prepare(
       'SELECT id, email, password, name, role, plan, avatar_url FROM users WHERE email = ?'
@@ -161,8 +287,9 @@ auth.post('/login', async (c) => {
       return c.json({ error: 'Invalid credentials' }, 401);
     }
     
-    // Verify password
-    if (!verifyPassword(password, user.password)) {
+    // SECURITY: Verify password with PBKDF2
+    const passwordValid = await verifyPassword(password, user.password);
+    if (!passwordValid) {
       return c.json({ error: 'Invalid credentials' }, 401);
     }
     
@@ -174,7 +301,7 @@ auth.post('/login', async (c) => {
         role: user.role,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
-      c.env.JWT_SECRET || JWT_SECRET
+      getJWTSecret(c.env)
     );
     
     return c.json({
@@ -208,7 +335,7 @@ auth.get('/me', async (c) => {
     const token = authHeader.substring(7);
     
     // Verify token
-    const payload = await verify(token, JWT_SECRET) as any;
+    const payload = await verify(token, getJWTSecret(c.env)) as any;
     
     // Get user with additional profile info
     const user = await c.env.DB.prepare(`
@@ -242,7 +369,7 @@ auth.put('/profile', async (c) => {
     }
     
     const token = authHeader.substring(7);
-    const payload = await verify(token, JWT_SECRET) as any;
+    const payload = await verify(token, getJWTSecret(c.env)) as any;
     
     const { name, bio, company, avatar_url } = await c.req.json();
     
@@ -273,7 +400,7 @@ auth.put('/role', async (c) => {
     }
     
     const token = authHeader.substring(7);
-    const payload = await verify(token, JWT_SECRET) as any;
+    const payload = await verify(token, getJWTSecret(c.env)) as any;
     
     const { newRole } = await c.req.json();
     
@@ -316,7 +443,7 @@ auth.put('/role', async (c) => {
         role: newRole,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
-      JWT_SECRET
+      getJWTSecret(c.env)
     );
     
     // Get updated user data
@@ -346,7 +473,7 @@ auth.post('/change-password', async (c) => {
     }
     
     const token = authHeader.substring(7);
-    const payload = await verify(token, JWT_SECRET) as any;
+    const payload = await verify(token, getJWTSecret(c.env)) as any;
     
     const { currentPassword, newPassword } = await c.req.json();
     
@@ -359,13 +486,14 @@ auth.post('/change-password', async (c) => {
       'SELECT password FROM users WHERE id = ?'
     ).bind(payload.userId).first() as any;
     
-    // Verify current password
-    if (!verifyPassword(currentPassword, user.password)) {
+    // SECURITY: Verify current password with PBKDF2
+    const passwordValid = await verifyPassword(currentPassword, user.password);
+    if (!passwordValid) {
       return c.json({ error: 'Current password is incorrect' }, 401);
     }
     
-    // Hash and update new password
-    const hashedPassword = hashPassword(newPassword);
+    // SECURITY: Hash new password with PBKDF2
+    const hashedPassword = await hashPassword(newPassword);
     
     await c.env.DB.prepare(
       'UPDATE users SET password = ? WHERE id = ?'
@@ -386,7 +514,7 @@ auth.post('/logout', async (c) => {
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
-      const payload = await verify(token, JWT_SECRET) as any;
+      const payload = await verify(token, getJWTSecret(c.env)) as any;
       
       // Log logout event
       console.log(`User ${payload.userId} logged out at ${new Date().toISOString()}`);
@@ -620,7 +748,7 @@ auth.get('/google/callback', async (c) => {
         role: userRole,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
-      c.env.JWT_SECRET || JWT_SECRET
+      getJWTSecret(c.env)
     );
 
     console.log('[GOOGLE-CALLBACK] JWT token generated');
@@ -630,17 +758,17 @@ auth.get('/google/callback', async (c) => {
     // Redirect new users to onboarding, existing users to dashboard
     const finalRedirect = existingUser.needsOnboarding ? '/onboarding' : (redirectPath || '/dashboard');
     
-    // Set the cookie (NOT HttpOnly so JavaScript can read it for API calls)
-    c.header('Set-Cookie', `authToken=${token}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`);
+    // SECURITY: Set secure cookie with proper flags
+    // Note: Not using HttpOnly because client JS needs to read for API calls
+    // Using SameSite=Lax for CSRF protection while allowing OAuth redirects
+    const isProduction = !frontendUrl.includes('localhost') && !frontendUrl.includes('127.0.0.1');
+    const secureFlag = isProduction ? '; Secure' : '';
+    c.header('Set-Cookie', `authToken=${token}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax${secureFlag}`);
     
-    // Also pass token in URL as backup (for first load)
-    const redirectWithToken = finalRedirect.includes('?') 
-      ? `${finalRedirect}&token=${token}` 
-      : `${finalRedirect}?token=${token}`;
+    // Redirect without token in URL for security
+    console.log('[GOOGLE-CALLBACK] Redirecting to:', finalRedirect);
     
-    console.log('[GOOGLE-CALLBACK] Redirecting to:', redirectWithToken);
-    
-    return c.redirect(redirectWithToken);
+    return c.redirect(finalRedirect);
 
   } catch (error) {
     console.error('[GOOGLE-CALLBACK] ERROR:', error);
@@ -659,7 +787,7 @@ auth.post('/complete-onboarding', async (c) => {
     }
 
     const token = authHeader.substring(7);
-    const payload = await verify(token, c.env.JWT_SECRET || JWT_SECRET) as any;
+    const payload = await verify(token, getJWTSecret(c.env)) as any;
     const userId = payload.userId;
     const userRole = payload.role;
 
@@ -810,7 +938,7 @@ export async function requireAuth(c: any, next: any) {
     }
     
     const token = authHeader.substring(7);
-    const payload = await verify(token, JWT_SECRET) as any;
+    const payload = await verify(token, getJWTSecret(c.env)) as any;
     
     // Add user info to context
     c.set('userId', payload.userId);
@@ -946,7 +1074,7 @@ auth.post('/verify-whatsapp-code', async (c) => {
         role: user.role,
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
       },
-      JWT_SECRET
+      getJWTSecret(c.env)
     );
 
     return c.json({

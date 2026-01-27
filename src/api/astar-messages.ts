@@ -106,6 +106,30 @@ async function requireAuth(c: any, next: any) {
 // RESEND EMAIL INTEGRATION
 // ============================================
 
+// Generate a secure unsubscribe token
+function generateUnsubscribeToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+// Create unsubscribe footer HTML
+function createUnsubscribeFooter(unsubscribeUrl: string): string {
+  return `
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+      <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+        ¿No quieres recibir más emails de ASTAR?
+        <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">
+          Cancelar suscripción
+        </a>
+      </p>
+    </div>
+  `;
+}
+
 async function sendEmailWithResend(
   apiKey: string,
   to: string,
@@ -302,6 +326,83 @@ async function calculateIterationScore(
   return Math.round(baseScore * responseMultiplier);
 }
 
+// Crear notificación específica basada en el template del email
+async function createEmailNotification(
+  db: any,
+  userId: number,
+  template: MessageTemplate
+): Promise<void> {
+  let title = '';
+  let message = '';
+  let link = 'https://astarlabshub.com/marketplace?tab=traction';
+
+  // Personalizar notificación según el día y tipo de mensaje
+  switch(template.day_of_week) {
+    case 1: // Monday - Ideas Day
+      if (template.time_of_day === 'evening') {
+        title = '💡 Time to define your hypothesis';
+        message = 'What is your #1 hypothesis for this week? Share your expected user behavior and validation signal.';
+        link += '&chat=hipotesis';
+      }
+      break;
+    case 2: // Tuesday - Build Day
+      if (template.time_of_day === 'evening') {
+        title = '🛠️ Share your build progress';
+        message = 'What did you build today? Include tech stack, time spent, and which hypothesis it tests.';
+        link += '&chat=construccion';
+      }
+      break;
+    case 3: // Wednesday - User Learning Day
+      if (template.time_of_day === 'evening') {
+        title = '💬 Report your user conversations';
+        message = 'How many users did you speak with? How many used the product? What was your key learning?';
+        link += '&chat=usuarios';
+      }
+      break;
+    case 4: // Thursday - Measurement & Insights Day
+      if (template.time_of_day === 'evening') {
+        title = '📊 Share your user behavior insights';
+        message = 'What actions did users repeat? Where did they drop off? What insight does this reveal?';
+        link += '&chat=metricas';
+      }
+      break;
+    case 5: // Friday - Metrics & Traction Day
+      if (template.time_of_day === 'evening') {
+        title = '📈 Report your weekly traction metrics';
+        message = 'Share revenue, new users, active users, churn, and your strongest traction signal.';
+        link += '&chat=traction';
+      }
+      break;
+    case 6: // Saturday - Rest & Reflect
+      if (template.time_of_day === 'evening') {
+        title = '🧘 Optional weekend reflection';
+        message = 'Any final thoughts from the week? Feel free to skip and rest!';
+        link += '&chat=reflexion';
+      }
+      break;
+    case 0: // Sunday - Weekly Review
+      if (template.time_of_day === 'evening') {
+        title = '🏁 Weekly Leaderboard is live!';
+        message = 'Check out how everyone performed this week and your position in the leaderboard.';
+        link += '&chat=reflexion';
+      }
+      break;
+  }
+
+  // Solo crear notificación si tenemos título y mensaje
+  if (title && message) {
+    try {
+      await db.prepare(`
+        INSERT INTO notifications (user_id, type, title, message, link)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(userId, 'astar_weekly_update', title, message, link).run();
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      // No fallar el envío del email por error en notificación
+    }
+  }
+}
+
 // ============================================
 // CRON: SEND DAILY MESSAGES
 // ============================================
@@ -333,14 +434,16 @@ astarMessages.post('/cron/send-daily', async (c) => {
       return c.json({ message: 'No template for this time', sent: 0 });
     }
 
-    // Obtener usuarios ASTAR activos
+    // Obtener usuarios ASTAR activos (que NO hayan cancelado suscripción)
     const users = await c.env.DB.prepare(`
       SELECT u.id, u.email, u.name 
       FROM users u
       WHERE u.email IN ('aihelpstudy@gmail.com', 'giorgio.rodrigano@gmail.com')
+        AND (u.email_unsubscribed IS NULL OR u.email_unsubscribed = 0)
     `).all() as { results: User[] };
 
     let sentCount = 0;
+    let skippedUnsubscribed = 0;
     const errors: string[] = [];
 
     for (const user of users.results || []) {
@@ -351,6 +454,15 @@ astarMessages.post('/cron/send-daily', async (c) => {
       `).bind(user.id, template.id, weekNumber, year).first();
 
       if (alreadySent) continue;
+
+      // Generate unsubscribe token for this user
+      const unsubscribeToken = generateUnsubscribeToken();
+      await c.env.DB.prepare(`
+        INSERT INTO email_unsubscribe_tokens (user_id, token)
+        VALUES (?, ?)
+      `).bind(user.id, unsubscribeToken).run();
+      
+      const unsubscribeUrl = `https://astarlabshub.com/api/astar-messages/unsubscribe/${unsubscribeToken}`;
 
       // Preparar datos para la plantilla
       const templateData: Record<string, any> = {
@@ -413,13 +525,16 @@ astarMessages.post('/cron/send-daily', async (c) => {
       // Renderizar plantilla
       const body = renderTemplate(template.body_template, templateData);
       const htmlBody = convertToHtml(body, template.category);
+      
+      // Add unsubscribe footer
+      const fullHtmlBody = htmlBody + createUnsubscribeFooter(unsubscribeUrl);
 
       // Enviar email con Resend
       const result = await sendEmailWithResend(
         c.env.RESEND_API_KEY,
         user.email,
         template.subject,
-        htmlBody
+        fullHtmlBody
       );
 
       if (result.success) {
@@ -428,6 +543,11 @@ astarMessages.post('/cron/send-daily', async (c) => {
           INSERT INTO astar_sent_messages (user_id, template_id, week_number, year, email_id)
           VALUES (?, ?, ?, ?, ?)
         `).bind(user.id, template.id, weekNumber, year, result.emailId || null).run();
+
+        // Crear notificación específica si el template espera respuesta
+        if (template.expects_response === 1) {
+          await createEmailNotification(c.env.DB, user.id, template);
+        }
         
         sentCount++;
       } else {
@@ -449,40 +569,56 @@ astarMessages.post('/cron/send-daily', async (c) => {
 });
 
 // ENDPOINT DE PRUEBA - Enviar email de prueba sin verificar si ya se envió
-astarMessages.post('/cron/test-email', async (c) => {
+astarMessages.get('/cron/test-email', async (c) => {
   try {
     const now = new Date();
+    const targetEmail = c.req.query('email') || 'aihelpstudy@gmail.com';
+    const dayOfWeek = parseInt(c.req.query('day') || '1'); // Default lunes
+    const timeOfDay = c.req.query('time') || 'morning';
 
-    // Obtener CUALQUIER plantilla disponible (priorizar las que esperan respuesta)
+    // Obtener plantilla específica por día y hora
     const template = await c.env.DB.prepare(`
       SELECT * FROM astar_message_templates 
-      WHERE expects_response = 1
-      ORDER BY id
+      WHERE day_of_week = ? AND time_of_day = ?
       LIMIT 1
-    `).first() as MessageTemplate | null;
+    `).bind(dayOfWeek, timeOfDay).first() as MessageTemplate | null;
 
     if (!template) {
-      // Si no hay plantillas con respuesta, obtener cualquiera
-      const anyTemplate = await c.env.DB.prepare(`
-        SELECT * FROM astar_message_templates 
-        LIMIT 1
-      `).first() as MessageTemplate | null;
-      
-      if (!anyTemplate) {
-        return c.json({ error: 'No templates found in database', sent: 0 }, 404);
-      }
+      return c.json({ error: 'No template found for specified day/time', day: dayOfWeek, time: timeOfDay }, 404);
     }
 
     // Obtener usuario de prueba
-    const user = await c.env.DB.prepare(`
+    let user = await c.env.DB.prepare(`
       SELECT u.id, u.email, u.name 
       FROM users u
-      WHERE u.email = 'aihelpstudy@gmail.com'
-    `).first() as User | null;
+      WHERE u.email = ?
+    `).bind(targetEmail).first() as User | null;
 
     if (!user) {
-      return c.json({ error: 'Test user not found' }, 404);
+      // Create user if doesn't exist
+      await c.env.DB.prepare(`
+        INSERT INTO users (email, name, created_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+      `).bind(targetEmail, 'Test User').run();
+      
+      user = await c.env.DB.prepare(`
+        SELECT u.id, u.email, u.name 
+        FROM users u
+        WHERE u.email = ?
+      `).bind(targetEmail).first() as User | null;
+      
+      if (!user) {
+        return c.json({ error: 'Failed to create test user' }, 500);
+      }
     }
+
+    // Generate unsubscribe token
+    const unsubscribeToken = generateUnsubscribeToken();
+    await c.env.DB.prepare(`
+      INSERT INTO email_unsubscribe_tokens (user_id, token)
+      VALUES (?, ?)
+    `).bind(user.id, unsubscribeToken).run();
+    const unsubscribeUrl = `https://astarlabshub.com/api/astar-messages/unsubscribe/${unsubscribeToken}`;
 
     // Renderizar y enviar email SIN verificar si ya se envió
     const rendered = renderTemplate(template.body_template, {
@@ -496,6 +632,7 @@ astarMessages.post('/cron/test-email', async (c) => {
           <h2 style="color: #1f2937; margin-bottom: 24px;">${template.subject}</h2>
           ${convertToHtml(rendered, template.category)}
         </div>
+        ${createUnsubscribeFooter(unsubscribeUrl)}
         <p style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px;">
           ASTAR Labs - Ayudando founders a iterar más rápido
         </p>
@@ -590,6 +727,14 @@ astarMessages.post('/cron/send-all-week/:email', async (c) => {
       return c.json({ error: 'No templates found' }, 404);
     }
 
+    // Generate unsubscribe token for this user (one per batch)
+    const unsubscribeToken = generateUnsubscribeToken();
+    await c.env.DB.prepare(`
+      INSERT INTO email_unsubscribe_tokens (user_id, token)
+      VALUES (?, ?)
+    `).bind(user.id, unsubscribeToken).run();
+    const unsubscribeUrl = `https://astarlabshub.com/api/astar-messages/unsubscribe/${unsubscribeToken}`;
+
     const results: any[] = [];
     const errors: string[] = [];
 
@@ -608,6 +753,7 @@ astarMessages.post('/cron/send-all-week/:email', async (c) => {
             <h2 style="color: #1f2937; margin-bottom: 24px;">${template.subject}</h2>
             ${convertToHtml(rendered, template.category)}
           </div>
+          ${createUnsubscribeFooter(unsubscribeUrl)}
           <p style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px;">
             ASTAR Labs - Ayudando founders a iterar más rápido
           </p>
@@ -696,7 +842,8 @@ astarMessages.use('/*', async (c, next) => {
                            fullUrl.includes('cron/test-email') ||
                            fullUrl.includes('cron/send-all-week') ||
                            fullUrl.includes('cron/send-by-day') ||
-                           fullUrl.includes('debug/');
+                           fullUrl.includes('debug/') ||
+                           fullUrl.includes('unsubscribe/');
   
   // Si es un endpoint público, saltar autenticación
   if (isPublicEndpoint) {
@@ -705,6 +852,203 @@ astarMessages.use('/*', async (c, next) => {
   
   // Para todas las demás rutas, requerir autenticación
   return requireAuth(c, next);
+});
+
+// ============================================
+// UNSUBSCRIBE ENDPOINTS (Públicos)
+// ============================================
+
+// GET /api/astar-messages/unsubscribe/:token - Process unsubscribe
+astarMessages.get('/unsubscribe/:token', async (c) => {
+  try {
+    const token = c.req.param('token');
+    
+    // Find token and user
+    const tokenRecord = await c.env.DB.prepare(`
+      SELECT ut.*, u.email, u.name 
+      FROM email_unsubscribe_tokens ut
+      JOIN users u ON ut.user_id = u.id
+      WHERE ut.token = ? AND ut.used_at IS NULL
+    `).bind(token).first() as any;
+    
+    if (!tokenRecord) {
+      // Return error page
+      return c.html(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Error - ASTAR</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+            .card { background: white; padding: 48px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
+            h1 { color: #ef4444; margin-bottom: 16px; }
+            p { color: #6b7280; line-height: 1.6; }
+            a { color: #667eea; text-decoration: none; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>❌ Link inválido</h1>
+            <p>Este link de cancelación de suscripción no es válido o ya fue usado.</p>
+            <p style="margin-top: 24px;"><a href="https://astarlabshub.com">Volver a ASTAR</a></p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    
+    // Mark user as unsubscribed
+    await c.env.DB.prepare(`
+      UPDATE users SET email_unsubscribed = 1 WHERE id = ?
+    `).bind(tokenRecord.user_id).run();
+    
+    // Mark token as used
+    await c.env.DB.prepare(`
+      UPDATE email_unsubscribe_tokens SET used_at = datetime('now') WHERE id = ?
+    `).bind(tokenRecord.id).run();
+    
+    // Return success page
+    return c.html(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Suscripción cancelada - ASTAR</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+          .card { background: white; padding: 48px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); text-align: center; max-width: 450px; }
+          h1 { color: #1f2937; margin-bottom: 16px; }
+          .checkmark { font-size: 64px; margin-bottom: 16px; }
+          p { color: #6b7280; line-height: 1.6; margin: 8px 0; }
+          .email { color: #667eea; font-weight: 600; }
+          .resubscribe { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; }
+          .btn { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px; }
+          .btn:hover { opacity: 0.9; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="checkmark">✅</div>
+          <h1>Suscripción cancelada</h1>
+          <p>Ya no recibirás más emails semanales de ASTAR en:</p>
+          <p class="email">${tokenRecord.email}</p>
+          <p style="margin-top: 16px; font-size: 14px;">Lamentamos verte ir. ¡Esperamos que tu startup siga creciendo! 🚀</p>
+          <div class="resubscribe">
+            <p style="font-size: 14px;">¿Cambiaste de opinión?</p>
+            <a href="https://astarlabshub.com/api/astar-messages/resubscribe/${token}" class="btn">
+              Volver a suscribirme
+            </a>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+    
+  } catch (error: any) {
+    console.error('Error processing unsubscribe:', error);
+    return c.html(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Error - ASTAR</title>
+        <style>
+          body { font-family: 'Segoe UI', sans-serif; background: #f3f4f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+          .card { background: white; padding: 48px; border-radius: 16px; text-align: center; }
+          h1 { color: #ef4444; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h1>❌ Error</h1>
+          <p>Ocurrió un error al procesar tu solicitud. Por favor intenta de nuevo.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+});
+
+// GET /api/astar-messages/resubscribe/:token - Re-subscribe user
+astarMessages.get('/resubscribe/:token', async (c) => {
+  try {
+    const token = c.req.param('token');
+    
+    // Find token (even if used)
+    const tokenRecord = await c.env.DB.prepare(`
+      SELECT ut.*, u.email, u.name 
+      FROM email_unsubscribe_tokens ut
+      JOIN users u ON ut.user_id = u.id
+      WHERE ut.token = ?
+    `).bind(token).first() as any;
+    
+    if (!tokenRecord) {
+      return c.html(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <title>Error - ASTAR</title>
+          <style>
+            body { font-family: 'Segoe UI', sans-serif; background: #f3f4f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+            .card { background: white; padding: 48px; border-radius: 16px; text-align: center; }
+            h1 { color: #ef4444; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>❌ Link inválido</h1>
+            <p>Este link no es válido.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    
+    // Re-subscribe user
+    await c.env.DB.prepare(`
+      UPDATE users SET email_unsubscribed = 0 WHERE id = ?
+    `).bind(tokenRecord.user_id).run();
+    
+    return c.html(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>¡Bienvenido de vuelta! - ASTAR</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+          .card { background: white; padding: 48px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); text-align: center; max-width: 450px; }
+          h1 { color: #1f2937; margin-bottom: 16px; }
+          .emoji { font-size: 64px; margin-bottom: 16px; }
+          p { color: #6b7280; line-height: 1.6; }
+          .email { color: #667eea; font-weight: 600; }
+          .btn { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 24px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="emoji">🎉</div>
+          <h1>¡Bienvenido de vuelta!</h1>
+          <p>Has vuelto a suscribirte a los emails semanales de ASTAR.</p>
+          <p class="email">${tokenRecord.email}</p>
+          <p style="margin-top: 16px;">Recibirás tips y recordatorios para hacer crecer tu startup cada semana.</p>
+          <a href="https://astarlabshub.com/marketplace?tab=traction" class="btn">
+            Ir al Dashboard
+          </a>
+        </div>
+      </body>
+      </html>
+    `);
+    
+  } catch (error: any) {
+    console.error('Error processing resubscribe:', error);
+    return c.json({ error: 'Failed to resubscribe' }, 500);
+  }
 });
 
 // GET /api/astar-messages/debug/pending/:email - Debug endpoint público
@@ -1070,13 +1414,25 @@ astarMessages.post('/cron/send-by-day/:dayOfWeek', async (c) => {
     const weekNumber = getWeekNumber(now);
     const year = now.getFullYear();
 
-    // Obtener usuario de prueba
-    const user = await c.env.DB.prepare(`
+    // Obtener usuario de prueba (o crearlo si no existe)
+    let user = await c.env.DB.prepare(`
       SELECT id, email, name FROM users WHERE email = 'aihelpstudy@gmail.com'
     `).first() as User | null;
 
     if (!user) {
-      return c.json({ error: 'Test user not found' }, 404);
+      // Create user if doesn't exist
+      await c.env.DB.prepare(`
+        INSERT INTO users (email, name, created_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+      `).bind('aihelpstudy@gmail.com', 'Test User').run();
+      
+      user = await c.env.DB.prepare(`
+        SELECT id, email, name FROM users WHERE email = 'aihelpstudy@gmail.com'
+      `).first() as User | null;
+      
+      if (!user) {
+        return c.json({ error: 'Failed to create test user' }, 500);
+      }
     }
 
     // Obtener todas las plantillas de ese día
@@ -1093,6 +1449,14 @@ astarMessages.post('/cron/send-by-day/:dayOfWeek', async (c) => {
         dayName: dayOfWeekParam 
       }, 404);
     }
+
+    // Generate unsubscribe token
+    const unsubscribeToken = generateUnsubscribeToken();
+    await c.env.DB.prepare(`
+      INSERT INTO email_unsubscribe_tokens (user_id, token)
+      VALUES (?, ?)
+    `).bind(user.id, unsubscribeToken).run();
+    const unsubscribeUrl = `https://astarlabshub.com/api/astar-messages/unsubscribe/${unsubscribeToken}`;
 
     const results: any[] = [];
     const errors: string[] = [];
@@ -1123,6 +1487,7 @@ astarMessages.post('/cron/send-by-day/:dayOfWeek', async (c) => {
             <h2 style="color: #1f2937; margin-bottom: 24px;">${template.subject}</h2>
             ${convertToHtml(rendered, template.category)}
           </div>
+          ${createUnsubscribeFooter(unsubscribeUrl)}
           <p style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px;">
             ASTAR Labs - Ayudando founders a iterar más rápido
           </p>
@@ -1157,6 +1522,11 @@ astarMessages.post('/cron/send-by-day/:dayOfWeek', async (c) => {
           INSERT INTO astar_sent_messages (user_id, template_id, week_number, year, sent_at, email_id)
           VALUES (?, ?, ?, ?, datetime('now'), ?)
         `).bind(user.id, template.id, weekNumber, year, result.emailId).run();
+
+        // Crear notificación específica si el template espera respuesta
+        if (template.expects_response === 1) {
+          await createEmailNotification(c.env.DB, user.id, template);
+        }
 
         results.push({
           time: template.time_of_day,

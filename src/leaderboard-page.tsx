@@ -55,9 +55,24 @@ export function getLeaderboardPage(props: LeaderboardPageProps): string {
       <!-- Leaderboard Table -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between">
-          <h2 class="text-xl font-bold">🏆 Startup Rankings</h2>
+          <div>
+            <h2 class="text-xl font-bold">🏆 Startup Rankings</h2>
+            <p class="text-purple-200 text-sm">Scored like a VC would evaluate</p>
+          </div>
           <div class="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">
             Live
+          </div>
+        </div>
+
+        <!-- Scoring Legend -->
+        <div class="px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
+          <div class="flex flex-wrap gap-4">
+            <span><strong>Score =</strong></span>
+            <span>🚀 Growth (35%)</span>
+            <span>📈 Traction (25%)</span>
+            <span>⭐ Stars (20%)</span>
+            <span>✅ Execution (15%)</span>
+            <span>💬 Engagement (5%)</span>
           </div>
         </div>
 
@@ -72,11 +87,13 @@ export function getLeaderboardPage(props: LeaderboardPageProps): string {
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rank</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Startup</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Score</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Rating</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Users</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">VC Score</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Growth</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Stars</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Active Users</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">New/Churned</th>
                 <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Revenue</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Goals</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Execution</th>
               </tr>
             </thead>
             <tbody id="leaderboard-tbody" class="divide-y divide-gray-200">
@@ -153,10 +170,54 @@ export function getLeaderboardPage(props: LeaderboardPageProps): string {
         tbody.innerHTML = filteredData.map((project, index) => {
           const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '#' + (index + 1);
           const score = project.leaderboard_score || 0;
+          const vcScore = project.vc_score || 'C';
           const completedGoals = project.completed_goals || 0;
           const totalGoals = project.total_goals || 0;
           const goalsPercent = totalGoals > 0 ? (completedGoals / totalGoals * 100) : 0;
           const category = formatCategory(project.category || 'Other');
+          
+          // Growth indicators - prefer traction data if available
+          const tractionData = project.tractionData || {};
+          let userGrowthWoW = 0;
+          let revenueGrowthWoW = 0;
+          
+          // Use traction data growth if available (more accurate)
+          if (tractionData.userWoWGrowth !== undefined && tractionData.userWoWGrowth !== 0) {
+            userGrowthWoW = tractionData.userWoWGrowth;
+          } else if (project.growth_wow?.users) {
+            userGrowthWoW = project.growth_wow.users;
+          }
+          
+          if (tractionData.revenueWoWGrowth !== undefined && tractionData.revenueWoWGrowth !== 0) {
+            revenueGrowthWoW = tractionData.revenueWoWGrowth;
+          } else if (project.growth_wow?.revenue) {
+            revenueGrowthWoW = project.growth_wow.revenue;
+          }
+          
+          const avgGrowth = (userGrowthWoW + revenueGrowthWoW) / 2;
+          const growthColor = avgGrowth > 10 ? 'text-green-600' : avgGrowth > 0 ? 'text-blue-600' : avgGrowth < 0 ? 'text-red-600' : 'text-gray-500';
+          const growthIcon = avgGrowth > 0 ? '↑' : avgGrowth < 0 ? '↓' : '→';
+          
+          // For display
+          const growthWoW = { users: userGrowthWoW, revenue: revenueGrowthWoW };
+          
+          // VC Score color
+          const vcColors = {
+            'A+': 'bg-green-500 text-white',
+            'A': 'bg-green-400 text-white',
+            'B+': 'bg-blue-500 text-white',
+            'B': 'bg-blue-400 text-white',
+            'C+': 'bg-yellow-500 text-white',
+            'C': 'bg-yellow-400 text-gray-800',
+            'D': 'bg-red-400 text-white'
+          };
+          const vcColor = vcColors[vcScore] || 'bg-gray-400 text-white';
+          
+          // Traction tracking indicator
+          const isTrackingTraction = tractionData.reportingWeeks >= 2;
+          const tractionBadge = isTrackingTraction 
+            ? \`<span class="ml-2 px-2 py-0.5 bg-pink-100 text-pink-700 text-xs rounded-full font-semibold" title="Actively tracking weekly traction">📊 Tracking</span>\`
+            : '';
           
           return \`
             <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="viewStartupDetail(\${project.id})">
@@ -165,13 +226,25 @@ export function getLeaderboardPage(props: LeaderboardPageProps): string {
               </td>
               <td class="px-4 py-4">
                 <div>
-                  <div class="font-bold text-gray-900">\${project.title}</div>
+                  <div class="font-bold text-gray-900 flex items-center">
+                    \${project.title}
+                    \${tractionBadge}
+                  </div>
                   <div class="text-sm text-gray-500">\${category}</div>
                   <div class="text-xs text-gray-400">by \${project.creator_name || 'Anonymous'}</div>
                 </div>
               </td>
               <td class="px-4 py-4 text-center">
-                <div class="text-2xl font-black text-purple-600">\${score.toFixed(1)}</div>
+                <div class="flex flex-col items-center">
+                  <span class="px-2 py-1 rounded text-xs font-bold \${vcColor}">\${vcScore}</span>
+                  <span class="text-lg font-black text-purple-600 mt-1">\${score.toFixed(1)}</span>
+                </div>
+              </td>
+              <td class="px-4 py-4 text-center">
+                <div class="flex flex-col items-center">
+                  <span class="\${growthColor} font-bold">\${growthIcon} \${Math.abs(avgGrowth).toFixed(1)}%</span>
+                  <span class="text-xs text-gray-400">WoW</span>
+                </div>
               </td>
               <td class="px-4 py-4 text-center">
                 <div class="flex items-center justify-center">
@@ -180,11 +253,34 @@ export function getLeaderboardPage(props: LeaderboardPageProps): string {
                   <span class="text-gray-400 text-sm ml-1">(\${project.votes_count || 0})</span>
                 </div>
               </td>
-              <td class="px-4 py-4 text-center font-semibold">\${formatNumber(project.current_users || 0)}</td>
-              <td class="px-4 py-4 text-center font-semibold text-green-600">$\${formatNumber(project.current_revenue || 0)}</td>
               <td class="px-4 py-4 text-center">
                 <div class="flex flex-col items-center">
-                  <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                  <span class="font-semibold text-purple-600">\${formatNumber(tractionData.avgActive4w || project.current_users || 0)}</span>
+                  \${growthWoW.users !== 0 ? \`<span class="text-xs \${growthWoW.users > 0 ? 'text-green-500' : 'text-red-500'}">\${growthWoW.users > 0 ? '+' : ''}\${growthWoW.users.toFixed(1)}%</span>\` : '<span class="text-xs text-gray-400">-</span>'}
+                </div>
+              </td>
+              <td class="px-4 py-4 text-center">
+                <div class="flex flex-col items-center gap-1">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-green-600 font-semibold" title="New users (4w)">
+                      <i class="fas fa-user-plus text-xs"></i> +\${tractionData.newUsers4w || 0}
+                    </span>
+                    <span class="text-xs text-red-500 font-semibold" title="Churned users">
+                      <i class="fas fa-user-minus text-xs"></i> -\${project.traction_churned_4w || 0}
+                    </span>
+                  </div>
+                  <span class="text-xs text-gray-400">Last 4 weeks</span>
+                </div>
+              </td>
+              <td class="px-4 py-4 text-center">
+                <div class="flex flex-col items-center">
+                  <span class="font-semibold text-green-600">€\${formatNumber(tractionData.revenue4w || project.current_revenue || 0)}</span>
+                  \${growthWoW.revenue !== 0 ? \`<span class="text-xs \${growthWoW.revenue > 0 ? 'text-green-500' : 'text-red-500'}">\${growthWoW.revenue > 0 ? '+' : ''}\${growthWoW.revenue.toFixed(1)}%</span>\` : '<span class="text-xs text-gray-400">-</span>'}
+                </div>
+              </td>
+              <td class="px-4 py-4 text-center">
+                <div class="flex flex-col items-center">
+                  <div class="w-16 bg-gray-200 rounded-full h-2 mb-1">
                     <div class="bg-purple-600 h-2 rounded-full" style="width: \${goalsPercent}%"></div>
                   </div>
                   <span class="text-xs text-gray-500">\${completedGoals}/\${totalGoals}</span>

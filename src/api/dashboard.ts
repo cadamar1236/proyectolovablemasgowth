@@ -21,10 +21,22 @@ dashboard.get('/goals', requireAuth, async (c) => {
                g.deadline, g.category, g.task, g.priority, g.priority_label, g.cadence, g.dri, 
                g.goal_status, g.day_mon, g.day_tue, g.day_wed, g.day_thu, g.day_fri, g.day_sat, g.day_sun,
                g.week_1, g.week_2, g.week_3, g.week_4, g.week_5,
+               g.hypothesis_expected_behavior, g.hypothesis_validation_signal, g.hypothesis_status,
+               g.build_tech_stack, g.build_hours_spent, g.build_hypothesis_id,
+               g.users_spoken, g.users_used_product, g.key_learning,
+               g.users_interacted, g.repeated_actions, g.drop_off_points, g.key_insight,
+               g.week_number, g.year_number,
+               gwt.revenue_amount as traction_revenue, gwt.new_users as traction_new_users,
+               gwt.active_users as traction_active_users, gwt.churned_users as traction_churned,
+               gwt.strongest_signal as traction_signal,
                g.week_of, g.order_index, g.created_at, g.updated_at,
                u.name as user_name, u.email as user_email
         FROM goals g
         LEFT JOIN users u ON g.user_id = u.id
+        LEFT JOIN goal_weekly_traction gwt ON g.week_number = gwt.week_number 
+                                           AND g.year_number = gwt.year 
+                                           AND g.user_id = gwt.user_id
+                                           AND g.category = 'traction'
         ORDER BY g.created_at DESC
       `).all();
 
@@ -50,26 +62,50 @@ dashboard.get('/goals', requireAuth, async (c) => {
           g.goal_status, g.day_mon, g.day_tue, g.day_wed, g.day_thu, g.day_fri, g.day_sat, g.day_sun,
           g.week_1, g.week_2, g.week_3, g.week_4, g.week_5,
           g.scheduled_dates,
+          g.hypothesis_expected_behavior, g.hypothesis_validation_signal, g.hypothesis_status,
+          g.build_tech_stack, g.build_hours_spent, g.build_hypothesis_id,
+          g.users_spoken, g.users_used_product, g.key_learning,
+          g.users_interacted, g.repeated_actions, g.drop_off_points, g.key_insight,
+          g.week_number, g.year_number,
+          gwt.revenue_amount as traction_revenue, gwt.new_users as traction_new_users,
+          gwt.active_users as traction_active_users, gwt.churned_users as traction_churned,
+          gwt.strongest_signal as traction_signal,
           g.week_of, g.order_index, g.created_at, g.updated_at,
           u.name as creator_name,
           u.avatar_url as creator_avatar
         FROM goals g
         INNER JOIN startup_team_members stm ON g.user_id = stm.user_id
         LEFT JOIN users u ON g.user_id = u.id
+        LEFT JOIN goal_weekly_traction gwt ON g.week_number = gwt.week_number 
+                                           AND g.year_number = gwt.year 
+                                           AND g.user_id = gwt.user_id
+                                           AND g.category = 'traction'
         WHERE stm.team_id = ?
         ORDER BY g.order_index ASC, g.priority ASC, g.created_at DESC
       `).bind(teamMembership.team_id).all();
     } else {
       // Fallback to user's own goals if not in a team
       results = await c.env.DB.prepare(`
-        SELECT id, user_id, description, status, target_value, current_value, 
-               deadline, category, task, priority, priority_label, cadence, dri, 
-               goal_status, day_mon, day_tue, day_wed, day_thu, day_fri, day_sat, day_sun,
-               scheduled_dates,
-               week_of, order_index, created_at, updated_at
-        FROM goals 
-        WHERE user_id = ? 
-        ORDER BY order_index ASC, priority ASC, created_at DESC
+        SELECT g.id, g.user_id, g.description, g.status, g.target_value, g.current_value, 
+               g.deadline, g.category, g.task, g.priority, g.priority_label, g.cadence, g.dri, 
+               g.goal_status, g.day_mon, g.day_tue, g.day_wed, g.day_thu, g.day_fri, g.day_sat, g.day_sun,
+               g.scheduled_dates,
+               g.hypothesis_expected_behavior, g.hypothesis_validation_signal, g.hypothesis_status,
+               g.build_tech_stack, g.build_hours_spent, g.build_hypothesis_id,
+               g.users_spoken, g.users_used_product, g.key_learning,
+               g.users_interacted, g.repeated_actions, g.drop_off_points, g.key_insight,
+               g.week_number, g.year_number,
+               gwt.revenue_amount as traction_revenue, gwt.new_users as traction_new_users,
+               gwt.active_users as traction_active_users, gwt.churned_users as traction_churned,
+               gwt.strongest_signal as traction_signal,
+               g.week_of, g.order_index, g.created_at, g.updated_at
+        FROM goals g
+        LEFT JOIN goal_weekly_traction gwt ON g.week_number = gwt.week_number 
+                                           AND g.year_number = gwt.year 
+                                           AND g.user_id = gwt.user_id
+                                           AND g.category = 'traction'
+        WHERE g.user_id = ? 
+        ORDER BY g.order_index ASC, g.priority ASC, g.created_at DESC
       `).bind(userId).all();
     }
 

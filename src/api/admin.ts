@@ -9,7 +9,13 @@ import type { Bindings } from '../types';
 
 const admin = new Hono<{ Bindings: Bindings }>();
 
-const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
+// SECURITY: No hardcoded fallback - JWT_SECRET must be configured in environment
+function getJWTSecret(env: Bindings): string {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is not configured');
+  }
+  return env.JWT_SECRET;
+}
 
 // JWT middleware with admin check
 const adminMiddleware = async (c: any, next: any) => {
@@ -22,7 +28,7 @@ const adminMiddleware = async (c: any, next: any) => {
   }
 
   try {
-    const payload = await verify(authToken, c.env.JWT_SECRET || JWT_SECRET) as any;
+    const payload = await verify(authToken, getJWTSecret(c.env)) as any;
     
     // Check if user is admin
     const user = await c.env.DB.prepare(`
@@ -703,6 +709,315 @@ admin.delete('/competitions/:id', adminMiddleware, async (c) => {
   } catch (error) {
     console.error('[ADMIN] Error deleting competition:', error);
     return c.json({ error: 'Failed to delete competition' }, 500);
+  }
+});
+
+// =====================================================
+// CHAT & ACTIVITY MONITORING ENDPOINTS
+// =====================================================
+
+// Get chat activity statistics
+admin.get('/stats/chat', adminMiddleware, async (c) => {
+  try {
+    // User-to-user conversations stats
+    const userConversations = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_conversations,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_conversations
+      FROM user_conversations
+    `).first();
+
+    // Total user messages
+    const totalMessages = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM user_messages
+    `).first();
+
+    // Messages in last 7 days
+    const recentMessages = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM user_messages 
+      WHERE created_at >= datetime('now', '-7 days')
+    `).first();
+
+    // AI Agent chat stats (from agent_chat_messages table)
+    const aiChatStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_messages,
+        COUNT(DISTINCT user_id) as unique_users
+      FROM agent_chat_messages
+    `).first();
+
+    // AI messages in last 7 days
+    const recentAiMessages = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM agent_chat_messages 
+      WHERE created_at >= datetime('now', '-7 days')
+    `).first();
+
+    // Messages by role
+    const messagesByRole = await c.env.DB.prepare(`
+      SELECT role, COUNT(*) as count
+      FROM agent_chat_messages
+      GROUP BY role
+      ORDER BY count DESC
+    `).all();
+
+    return c.json({
+      userChats: {
+        totalConversations: userConversations?.total_conversations || 0,
+        activeConversations: userConversations?.active_conversations || 0,
+        totalMessages: totalMessages?.count || 0,
+        recentMessages: recentMessages?.count || 0
+      },
+      aiChats: {
+        totalMessages: aiChatStats?.total_messages || 0,
+        uniqueUsers: aiChatStats?.unique_users || 0,
+        recentMessages: recentAiMessages?.count || 0,
+        byRole: messagesByRole.results || []
+      }
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching chat stats:', error);
+    return c.json({ error: 'Failed to fetch chat statistics' }, 500);
+  }
+});
+
+// Get all user-to-user conversations with messages
+admin.get('/conversations', adminMiddleware, async (c) => {
+  try {
+    const limit = parseInt(c.req.query('limit') || '50');
+    const offset = parseInt(c.req.query('offset') || '0');
+
+    const conversations = await c.env.DB.prepare(`
+      SELECT 
+        uc.id,
+        uc.status,
+        uc.created_at,
+        uc.last_message_at,
+        u1.id as user1_id,
+        u1.name as user1_name,
+        u1.email as user1_email,
+        u1.avatar_url as user1_avatar,
+        u2.id as user2_id,
+        u2.name as user2_name,
+        u2.email as user2_email,
+        u2.avatar_url as user2_avatar,
+        (SELECT COUNT(*) FROM user_messages WHERE conversation_id = uc.id) as message_count,
+        (SELECT message FROM user_messages WHERE conversation_id = uc.id ORDER BY created_at DESC LIMIT 1) as last_message
+      FROM user_conversations uc
+      JOIN users u1 ON uc.user1_id = u1.id
+      JOIN users u2 ON uc.user2_id = u2.id
+      ORDER BY uc.last_message_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(limit, offset).all();
+
+    const total = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM user_conversations
+    `).first();
+
+    return c.json({ 
+      conversations: conversations.results || [],
+      total: total?.count || 0,
+      limit,
+      offset
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching conversations:', error);
+    return c.json({ error: 'Failed to fetch conversations' }, 500);
+  }
+});
+
+// Get messages for a specific conversation
+admin.get('/conversations/:id/messages', adminMiddleware, async (c) => {
+  try {
+    const conversationId = c.req.param('id');
+
+    const messages = await c.env.DB.prepare(`
+      SELECT 
+        m.id,
+        m.message,
+        m.is_read,
+        m.created_at,
+        u.id as sender_id,
+        u.name as sender_name,
+        u.email as sender_email,
+        u.avatar_url as sender_avatar
+      FROM user_messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.conversation_id = ?
+      ORDER BY m.created_at ASC
+    `).bind(conversationId).all();
+
+    return c.json({ messages: messages.results || [] });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching messages:', error);
+    return c.json({ error: 'Failed to fetch messages' }, 500);
+  }
+});
+
+// Get all AI agent conversations (grouped by user)
+admin.get('/agent-conversations', adminMiddleware, async (c) => {
+  try {
+    const limit = parseInt(c.req.query('limit') || '50');
+    const offset = parseInt(c.req.query('offset') || '0');
+
+    // Get unique users who have chatted with AI, with their message counts
+    const conversations = await c.env.DB.prepare(`
+      SELECT 
+        u.id as user_id,
+        u.name as user_name,
+        u.email as user_email,
+        u.avatar_url as user_avatar,
+        COUNT(acm.id) as message_count,
+        MAX(acm.created_at) as last_message_at,
+        (SELECT content FROM agent_chat_messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as last_message
+      FROM users u
+      JOIN agent_chat_messages acm ON u.id = acm.user_id
+      GROUP BY u.id
+      ORDER BY last_message_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(limit, offset).all();
+
+    const total = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count FROM agent_chat_messages
+    `).first();
+
+    return c.json({ 
+      conversations: conversations.results || [],
+      total: total?.count || 0,
+      limit,
+      offset
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching agent conversations:', error);
+    return c.json({ error: 'Failed to fetch agent conversations' }, 500);
+  }
+});
+
+// Get full AI conversation for a specific user
+admin.get('/agent-conversations/:userId', adminMiddleware, async (c) => {
+  try {
+    const userId = c.req.param('userId');
+
+    // Get user info
+    const user = await c.env.DB.prepare(`
+      SELECT id, name, email, avatar_url FROM users WHERE id = ?
+    `).bind(userId).first();
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Get all messages for this user
+    const messages = await c.env.DB.prepare(`
+      SELECT 
+        id,
+        role,
+        content,
+        metadata,
+        created_at
+      FROM agent_chat_messages
+      WHERE user_id = ?
+      ORDER BY created_at ASC
+    `).bind(userId).all();
+
+    return c.json({ 
+      conversation: {
+        user_id: user.id,
+        user_name: user.name,
+        user_email: user.email,
+        user_avatar: user.avatar_url,
+        messages: messages.results || []
+      }
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching agent conversation:', error);
+    return c.json({ error: 'Failed to fetch conversation' }, 500);
+  }
+});
+
+// Get most active users
+admin.get('/stats/active-users', adminMiddleware, async (c) => {
+  try {
+    // Users with most AI chat messages
+    const topMessagers = await c.env.DB.prepare(`
+      SELECT 
+        u.id,
+        u.name,
+        u.email,
+        u.avatar_url,
+        COUNT(DISTINCT m.id) as message_count,
+        COUNT(DISTINCT acm.id) as ai_chat_count
+      FROM users u
+      LEFT JOIN user_messages m ON u.id = m.sender_id
+      LEFT JOIN agent_chat_messages acm ON u.id = acm.user_id
+      GROUP BY u.id
+      HAVING message_count > 0 OR ai_chat_count > 0
+      ORDER BY (message_count + ai_chat_count) DESC
+      LIMIT 20
+    `).all();
+
+    // Recent active users (last 7 days)
+    const recentActiveUsers = await c.env.DB.prepare(`
+      SELECT DISTINCT 
+        u.id,
+        u.name,
+        u.email,
+        u.avatar_url,
+        MAX(COALESCE(m.created_at, acm.created_at)) as last_activity
+      FROM users u
+      LEFT JOIN user_messages m ON u.id = m.sender_id AND m.created_at >= datetime('now', '-7 days')
+      LEFT JOIN agent_chat_messages acm ON u.id = acm.user_id AND acm.created_at >= datetime('now', '-7 days')
+      WHERE m.id IS NOT NULL OR acm.id IS NOT NULL
+      GROUP BY u.id
+      ORDER BY last_activity DESC
+      LIMIT 20
+    `).all();
+
+    return c.json({
+      topMessagers: topMessagers.results || [],
+      recentActive: recentActiveUsers.results || []
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching active users:', error);
+    return c.json({ error: 'Failed to fetch active users' }, 500);
+  }
+});
+
+// Get user engagement timeline (for charts)
+admin.get('/stats/engagement-timeline', adminMiddleware, async (c) => {
+  try {
+    const days = parseInt(c.req.query('days') || '30');
+
+    // User messages per day
+    const messagesByDay = await c.env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as count
+      FROM user_messages
+      WHERE created_at >= datetime('now', '-' || ? || ' days')
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `).bind(days).all();
+
+    // AI chats per day (from agent_chat_messages)
+    const aiChatsByDay = await c.env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as count
+      FROM agent_chat_messages
+      WHERE created_at >= datetime('now', '-' || ? || ' days')
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `).bind(days).all();
+
+    return c.json({
+      messages: messagesByDay.results || [],
+      aiChats: aiChatsByDay.results || []
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching engagement timeline:', error);
+    return c.json({ error: 'Failed to fetch engagement timeline' }, 500);
   }
 });
 

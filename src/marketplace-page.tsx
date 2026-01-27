@@ -328,13 +328,86 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           </div>
         </div>
         
+        <!-- Weekly Traction Metrics Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+          <div class="p-6 border-b border-gray-200">
+            <h3 class="font-bold text-gray-900 flex items-center gap-2">
+              <i class="fas fa-rocket text-pink-600"></i>
+              Weekly Traction Metrics
+            </h3>
+            <p class="text-sm text-gray-500 mt-1">Track your user types and revenue over time</p>
+          </div>
+          
+          <!-- Traction Summary Cards -->
+          <div class="p-6 grid grid-cols-2 md:grid-cols-5 gap-4 bg-gradient-to-br from-pink-50 to-purple-50">
+            <div class="bg-white p-4 rounded-lg border border-pink-100 text-center">
+              <p class="text-xs text-gray-500 uppercase mb-1">Revenue (4w)</p>
+              <p id="traction-summary-revenue" class="text-2xl font-bold text-pink-600">€0</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-green-100 text-center">
+              <p class="text-xs text-gray-500 uppercase mb-1">New Users (4w)</p>
+              <p id="traction-summary-new" class="text-2xl font-bold text-green-600">0</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-blue-100 text-center">
+              <p class="text-xs text-gray-500 uppercase mb-1">Active Users</p>
+              <p id="traction-summary-active" class="text-2xl font-bold text-blue-600">0</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-red-100 text-center">
+              <p class="text-xs text-gray-500 uppercase mb-1">Churned (4w)</p>
+              <p id="traction-summary-churned" class="text-2xl font-bold text-red-500">0</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-purple-100 text-center">
+              <p class="text-xs text-gray-500 uppercase mb-1">Net Growth</p>
+              <p id="traction-summary-net" class="text-2xl font-bold text-purple-600">0</p>
+            </div>
+          </div>
+          
+          <!-- Traction Charts -->
+          <div class="p-6 space-y-6">
+            <!-- User Types Chart -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <i class="fas fa-users"></i> User Types Breakdown (Last 12 Weeks)
+                <span class="ml-auto flex items-center gap-3 text-xs">
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 rounded-full"></span> New</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded-full"></span> Active</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded-full"></span> Churned</span>
+                </span>
+              </h4>
+              <div style="height: 280px; position: relative;">
+                <canvas id="dashboard-user-types-chart"></canvas>
+              </div>
+            </div>
+            
+            <!-- Net Growth & Revenue -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <i class="fas fa-chart-bar"></i> Net User Growth (New - Churned)
+                </h4>
+                <div style="height: 220px; position: relative;">
+                  <canvas id="dashboard-net-growth-chart"></canvas>
+                </div>
+              </div>
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <i class="fas fa-euro-sign"></i> Revenue Trend
+                </h4>
+                <div style="height: 220px; position: relative;">
+                  <canvas id="dashboard-revenue-trend-chart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 class="font-bold text-gray-900 mb-4">User Growth</h3>
+            <h3 class="font-bold text-gray-900 mb-4">User Growth (Global)</h3>
             <div class="h-64"><canvas id="chart-users"></canvas></div>
           </div>
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 class="font-bold text-gray-900 mb-4">Revenue Growth</h3>
+            <h3 class="font-bold text-gray-900 mb-4">Revenue Growth (Global)</h3>
             <div class="h-64"><canvas id="chart-revenue"></canvas></div>
           </div>
         </div>
@@ -1019,6 +1092,241 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <label class="text-xs font-medium text-gray-500 uppercase">Description</label>
             <p id="detail-description" class="text-gray-800 mt-1"></p>
           </div>
+          
+          <!-- Hypothesis-specific fields - only shown for hypothesis category -->
+          <div id="hypothesis-details" class="hidden space-y-4 bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-xl border border-purple-200">
+            <h4 class="font-semibold text-purple-800 flex items-center gap-2">
+              <i class="fas fa-flask"></i> Hypothesis Details
+            </h4>
+            <div class="grid grid-cols-1 gap-4">
+              <div class="bg-white p-3 rounded-lg border border-purple-100">
+                <label class="text-xs font-medium text-purple-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-chart-line text-xs"></i> Expected Behavior
+                </label>
+                <p id="detail-expected-behavior" class="text-gray-800 mt-1 text-sm"></p>
+              </div>
+              <div class="bg-white p-3 rounded-lg border border-purple-100">
+                <label class="text-xs font-medium text-purple-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-check-circle text-xs"></i> Validation Signal
+                </label>
+                <p id="detail-validation-signal" class="text-gray-800 mt-1 text-sm"></p>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="bg-white px-4 py-2 rounded-lg border border-purple-100 flex items-center gap-2">
+                  <label class="text-xs font-medium text-purple-600 uppercase">Status</label>
+                  <span id="detail-hypothesis-status" class="px-2 py-1 text-xs font-medium rounded-full"></span>
+                </div>
+                <div class="bg-white px-4 py-2 rounded-lg border border-purple-100 flex items-center gap-2">
+                  <label class="text-xs font-medium text-purple-600 uppercase">Week</label>
+                  <span id="detail-week-number" class="font-semibold text-sm"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Build-specific fields - only shown for build category -->
+          <div id="build-details" class="hidden space-y-4 bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-200">
+            <h4 class="font-semibold text-blue-800 flex items-center gap-2">
+              <i class="fas fa-hammer"></i> Build Details
+            </h4>
+            <div class="grid grid-cols-1 gap-4">
+              <div class="bg-white p-3 rounded-lg border border-blue-100">
+                <label class="text-xs font-medium text-blue-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-code text-xs"></i> Tech Stack
+                </label>
+                <p id="detail-tech-stack" class="text-gray-800 mt-1 text-sm"></p>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white p-3 rounded-lg border border-blue-100">
+                  <label class="text-xs font-medium text-blue-600 uppercase flex items-center gap-1">
+                    <i class="fas fa-clock text-xs"></i> Hours Spent
+                  </label>
+                  <p id="detail-hours-spent" class="text-gray-800 mt-1 text-sm font-semibold"></p>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-blue-100">
+                  <label class="text-xs font-medium text-blue-600 uppercase flex items-center gap-1">
+                    <i class="fas fa-flask text-xs"></i> Related Hypothesis
+                  </label>
+                  <p id="detail-hypothesis-link" class="text-gray-800 mt-1 text-sm"></p>
+                </div>
+              </div>
+              <div class="bg-white px-4 py-2 rounded-lg border border-blue-100 flex items-center gap-2">
+                <label class="text-xs font-medium text-blue-600 uppercase">Week</label>
+                <span id="detail-build-week-number" class="font-semibold text-sm"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- User Learning-specific fields - Wednesday -->
+          <div id="user-learning-details" class="hidden space-y-4 bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
+            <h4 class="font-semibold text-green-800 flex items-center gap-2">
+              <i class="fas fa-users"></i> User Conversations Details
+            </h4>
+            <div class="grid grid-cols-1 gap-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white p-3 rounded-lg border border-green-100">
+                  <label class="text-xs font-medium text-green-600 uppercase flex items-center gap-1">
+                    <i class="fas fa-comments text-xs"></i> Users Spoken To
+                  </label>
+                  <p id="detail-users-spoken" class="text-gray-800 mt-1 text-2xl font-bold"></p>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-green-100">
+                  <label class="text-xs font-medium text-green-600 uppercase flex items-center gap-1">
+                    <i class="fas fa-user-check text-xs"></i> Users Who Used Product
+                  </label>
+                  <p id="detail-users-used" class="text-gray-800 mt-1 text-2xl font-bold"></p>
+                </div>
+              </div>
+              <div class="bg-white p-3 rounded-lg border border-green-100">
+                <label class="text-xs font-medium text-green-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-info-circle text-xs"></i> Details
+                </label>
+                <p id="detail-users-details" class="text-gray-800 mt-1 text-sm"></p>
+              </div>
+              <div class="bg-white p-3 rounded-lg border border-green-100">
+                <label class="text-xs font-medium text-green-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-lightbulb text-xs"></i> Key Learning
+                </label>
+                <p id="detail-key-learning" class="text-gray-800 mt-1 text-sm"></p>
+              </div>
+              <div class="bg-white px-4 py-2 rounded-lg border border-green-100 flex items-center gap-2">
+                <label class="text-xs font-medium text-green-600 uppercase">Week</label>
+                <span id="detail-user-week-number" class="font-semibold text-sm"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Insight-specific fields - Thursday -->
+          <div id="insight-details" class="hidden space-y-4 bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-200">
+            <h4 class="font-semibold text-orange-800 flex items-center gap-2">
+              <i class="fas fa-chart-pie"></i> User Behavior Insights
+            </h4>
+            <div class="grid grid-cols-1 gap-4">
+              <div class="bg-white p-3 rounded-lg border border-orange-100">
+                <label class="text-xs font-medium text-orange-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-users text-xs"></i> Users Interacted
+                </label>
+                <p id="detail-users-interacted" class="text-gray-800 mt-1 text-2xl font-bold"></p>
+              </div>
+              <div class="bg-white p-3 rounded-lg border border-orange-100">
+                <label class="text-xs font-medium text-orange-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-redo text-xs"></i> Repeated Actions
+                </label>
+                <p id="detail-repeated-actions" class="text-gray-800 mt-1 text-sm"></p>
+              </div>
+              <div class="bg-white p-3 rounded-lg border border-orange-100">
+                <label class="text-xs font-medium text-orange-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-sign-out-alt text-xs"></i> Drop-off Points
+                </label>
+                <p id="detail-drop-off-points" class="text-gray-800 mt-1 text-sm"></p>
+              </div>
+              <div class="bg-white p-3 rounded-lg border border-orange-100">
+                <label class="text-xs font-medium text-orange-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-brain text-xs"></i> Key Insight
+                </label>
+                <p id="detail-key-insight" class="text-gray-800 mt-1 text-sm font-medium"></p>
+              </div>
+              <div class="bg-white px-4 py-2 rounded-lg border border-orange-100 flex items-center gap-2">
+                <label class="text-xs font-medium text-orange-600 uppercase">Week</label>
+                <span id="detail-insight-week-number" class="font-semibold text-sm"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Traction-specific fields - Friday -->
+          <div id="traction-details" class="hidden space-y-4 bg-gradient-to-br from-pink-50 to-rose-50 p-4 rounded-xl border border-pink-200">
+            <h4 class="font-semibold text-pink-800 flex items-center gap-2">
+              <i class="fas fa-rocket"></i> Weekly Traction Metrics
+            </h4>
+            <div class="grid grid-cols-1 gap-4">
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-3 rounded-lg border border-pink-100">
+                  <label class="text-xs font-medium text-pink-600 uppercase flex items-center gap-1">
+                    <i class="fas fa-dollar-sign text-xs"></i> Revenue
+                  </label>
+                  <p id="detail-revenue" class="text-gray-800 mt-1 text-2xl font-bold"></p>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-pink-100">
+                  <label class="text-xs font-medium text-pink-600 uppercase flex items-center gap-1">
+                    <i class="fas fa-user-plus text-xs"></i> New Users
+                  </label>
+                  <p id="detail-new-users" class="text-gray-800 mt-1 text-2xl font-bold"></p>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-pink-100">
+                  <label class="text-xs font-medium text-pink-600 uppercase flex items-center gap-1">
+                    <i class="fas fa-users text-xs"></i> Active
+                  </label>
+                  <p id="detail-active-users" class="text-gray-800 mt-1 text-2xl font-bold"></p>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-pink-100">
+                  <label class="text-xs font-medium text-pink-600 uppercase flex items-center gap-1">
+                    <i class="fas fa-user-minus text-xs"></i> Churned
+                  </label>
+                  <p id="detail-churned" class="text-gray-800 mt-1 text-2xl font-bold"></p>
+                </div>
+              </div>
+              
+              <!-- Traction Trend Charts -->
+              <div id="traction-charts-container" class="space-y-4">
+                <!-- User Types Overview Chart -->
+                <div class="bg-white p-4 rounded-lg border border-pink-100">
+                  <h5 class="text-sm font-semibold text-pink-800 mb-3 flex items-center gap-2">
+                    <i class="fas fa-users"></i> User Types Breakdown (Last 12 Weeks)
+                  </h5>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p class="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                        <span class="w-3 h-3 bg-green-500 rounded-full inline-block"></span> New Users
+                        <span class="w-3 h-3 bg-blue-500 rounded-full inline-block ml-2"></span> Active
+                        <span class="w-3 h-3 bg-red-500 rounded-full inline-block ml-2"></span> Churned
+                      </p>
+                      <div style="height: 220px; position: relative;">
+                        <canvas id="traction-user-types-chart"></canvas>
+                      </div>
+                    </div>
+                    <div>
+                      <p class="text-xs text-gray-500 mb-2">Net User Growth</p>
+                      <div style="height: 220px; position: relative;">
+                        <canvas id="traction-net-growth-chart"></canvas>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Revenue Trend -->
+                <div class="bg-white p-4 rounded-lg border border-pink-100">
+                  <h5 class="text-sm font-semibold text-pink-800 mb-3 flex items-center gap-2">
+                    <i class="fas fa-chart-line"></i> Revenue Trend (Last 12 Weeks)
+                  </h5>
+                  <div style="height: 200px; position: relative;">
+                    <canvas id="traction-revenue-chart"></canvas>
+                  </div>
+                </div>
+                
+                <!-- Detailed User Metrics -->
+                <div class="bg-white p-4 rounded-lg border border-pink-100">
+                  <h5 class="text-sm font-semibold text-pink-800 mb-3 flex items-center gap-2">
+                    <i class="fas fa-chart-bar"></i> Weekly User Metrics Comparison
+                  </h5>
+                  <div style="height: 220px; position: relative;">
+                    <canvas id="traction-acquisition-chart"></canvas>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="bg-white p-3 rounded-lg border border-pink-100">
+                <label class="text-xs font-medium text-pink-600 uppercase flex items-center gap-1">
+                  <i class="fas fa-bolt text-xs"></i> Strongest Traction Signal
+                </label>
+                <p id="detail-traction-signal" class="text-gray-800 mt-1 text-sm font-medium"></p>
+              </div>
+              <div class="bg-white px-4 py-2 rounded-lg border border-pink-100 flex items-center gap-2">
+                <label class="text-xs font-medium text-pink-600 uppercase">Week</label>
+                <span id="detail-traction-week-number" class="font-semibold text-sm"></span>
+              </div>
+            </div>
+          </div>
+          
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-gray-50 p-3 rounded-lg">
               <label class="text-xs font-medium text-gray-500 uppercase">Priority</label>
@@ -1162,6 +1470,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         if (tab === 'traction') {
           setTimeout(initCharts, 100);
           renderTeamTodoList();
+          loadDashboardTractionCharts();
         }
         if (tab === 'inbox') loadConversations();
         if (tab === 'directory') { loadProducts(); loadValidators(); }
@@ -3050,15 +3359,365 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         }
         document.getElementById('detail-schedule').innerHTML = scheduleHtml;
         
+        // Handle category-specific fields
+        const hypothesisDetails = document.getElementById('hypothesis-details');
+        const buildDetails = document.getElementById('build-details');
+        const userLearningDetails = document.getElementById('user-learning-details');
+        const insightDetails = document.getElementById('insight-details');
+        const tractionDetails = document.getElementById('traction-details');
+        
+        // Hide all detail sections first
+        hypothesisDetails.classList.add('hidden');
+        buildDetails.classList.add('hidden');
+        userLearningDetails.classList.add('hidden');
+        insightDetails.classList.add('hidden');
+        tractionDetails.classList.add('hidden');
+        
+        if (goal.category === 'hypothesis') {
+          hypothesisDetails.classList.remove('hidden');
+          
+          document.getElementById('detail-expected-behavior').textContent = goal.hypothesis_expected_behavior || 'Not specified';
+          document.getElementById('detail-validation-signal').textContent = goal.hypothesis_validation_signal || 'Not specified';
+          
+          // Hypothesis status badge
+          const statusColors = {
+            'testing': 'bg-yellow-100 text-yellow-800',
+            'validated': 'bg-green-100 text-green-800',
+            'invalidated': 'bg-red-100 text-red-800',
+            'paused': 'bg-gray-100 text-gray-600'
+          };
+          const statusEl = document.getElementById('detail-hypothesis-status');
+          statusEl.textContent = goal.hypothesis_status || 'testing';
+          statusEl.className = 'px-2 py-1 text-xs font-medium rounded-full ' + (statusColors[goal.hypothesis_status] || statusColors['testing']);
+          
+          document.getElementById('detail-week-number').textContent = goal.week_number ? 'Week ' + goal.week_number + ' / ' + goal.year_number : 'N/A';
+        } else if (goal.category === 'build') {
+          buildDetails.classList.remove('hidden');
+          
+          document.getElementById('detail-tech-stack').textContent = goal.build_tech_stack || 'Not specified';
+          document.getElementById('detail-hours-spent').textContent = goal.build_hours_spent ? goal.build_hours_spent + ' hours' : 'Not specified';
+          
+          // Link to hypothesis if exists
+          if (goal.build_hypothesis_id) {
+            const linkedHypothesis = allGoals.find(g => g.id === goal.build_hypothesis_id);
+            if (linkedHypothesis) {
+              document.getElementById('detail-hypothesis-link').innerHTML = \`<a href="#" onclick="event.preventDefault(); showGoalDetail(\${linkedHypothesis.id})" class="text-blue-600 hover:underline">#\${linkedHypothesis.id} - \${linkedHypothesis.description?.substring(0, 40) || 'View hypothesis'}...</a>\`;
+            } else {
+              document.getElementById('detail-hypothesis-link').textContent = 'Hypothesis #' + goal.build_hypothesis_id;
+            }
+          } else {
+            document.getElementById('detail-hypothesis-link').textContent = 'Not linked';
+          }
+          
+          document.getElementById('detail-build-week-number').textContent = goal.week_number ? 'Week ' + goal.week_number + ' / ' + goal.year_number : 'N/A';
+        } else if (goal.category === 'user_learning') {
+          userLearningDetails.classList.remove('hidden');
+          
+          document.getElementById('detail-users-spoken').textContent = goal.users_spoken || '0';
+          document.getElementById('detail-users-used').textContent = goal.users_used_product || '0';
+          document.getElementById('detail-users-details').textContent = goal.task || 'No details provided';
+          document.getElementById('detail-key-learning').textContent = goal.key_learning || 'Not specified';
+          document.getElementById('detail-user-week-number').textContent = goal.week_number ? 'Week ' + goal.week_number + ' / ' + goal.year_number : 'N/A';
+        } else if (goal.category === 'insight') {
+          insightDetails.classList.remove('hidden');
+          
+          document.getElementById('detail-users-interacted').textContent = goal.users_interacted || '0';
+          document.getElementById('detail-repeated-actions').textContent = goal.repeated_actions || 'Not specified';
+          document.getElementById('detail-drop-off-points').textContent = goal.drop_off_points || 'Not specified';
+          document.getElementById('detail-key-insight').textContent = goal.key_insight || 'Not specified';
+          document.getElementById('detail-insight-week-number').textContent = goal.week_number ? 'Week ' + goal.week_number + ' / ' + goal.year_number : 'N/A';
+        } else if (goal.category === 'traction') {
+          tractionDetails.classList.remove('hidden');
+          
+          // Display traction data - these come from goal_weekly_traction table via API join
+          document.getElementById('detail-revenue').textContent = goal.traction_revenue ? '€' + goal.traction_revenue : '€0';
+          document.getElementById('detail-new-users').textContent = goal.traction_new_users || '0';
+          document.getElementById('detail-active-users').textContent = goal.traction_active_users || '0';
+          document.getElementById('detail-churned').textContent = goal.traction_churned || '0';
+          document.getElementById('detail-traction-signal').textContent = goal.traction_signal || goal.description || 'No signal specified';
+          document.getElementById('detail-traction-week-number').textContent = goal.week_number ? 'Week ' + goal.week_number + ' / ' + goal.year_number : 'N/A';
+          
+          // Load historical traction data and render charts
+          loadTractionCharts(goal.user_id);
+        }
+        
         // Show modal
         document.getElementById('goal-detail-modal').classList.remove('hidden');
         document.getElementById('goal-detail-modal').classList.add('flex');
       };
       
+      // Traction charts instances
+      let tractionRevenueChart = null;
+      let tractionUserTypesChart = null;
+      let tractionNetGrowthChart = null;
+      let tractionAcquisitionChart = null;
+      
+      async function loadTractionCharts(userId) {
+        try {
+          const response = await fetch('/api/traction/metrics/' + userId + '?limit=12');
+          const data = await response.json();
+          
+          if (!data.metrics || data.metrics.length === 0) {
+            console.log('No traction data available for charts');
+            document.getElementById('traction-charts-container').innerHTML = '<div class="bg-gray-50 p-6 rounded-lg text-center text-gray-500"><i class="fas fa-chart-line text-3xl mb-2"></i><p>No historical data yet. Track your weekly traction to see trends!</p></div>';
+            return;
+          }
+          
+          // Sort by week (oldest first for charts)
+          const metrics = data.metrics.reverse();
+          
+          // Prepare data
+          const labels = metrics.map(m => \`W\${m.week_number}\`);
+          const revenueData = metrics.map(m => m.revenue_amount || 0);
+          const activeUsersData = metrics.map(m => m.active_users || 0);
+          const newUsersData = metrics.map(m => m.new_users || 0);
+          const churnedData = metrics.map(m => m.churned_users || 0);
+          const netGrowthData = metrics.map(m => (m.new_users || 0) - (m.churned_users || 0));
+          
+          // Destroy existing charts if they exist
+          if (tractionRevenueChart) tractionRevenueChart.destroy();
+          if (tractionUserTypesChart) tractionUserTypesChart.destroy();
+          if (tractionNetGrowthChart) tractionNetGrowthChart.destroy();
+          if (tractionAcquisitionChart) tractionAcquisitionChart.destroy();
+          
+          // 1. User Types Chart - Line chart with all 3 user types
+          const userTypesCtx = document.getElementById('traction-user-types-chart');
+          if (userTypesCtx) {
+            tractionUserTypesChart = new Chart(userTypesCtx, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [
+                  {
+                    label: 'New Users',
+                    data: newUsersData,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: false,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#10b981'
+                  },
+                  {
+                    label: 'Active Users',
+                    data: activeUsersData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: false,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#3b82f6'
+                  },
+                  {
+                    label: 'Churned',
+                    data: churnedData,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: false,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#ef4444'
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                  mode: 'index',
+                  intersect: false
+                },
+                plugins: {
+                  legend: { 
+                    display: true,
+                    position: 'bottom',
+                    labels: { usePointStyle: true, padding: 15 }
+                  }
+                },
+                scales: {
+                  y: { beginAtZero: true }
+                }
+              }
+            });
+          }
+          
+          // 2. Net Growth Chart - Bar chart showing net user change
+          const netGrowthCtx = document.getElementById('traction-net-growth-chart');
+          if (netGrowthCtx) {
+            tractionNetGrowthChart = new Chart(netGrowthCtx, {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'Net Growth (New - Churned)',
+                  data: netGrowthData,
+                  backgroundColor: netGrowthData.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)'),
+                  borderColor: netGrowthData.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+                  borderWidth: 2,
+                  borderRadius: 6
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const v = context.parsed.y;
+                        return v >= 0 ? '+' + v + ' users' : v + ' users';
+                      }
+                    }
+                  }
+                },
+                scales: {
+                  y: { 
+                    beginAtZero: false,
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                  }
+                }
+              }
+            });
+          }
+          
+          // 3. Revenue Chart
+          const revenueCtx = document.getElementById('traction-revenue-chart');
+          if (revenueCtx) {
+            tractionRevenueChart = new Chart(revenueCtx, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'Revenue (€)',
+                  data: revenueData,
+                  borderColor: '#ec4899',
+                  backgroundColor: 'rgba(236, 72, 153, 0.15)',
+                  fill: true,
+                  tension: 0.4,
+                  borderWidth: 3,
+                  pointRadius: 5,
+                  pointHoverRadius: 8,
+                  pointBackgroundColor: '#ec4899'
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        return '€' + context.parsed.y.toLocaleString();
+                      }
+                    }
+                  }
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      callback: function(value) {
+                        return '€' + value;
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+          
+          // 4. Weekly User Metrics Comparison (Grouped Bar)
+          const acquisitionCtx = document.getElementById('traction-acquisition-chart');
+          if (acquisitionCtx) {
+            tractionAcquisitionChart = new Chart(acquisitionCtx, {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [
+                  {
+                    label: '👥 New Users',
+                    data: newUsersData,
+                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                    borderColor: '#10b981',
+                    borderWidth: 1,
+                    borderRadius: 4
+                  },
+                  {
+                    label: '📱 Active Users',
+                    data: activeUsersData,
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                    borderColor: '#3b82f6',
+                    borderWidth: 1,
+                    borderRadius: 4
+                  },
+                  {
+                    label: '📉 Churned',
+                    data: churnedData,
+                    backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                    borderColor: '#ef4444',
+                    borderWidth: 1,
+                    borderRadius: 4
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { 
+                    display: true,
+                    position: 'top',
+                    labels: { padding: 15 }
+                  }
+                },
+                scales: {
+                  y: { 
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                  },
+                  x: {
+                    grid: { display: false }
+                  }
+                }
+              }
+            });
+          }
+          
+        } catch (error) {
+          console.error('Error loading traction charts:', error);
+        }
+      }
+      
       window.closeGoalDetailModal = function() {
         document.getElementById('goal-detail-modal').classList.add('hidden');
         document.getElementById('goal-detail-modal').classList.remove('flex');
         currentDetailGoalId = null;
+        
+        // Destroy charts when closing modal to prevent memory leaks
+        if (tractionRevenueChart) {
+          tractionRevenueChart.destroy();
+          tractionRevenueChart = null;
+        }
+        if (tractionUserTypesChart) {
+          tractionUserTypesChart.destroy();
+          tractionUserTypesChart = null;
+        }
+        if (tractionNetGrowthChart) {
+          tractionNetGrowthChart.destroy();
+          tractionNetGrowthChart = null;
+        }
+        if (tractionAcquisitionChart) {
+          tractionAcquisitionChart.destroy();
+          tractionAcquisitionChart = null;
+        }
       };
       
       window.editGoalFromDetail = function() {
@@ -3119,6 +3778,144 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             data: { labels: revM.map(m => new Date(m.recorded_date).toLocaleDateString()), datasets: [{ label: 'Revenue', data: revM.map(m => m.metric_value), backgroundColor: '#FB651E', borderRadius: 4 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
           });
+        }
+      }
+
+      // Dashboard Traction Charts
+      let dashboardUserTypesChart = null;
+      let dashboardNetGrowthChart = null;
+      let dashboardRevenueTrendChart = null;
+      
+      async function loadDashboardTractionCharts() {
+        try {
+          const currentUserId = getCurrentUserId();
+          if (!currentUserId) {
+            console.log('No user logged in for traction charts');
+            return;
+          }
+          const response = await fetch('/api/traction/metrics/' + currentUserId + '?limit=12');
+          const data = await response.json();
+          
+          // Update summary cards with totals
+          if (data.metrics && data.metrics.length > 0) {
+            const metrics = data.metrics;
+            const totalRevenue = metrics.reduce((sum, m) => sum + (m.revenue_amount || 0), 0);
+            const totalNew = metrics.reduce((sum, m) => sum + (m.new_users || 0), 0);
+            const totalChurned = metrics.reduce((sum, m) => sum + (m.churned_users || 0), 0);
+            const latestActive = metrics[0]?.active_users || 0;
+            const netGrowth = totalNew - totalChurned;
+            
+            document.getElementById('traction-summary-revenue').textContent = '€' + totalRevenue.toLocaleString();
+            document.getElementById('traction-summary-new').textContent = totalNew.toLocaleString();
+            document.getElementById('traction-summary-active').textContent = latestActive.toLocaleString();
+            document.getElementById('traction-summary-churned').textContent = totalChurned.toLocaleString();
+            document.getElementById('traction-summary-net').textContent = (netGrowth >= 0 ? '+' : '') + netGrowth.toLocaleString();
+            document.getElementById('traction-summary-net').className = 'text-2xl font-bold ' + (netGrowth >= 0 ? 'text-green-600' : 'text-red-600');
+          }
+          
+          if (!data.metrics || data.metrics.length === 0) {
+            // Show empty state
+            const chartContainers = ['dashboard-user-types-chart', 'dashboard-net-growth-chart', 'dashboard-revenue-trend-chart'];
+            chartContainers.forEach(id => {
+              const container = document.getElementById(id)?.parentElement;
+              if (container) {
+                container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><div class="text-center"><i class="fas fa-chart-line text-4xl mb-2"></i><p class="text-sm">No traction data yet</p><p class="text-xs">Track your weekly metrics to see trends</p></div></div>';
+              }
+            });
+            return;
+          }
+          
+          // Sort oldest first for charts
+          const metrics = data.metrics.reverse();
+          const labels = metrics.map(m => 'W' + m.week_number);
+          const newUsersData = metrics.map(m => m.new_users || 0);
+          const activeUsersData = metrics.map(m => m.active_users || 0);
+          const churnedData = metrics.map(m => m.churned_users || 0);
+          const revenueData = metrics.map(m => m.revenue_amount || 0);
+          const netGrowthData = metrics.map(m => (m.new_users || 0) - (m.churned_users || 0));
+          
+          // Destroy existing charts
+          if (dashboardUserTypesChart) dashboardUserTypesChart.destroy();
+          if (dashboardNetGrowthChart) dashboardNetGrowthChart.destroy();
+          if (dashboardRevenueTrendChart) dashboardRevenueTrendChart.destroy();
+          
+          // 1. User Types Chart
+          const userTypesCtx = document.getElementById('dashboard-user-types-chart');
+          if (userTypesCtx) {
+            dashboardUserTypesChart = new Chart(userTypesCtx, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [
+                  { label: 'New Users', data: newUsersData, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: false, tension: 0.4, borderWidth: 3, pointRadius: 5 },
+                  { label: 'Active Users', data: activeUsersData, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: false, tension: 0.4, borderWidth: 3, pointRadius: 5 },
+                  { label: 'Churned', data: churnedData, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: false, tension: 0.4, borderWidth: 3, pointRadius: 5 }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: true, position: 'bottom', labels: { usePointStyle: true, padding: 15 } } },
+                scales: { y: { beginAtZero: true } }
+              }
+            });
+          }
+          
+          // 2. Net Growth Chart
+          const netGrowthCtx = document.getElementById('dashboard-net-growth-chart');
+          if (netGrowthCtx) {
+            dashboardNetGrowthChart = new Chart(netGrowthCtx, {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'Net Growth',
+                  data: netGrowthData,
+                  backgroundColor: netGrowthData.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)'),
+                  borderColor: netGrowthData.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+                  borderWidth: 2,
+                  borderRadius: 6
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: false } }
+              }
+            });
+          }
+          
+          // 3. Revenue Trend Chart
+          const revenueCtx = document.getElementById('dashboard-revenue-trend-chart');
+          if (revenueCtx) {
+            dashboardRevenueTrendChart = new Chart(revenueCtx, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'Revenue (€)',
+                  data: revenueData,
+                  borderColor: '#ec4899',
+                  backgroundColor: 'rgba(236, 72, 153, 0.15)',
+                  fill: true,
+                  tension: 0.4,
+                  borderWidth: 3,
+                  pointRadius: 5
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '€' + ctx.parsed.y.toLocaleString() } } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => '€' + v } } }
+              }
+            });
+          }
+          
+        } catch (error) {
+          console.error('Error loading dashboard traction charts:', error);
         }
       }
 

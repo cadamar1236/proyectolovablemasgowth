@@ -9,7 +9,13 @@ import type { Bindings } from '../types';
 
 const notifications = new Hono<{ Bindings: Bindings }>();
 
-const JWT_SECRET = 'your-secret-key-change-in-production-use-env-var';
+// SECURITY: No hardcoded fallback - JWT_SECRET must be configured in environment
+function getJWTSecret(env: Bindings): string {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is not configured');
+  }
+  return env.JWT_SECRET;
+}
 
 // Middleware: Verify authentication
 async function requireAuth(c: any, next: any) {
@@ -21,7 +27,7 @@ async function requireAuth(c: any, next: any) {
     }
     
     const token = authHeader.substring(7);
-    const payload = await verify(token, JWT_SECRET) as any;
+    const payload = await verify(token, getJWTSecret(c.env)) as any;
     
     c.set('userId', payload.userId);
     c.set('userRole', payload.role);

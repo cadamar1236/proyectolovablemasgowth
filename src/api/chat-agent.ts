@@ -304,8 +304,8 @@ app.post('/message', jwtMiddleware, async (c) => {
     return c.json({ error: 'Invalid JSON' }, 400);
   }
   
-  let { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, goalData, emailContext } = requestBody;
-  console.log('[CHAT] Flags:', { useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, hasGoalData: !!goalData, emailContext });
+  let { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, goalData, emailContext, flowState } = requestBody;
+  console.log('[CHAT] Flags:', { useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, hasGoalData: !!goalData, emailContext, flowState });
 
   // ============ EMAIL CONTEXT HANDLING ============
   // Si viene desde un email con contexto, interceptar ANTES de validar el mensaje
@@ -318,50 +318,64 @@ app.post('/message', jwtMiddleware, async (c) => {
     
     switch(emailContext) {
       case 'hipotesis':
-        contextMessage = '💡 ¡Perfecto! Cuéntame: **¿Qué hipótesis quieres validar esta semana?**\n\n' +
-          'Ejemplos:\n' +
-          '• "Los usuarios necesitan [X característica]"\n' +
-          '• "Si cambio [Y], aumentarán las conversiones"\n' +
-          '• "El problema principal de mis usuarios es [Z]"\n\n' +
-          'Una vez me lo cuentes, lo registraré automáticamente como un objetivo para ti. 📝';
-        category = 'ASTAR';
+        contextMessage = '💡 **Monday Update — Ideas Day**\n\n' +
+          'Let me capture your hypothesis for this week!\n\n' +
+          '**Question 1 of 3:**\n' +
+          'What is your **#1 hypothesis** you will test this week?\n\n' +
+          '_Example: "If new users can complete onboarding in under 2 minutes, more of them will reach the first aha moment."_';
+        category = 'hypothesis';
         break;
         
       case 'construccion':
-        contextMessage = '🛠️ ¡Excelente! Cuéntame: **¿Qué estás construyendo esta semana?**\n\n' +
-          'Puedes contarme:\n' +
-          '• La nueva funcionalidad que estás desarrollando\n' +
-          '• El problema técnico que estás resolviendo\n' +
-          '• La mejora que estás implementando\n\n' +
-          'Lo registraré como un objetivo de construcción automáticamente. ⚙️';
-        category = 'ASTAR';
+        contextMessage = '🛠️ **Tuesday Update — Build Day**\n\n' +
+          'Let me capture your build progress!\n\n' +
+          '**Question 1 of 4:**\n' +
+          'What did you **build today**?\n_(Feature, flow, or experiment — be specific)_\n\n' +
+          '_Example: "Built a basic onboarding flow that lets users create their first project."_';
+        category = 'build';
+        break;
+        
+      case 'usuarios':
+        contextMessage = '💬 **Wednesday Update — User Learning Day**\n\n' +
+          'Let me capture your user conversations!\n\n' +
+          '**Question 1 of 3:**\n' +
+          'How many users did you **speak with today**?\n_(Conversations, interviews, or live feedback sessions)_\n\n' +
+          '_Example: "6 users (4 live calls, 2 async chats)"_';
+        category = 'user_learning';
         break;
         
       case 'metricas':
-        contextMessage = '📊 ¡Genial! Cuéntame: **¿Qué números tienes esta semana?**\n\n' +
-          'Puedes compartir:\n' +
-          '• "Tengo X usuarios activos"\n' +
-          '• "Generé $Y en revenue"\n' +
-          '• "Alcancé Z conversiones"\n\n' +
-          'Registraré tus métricas automáticamente. 📈';
-        category = 'metrics';
+        contextMessage = '📊 **Thursday Update — Measurement & Insights**\n\n' +
+          'Let me capture your user behavior insights!\n\n' +
+          '**Question 1 of 4:**\n' +
+          'How many users **interacted with your product today**?\n_(Any meaningful usage)_\n\n' +
+          '_Example: "9 users total"_';
+        category = 'insight';
+        break;
+        
+      case 'traction':
+        contextMessage = '📈 **Friday Update — Traction Metrics**\n\n' +
+          'Let me capture your weekly traction!\n\n' +
+          '**Question 1 of 5:**\n' +
+          'How much **revenue** did you generate this week? (€)\n_(Cash collected or committed)_\n\n' +
+          '_Example: "€420 (7 users × €60)"_';
+        category = 'traction';
         break;
         
       case 'reflexion':
-        contextMessage = '🤔 ¡Perfecto! Es momento de reflexionar: **¿Qué aprendiste esta semana?**\n\n' +
-          'Comparte:\n' +
-          '• Qué funcionó bien\n' +
-          '• Qué no funcionó como esperabas\n' +
-          '• Qué harás diferente la próxima semana\n\n' +
-          'Registraré tus aprendizajes como objetivos de mejora. 💭';
-        category = 'ASTAR';
+        contextMessage = '🧘 **Weekend Reflection**\n\n' +
+          'Share any final thoughts from the week:\n\n' +
+          '• What feedback did you close?\n' +
+          '• What signal leaves you most confident (or worried)?\n\n' +
+          '_This is optional — feel free to skip!_';
+        category = 'reflect';
         break;
         
       default:
-        contextMessage = '👋 ¡Hola! ¿En qué puedo ayudarte hoy?';
+        contextMessage = '👋 Hi! How can I help you today?';
     }
     
-    // Guardar mensaje del sistema con contexto
+    // Guardar mensaje del sistema con contexto y estado del flujo
     await c.env.DB.prepare(`
       INSERT INTO agent_chat_messages (user_id, role, content, created_at)
       VALUES (?, 'assistant', ?, datetime('now'))
@@ -371,6 +385,7 @@ app.post('/message', jwtMiddleware, async (c) => {
       message: contextMessage,
       emailContext: emailContext,
       category: category,
+      flowState: 'question_1', // Track where we are in the flow
       waitingForUserResponse: true
     });
   }
@@ -402,7 +417,7 @@ app.post('/message', jwtMiddleware, async (c) => {
   // Si el usuario está respondiendo a una pregunta de contexto de email
   if (emailContext && message?.trim()) {
     console.log('[CHAT] ========== PROCESSING EMAIL CONTEXT RESPONSE ==========');
-    console.log('[CHAT] Context:', emailContext, 'Message:', message);
+    console.log('[CHAT] Context:', emailContext, 'Message:', message, 'FlowState:', flowState);
     
     const db = c.env.DB;
     
@@ -414,163 +429,632 @@ app.post('/message', jwtMiddleware, async (c) => {
     
     try {
       let responseMessage = '';
+      let nextFlowState = '';
       let goalCreated = false;
       
       switch(emailContext) {
         case 'hipotesis': {
-          // Crear goal automáticamente con la hipótesis
-          const result = await db.prepare(`
-            INSERT INTO goals (
-              user_id, category, description, task, priority, priority_label, 
-              cadence, dri, goal_status, week_of, status, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
-          `).bind(
-            user.userId,
-            'ASTAR',
-            message, // La hipótesis del usuario
-            'Validar hipótesis',
-            'P1',
-            'High Priority',
-            'One time',
-            null,
-            'To start',
-            null
-          ).run();
-          
-          goalCreated = true;
-          responseMessage = '✅ ¡Perfecto! He registrado tu hipótesis:\n\n' +
-            '💡 "' + message + '"\n\n' +
-            '📋 Lo puedes ver en tu dashboard en la sección de Objetivos.\n' +
-            '🎯 ID del objetivo: ' + result.meta?.last_row_id + '\n\n' +
-            '¿Hay algo más en lo que pueda ayudarte?';
+          // Monday - Ideas Day: 3 questions flow
+          if (!flowState || flowState === 'question_1') {
+            // User answered Q1: What is your #1 hypothesis?
+            // Store temporarily and ask Q2
+            await db.prepare(`
+              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
+              VALUES (?, 'system', ?, ?, datetime('now'))
+            `).bind(user.userId, 'temp_hypothesis', JSON.stringify({ hypothesis: message })).run();
+            
+            responseMessage = '✅ Got it!\n\n' +
+              '💡 **Hypothesis:** "' + message + '"\n\n' +
+              '---\n\n' +
+              '**Question 2 of 3:**\n' +
+              'What **user behavior** do you expect to see if this hypothesis is correct?\n\n' +
+              '_Example: "At least 50% of new users complete onboarding and interact with the core feature within their first session."_';
+            nextFlowState = 'question_2';
+          } else if (flowState === 'question_2') {
+            // User answered Q2: Expected behavior
+            // Get stored hypothesis, add behavior, ask Q3
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_hypothesis'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const hypothesisData = storedData ? JSON.parse(storedData.metadata) : {};
+            hypothesisData.expected_behavior = message;
+            
+            await db.prepare(`
+              UPDATE agent_chat_messages 
+              SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_hypothesis'
+            `).bind(JSON.stringify(hypothesisData), user.userId).run();
+            
+            responseMessage = '✅ Perfect!\n\n' +
+              '📊 **Expected behavior:** "' + message + '"\n\n' +
+              '---\n\n' +
+              '**Question 3 of 3:**\n' +
+              'How will you know the hypothesis is **validated**? (specific signal)\n\n' +
+              '_Example: "6 out of 10 new users complete onboarding and trigger the core action within 24 hours."_';
+            nextFlowState = 'question_3';
+          } else if (flowState === 'question_3') {
+            // User answered Q3: Validation signal
+            // Get all stored data and create the hypothesis goal
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_hypothesis'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const hypothesisData = storedData ? JSON.parse(storedData.metadata) : {};
+            
+            // Get current week number
+            const now = new Date();
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+            
+            // Create the hypothesis goal with all new fields
+            const result = await db.prepare(`
+              INSERT INTO goals (
+                user_id, category, description, task, 
+                hypothesis_expected_behavior, hypothesis_validation_signal, hypothesis_status,
+                priority, priority_label, cadence, goal_status, 
+                week_number, year_number, status, created_at
+              )
+              VALUES (?, 'hypothesis', ?, 'Validate hypothesis', ?, ?, 'testing', 'P1', 'Urgent & important', 'Recurrent', 'To start', ?, ?, 'active', CURRENT_TIMESTAMP)
+            `).bind(
+              user.userId,
+              hypothesisData.hypothesis || message,
+              hypothesisData.expected_behavior || '',
+              message, // validation signal
+              weekNumber,
+              now.getFullYear()
+            ).run();
+            
+            // Clean up temp data
+            await db.prepare(`
+              DELETE FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_hypothesis'
+            `).bind(user.userId).run();
+            
+            goalCreated = true;
+            responseMessage = '🎉 **Monday Update Complete!**\n\n' +
+              '---\n\n' +
+              '💡 **Hypothesis:**\n"' + hypothesisData.hypothesis + '"\n\n' +
+              '📊 **Expected behavior:**\n"' + hypothesisData.expected_behavior + '"\n\n' +
+              '✅ **Validation signal:**\n"' + message + '"\n\n' +
+              '---\n\n' +
+              '📋 Saved to your Goals with category **hypothesis**\n' +
+              '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
+              'Good luck validating this week! 🚀';
+            nextFlowState = 'complete';
+          }
           break;
         }
         
         case 'construccion': {
-          // Crear goal de construcción
-          const result = await db.prepare(`
-            INSERT INTO goals (
-              user_id, category, description, task, priority, priority_label, 
-              cadence, dri, goal_status, week_of, status, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
-          `).bind(
-            user.userId,
-            'ASTAR',
-            message,
-            'Construcción/Desarrollo',
-            'P1',
-            'High Priority',
-            'One time',
-            null,
-            'To start',
-            null
-          ).run();
-          
-          goalCreated = true;
-          responseMessage = '✅ ¡Excelente! He registrado tu tarea de construcción:\n\n' +
-            '🛠️ "' + message + '"\n\n' +
-            '📋 Lo puedes ver en tu dashboard.\n' +
-            '🎯 ID del objetivo: ' + result.meta?.last_row_id + '\n\n' +
-            '¿Necesitas ayuda con algo más?';
+          // Tuesday - Build Day: 4 questions flow
+          if (!flowState || flowState === 'question_1') {
+            await db.prepare(`
+              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
+              VALUES (?, 'system', ?, ?, datetime('now'))
+            `).bind(user.userId, 'temp_build', JSON.stringify({ build_description: message })).run();
+            
+            responseMessage = '✅ Great!\n\n' +
+              '🛠️ **Build:** "' + message + '"\n\n' +
+              '---\n\n' +
+              '**Question 2 of 4:**\n' +
+              'What **tech stack or tools** did you use?\n_(Frameworks, no-code tools, APIs, AI models, etc.)_\n\n' +
+              '_Example: "Frontend: Next.js + Tailwind | Backend: Firebase | AI: OpenAI API"_';
+            nextFlowState = 'question_2';
+          } else if (flowState === 'question_2') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const buildData = storedData ? JSON.parse(storedData.metadata) : {};
+            buildData.tech_stack = message;
+            
+            await db.prepare(`
+              UPDATE agent_chat_messages SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
+            `).bind(JSON.stringify(buildData), user.userId).run();
+            
+            responseMessage = '✅ Nice stack!\n\n' +
+              '⚙️ **Tech:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 3 of 4:**\n' +
+              'How **long** did it take you to build this?\n_(Approximate hours)_\n\n' +
+              '_Example: "~3.5 hours"_';
+            nextFlowState = 'question_3';
+          } else if (flowState === 'question_3') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const buildData = storedData ? JSON.parse(storedData.metadata) : {};
+            // Extract number from hours
+            const hoursMatch = message.match(/(\d+(?:\.\d+)?)/);
+            buildData.hours_spent = hoursMatch ? parseFloat(hoursMatch[1]) : 0;
+            
+            await db.prepare(`
+              UPDATE agent_chat_messages SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
+            `).bind(JSON.stringify(buildData), user.userId).run();
+            
+            responseMessage = '✅ Tracked!\n\n' +
+              '⏱️ **Time:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 4 of 4:**\n' +
+              'Which **hypothesis** is this build testing?\n_(Link it to your Monday hypothesis)_\n\n' +
+              '_Example: "Testing if users can generate a useful output in their first session to increase activation."_';
+            nextFlowState = 'question_4';
+          } else if (flowState === 'question_4') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const buildData = storedData ? JSON.parse(storedData.metadata) : {};
+            
+            const now = new Date();
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+            
+            const result = await db.prepare(`
+              INSERT INTO goals (
+                user_id, category, description, task,
+                build_tech_stack, build_hours_spent,
+                priority, priority_label, cadence, goal_status,
+                week_number, year_number, status, created_at
+              )
+              VALUES (?, 'build', ?, ?, ?, ?, 'P1', 'Urgent & important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
+            `).bind(
+              user.userId,
+              buildData.build_description || '',
+              'Build: ' + message, // hypothesis it tests
+              buildData.tech_stack || '',
+              buildData.hours_spent || 0,
+              weekNumber,
+              now.getFullYear()
+            ).run();
+            
+            await db.prepare(`
+              DELETE FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
+            `).bind(user.userId).run();
+            
+            goalCreated = true;
+            responseMessage = '🎉 **Tuesday Update Complete!**\n\n' +
+              '---\n\n' +
+              '🛠️ **Built:** "' + buildData.build_description + '"\n\n' +
+              '⚙️ **Tech stack:** ' + buildData.tech_stack + '\n\n' +
+              '⏱️ **Time spent:** ' + buildData.hours_spent + ' hours\n\n' +
+              '💡 **Testing hypothesis:** "' + message + '"\n\n' +
+              '---\n\n' +
+              '📋 Saved to your Goals with category **build**\n' +
+              '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
+              'Great progress! Keep building! 🚀';
+            nextFlowState = 'complete';
+          }
+          break;
+        }
+        
+        case 'usuarios': {
+          // Wednesday - User Learning: 3 questions
+          if (!flowState || flowState === 'question_1') {
+            const usersMatch = message.match(/(\d+)/);
+            await db.prepare(`
+              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
+              VALUES (?, 'system', ?, ?, datetime('now'))
+            `).bind(user.userId, 'temp_users', JSON.stringify({ users_spoken: usersMatch ? parseInt(usersMatch[1]) : 0 })).run();
+            
+            responseMessage = '✅ Great!\n\n' +
+              '💬 **Users spoken:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 2 of 3:**\n' +
+              'How many of them **actually used the product**?\n_(Touched the product, not just gave opinions)_\n\n' +
+              '_Example: "4 users completed the core flow, 2 dropped off during onboarding"_';
+            nextFlowState = 'question_2';
+          } else if (flowState === 'question_2') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_users'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const userData = storedData ? JSON.parse(storedData.metadata) : {};
+            const usersMatch = message.match(/(\d+)/);
+            userData.users_used_product = usersMatch ? parseInt(usersMatch[1]) : 0;
+            userData.users_detail = message;
+            
+            await db.prepare(`
+              UPDATE agent_chat_messages SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_users'
+            `).bind(JSON.stringify(userData), user.userId).run();
+            
+            responseMessage = '✅ Noted!\n\n' +
+              '📱 **Used product:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 3 of 3:**\n' +
+              'What was the **single most important thing** you learned today?\n_(One sentence only)_\n\n' +
+              '_Example: "Users understand the value only after seeing a real example, not from the landing page."_';
+            nextFlowState = 'question_3';
+          } else if (flowState === 'question_3') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_users'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const userData = storedData ? JSON.parse(storedData.metadata) : {};
+            
+            const now = new Date();
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+            
+            // Build comprehensive description
+            const description = `User Learning Week ${weekNumber}: Spoke with ${userData.users_spoken || 0} users, ${userData.users_used_product || 0} used the product. ${userData.users_detail || 'Details in task field.'}`;
+            
+            const result = await db.prepare(`
+              INSERT INTO goals (
+                user_id, category, description, task,
+                users_spoken, users_used_product, key_learning,
+                priority, priority_label, cadence, goal_status,
+                week_number, year_number, status, created_at
+              )
+              VALUES (?, 'user_learning', ?, ?, ?, ?, ?, 'P1', 'Urgent & important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
+            `).bind(
+              user.userId,
+              description,
+              userData.users_detail || 'User conversations and product usage details',
+              userData.users_spoken || 0,
+              userData.users_used_product || 0,
+              message, // key learning
+              weekNumber,
+              now.getFullYear()
+            ).run();
+            
+            await db.prepare(`
+              DELETE FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_users'
+            `).bind(user.userId).run();
+            
+            goalCreated = true;
+            responseMessage = '🎉 **Wednesday Update Complete!**\n\n' +
+              '---\n\n' +
+              '💬 **Users spoken:** ' + userData.users_spoken + '\n\n' +
+              '📱 **Used product:** ' + (userData.users_detail || userData.users_used_product) + '\n\n' +
+              '💡 **Key learning:**\n"' + message + '"\n\n' +
+              '---\n\n' +
+              '📋 Saved to your Goals with category **user_learning**\n' +
+              '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
+              'Great insights! Keep talking to users! 🚀';
+            nextFlowState = 'complete';
+          }
           break;
         }
         
         case 'metricas': {
-          // Extraer números del mensaje y crear métricas
-          // Buscar patrones como "X usuarios", "$Y revenue", "Z conversiones"
-          const userMatch = message.match(/(\d+)\s*(usuarios|users|user)/i);
-          const revenueMatch = message.match(/\$?(\d+(?:\.\d+)?)\s*(revenue|ingresos|dollars?|usd)/i);
-          const conversionMatch = message.match(/(\d+(?:\.\d+)?)\s*(conversiones|conversions?)/i);
-          
-          const metrics = [];
-          if (userMatch) {
+          // Thursday - Measurement & Insights: 4 questions
+          if (!flowState || flowState === 'question_1') {
+            const usersMatch = message.match(/(\d+)/);
             await db.prepare(`
-              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-              VALUES (?, 'users', ?, date('now'))
-            `).bind(user.userId, parseInt(userMatch[1])).run();
-            metrics.push('👥 ' + userMatch[1] + ' usuarios');
-          }
-          
-          if (revenueMatch) {
+              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
+              VALUES (?, 'system', ?, ?, datetime('now'))
+            `).bind(user.userId, 'temp_insights', JSON.stringify({ users_interacted: usersMatch ? parseInt(usersMatch[1]) : 0 })).run();
+            
+            responseMessage = '✅ Got it!\n\n' +
+              '📊 **Users interacted:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 2 of 4:**\n' +
+              'What actions did users **repeat most often**?\n_(Core behaviors, not edge cases)_\n\n' +
+              '_Example: "6 users generated a second output within the same session, 3 users returned later the same day"_';
+            nextFlowState = 'question_2';
+          } else if (flowState === 'question_2') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const insightData = storedData ? JSON.parse(storedData.metadata) : {};
+            insightData.repeated_actions = message;
+            
             await db.prepare(`
-              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-              VALUES (?, 'revenue', ?, date('now'))
-            `).bind(user.userId, parseFloat(revenueMatch[1])).run();
-            metrics.push('💰 $' + revenueMatch[1] + ' revenue');
-          }
-          
-          if (conversionMatch) {
+              UPDATE agent_chat_messages SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
+            `).bind(JSON.stringify(insightData), user.userId).run();
+            
+            responseMessage = '✅ Interesting patterns!\n\n' +
+              '🔄 **Repeated actions:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 3 of 4:**\n' +
+              'Where did users **get stuck, drop off, or ask for help**?\n\n' +
+              '_Example: "Most users hesitated on the pricing screen, 2 users didn\'t understand what to do after the first result"_';
+            nextFlowState = 'question_3';
+          } else if (flowState === 'question_3') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const insightData = storedData ? JSON.parse(storedData.metadata) : {};
+            insightData.drop_off_points = message;
+            
             await db.prepare(`
-              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-              VALUES (?, 'conversions', ?, date('now'))
-            `).bind(user.userId, parseFloat(conversionMatch[1])).run();
-            metrics.push('📈 ' + conversionMatch[1] + ' conversiones');
-          }
-          
-          if (metrics.length > 0) {
-            responseMessage = '✅ ¡Genial! He registrado tus métricas:\n\n' +
-              metrics.join('\n') + '\n\n' +
-              '📊 Puedes verlas en tu timeline de métricas.\n\n' +
-              '¿Algo más que quieras registrar?';
-          } else {
-            // Si no se detectaron métricas, crear un goal con la información
+              UPDATE agent_chat_messages SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
+            `).bind(JSON.stringify(insightData), user.userId).run();
+            
+            responseMessage = '✅ Important friction points!\n\n' +
+              '⚠️ **Drop-off points:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 4 of 4:**\n' +
+              'What **insight** does this reveal about your product?\n_(One sentence only)_\n\n' +
+              '_Example: "The core feature is valuable, but the next step is unclear after first success."_';
+            nextFlowState = 'question_4';
+          } else if (flowState === 'question_4') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const insightData = storedData ? JSON.parse(storedData.metadata) : {};
+            
+            const now = new Date();
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+            
             const result = await db.prepare(`
               INSERT INTO goals (
-                user_id, category, description, task, priority, priority_label, 
-                cadence, dri, goal_status, week_of, status, created_at
+                user_id, category, description, task,
+                users_interacted, repeated_actions, drop_off_points, key_insight,
+                priority, priority_label, cadence, goal_status,
+                week_number, year_number, status, created_at
               )
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+              VALUES (?, 'insight', ?, 'User behavior insights', ?, ?, ?, ?, 'P1', 'Urgent & important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
             `).bind(
               user.userId,
-              'ASTAR',
+              message, // key insight as description
+              insightData.users_interacted || 0,
+              insightData.repeated_actions || '',
+              insightData.drop_off_points || '',
               message,
-              'Actualización de métricas',
-              'P2',
-              'Medium Priority',
-              'One time',
-              null,
-              'To start',
-              null
+              weekNumber,
+              now.getFullYear()
             ).run();
             
+            await db.prepare(`
+              DELETE FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
+            `).bind(user.userId).run();
+            
             goalCreated = true;
-            responseMessage = '✅ He registrado tu actualización:\n\n' +
-              '📊 "' + message + '"\n\n' +
-              '💡 Tip: Para registrar métricas automáticamente, menciona números específicos como "100 usuarios" o "$500 revenue".\n\n' +
-              '¿Necesitas algo más?';
+            responseMessage = '🎉 **Thursday Update Complete!**\n\n' +
+              '---\n\n' +
+              '📊 **Users interacted:** ' + insightData.users_interacted + '\n\n' +
+              '🔄 **Repeated actions:** ' + insightData.repeated_actions + '\n\n' +
+              '⚠️ **Drop-off points:** ' + insightData.drop_off_points + '\n\n' +
+              '💡 **Key insight:**\n"' + message + '"\n\n' +
+              '---\n\n' +
+              '📋 Saved to your Goals with category **insight**\n' +
+              '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
+              'Great analysis! Use these insights tomorrow! 🚀';
+            nextFlowState = 'complete';
+          }
+          break;
+        }
+        
+        case 'traction': {
+          // Friday - Traction Metrics: 5 questions
+          if (!flowState || flowState === 'question_1') {
+            const revenueMatch = message.match(/[€$]?(\d+(?:[.,]\d+)?)/);
+            await db.prepare(`
+              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
+              VALUES (?, 'system', ?, ?, datetime('now'))
+            `).bind(user.userId, 'temp_traction', JSON.stringify({ revenue: revenueMatch ? parseFloat(revenueMatch[1].replace(',', '.')) : 0 })).run();
+            
+            responseMessage = '✅ Tracked!\n\n' +
+              '💰 **Revenue:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 2 of 5:**\n' +
+              'How many **new users** did you acquire this week?\n\n' +
+              '_Example: "18 new users"_';
+            nextFlowState = 'question_2';
+          } else if (flowState === 'question_2') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const tractionData = storedData ? JSON.parse(storedData.metadata) : {};
+            const usersMatch = message.match(/(\d+)/);
+            tractionData.new_users = usersMatch ? parseInt(usersMatch[1]) : 0;
+            
+            await db.prepare(`
+              UPDATE agent_chat_messages SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
+            `).bind(JSON.stringify(tractionData), user.userId).run();
+            
+            responseMessage = '✅ Great!\n\n' +
+              '👥 **New users:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 3 of 5:**\n' +
+              'How many users were **active** this week?\n_(Used the product at least once)_\n\n' +
+              '_Example: "12 users used the product at least once"_';
+            nextFlowState = 'question_3';
+          } else if (flowState === 'question_3') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const tractionData = storedData ? JSON.parse(storedData.metadata) : {};
+            const usersMatch = message.match(/(\d+)/);
+            tractionData.active_users = usersMatch ? parseInt(usersMatch[1]) : 0;
+            
+            await db.prepare(`
+              UPDATE agent_chat_messages SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
+            `).bind(JSON.stringify(tractionData), user.userId).run();
+            
+            responseMessage = '✅ Noted!\n\n' +
+              '📱 **Active users:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 4 of 5:**\n' +
+              'How many users **churned** this week?\n_(Stopped using the product or explicitly dropped off)_\n\n' +
+              '_Example: "3 users stopped using the product"_';
+            nextFlowState = 'question_4';
+          } else if (flowState === 'question_4') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const tractionData = storedData ? JSON.parse(storedData.metadata) : {};
+            const usersMatch = message.match(/(\d+)/);
+            tractionData.churned_users = usersMatch ? parseInt(usersMatch[1]) : 0;
+            
+            await db.prepare(`
+              UPDATE agent_chat_messages SET metadata = ?
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
+            `).bind(JSON.stringify(tractionData), user.userId).run();
+            
+            responseMessage = '✅ Important metric!\n\n' +
+              '📉 **Churned:** ' + message + '\n\n' +
+              '---\n\n' +
+              '**Question 5 of 5:**\n' +
+              'What was the **strongest traction signal** this week?\n_(One sentence only)_\n\n' +
+              '_Example: "Two users upgraded without being prompted after their first successful use"_';
+            nextFlowState = 'question_5';
+          } else if (flowState === 'question_5') {
+            const storedData = await db.prepare(`
+              SELECT metadata FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
+              ORDER BY created_at DESC LIMIT 1
+            `).bind(user.userId).first() as { metadata: string } | null;
+            
+            const tractionData = storedData ? JSON.parse(storedData.metadata) : {};
+            
+            const now = new Date();
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+            
+            // Save to goal_weekly_traction table
+            const result = await db.prepare(`
+              INSERT OR REPLACE INTO goal_weekly_traction (
+                user_id, revenue_amount, new_users, active_users, churned_users, strongest_signal,
+                week_number, year, created_at
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            `).bind(
+              user.userId,
+              tractionData.revenue || 0,
+              tractionData.new_users || 0,
+              tractionData.active_users || 0,
+              tractionData.churned_users || 0,
+              message,
+              weekNumber,
+              now.getFullYear()
+            ).run();
+            
+            // Sync with global user_metrics for leaderboard consistency
+            const today = now.toISOString().split('T')[0];
+            
+            // Update active users in user_metrics
+            await db.prepare(`
+              DELETE FROM user_metrics WHERE user_id = ? AND metric_name = 'users' AND recorded_date = ?
+            `).bind(user.userId, today).run();
+            await db.prepare(`
+              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+              VALUES (?, 'users', ?, ?)
+            `).bind(user.userId, tractionData.active_users || 0, today).run();
+            
+            // Update revenue in user_metrics
+            await db.prepare(`
+              DELETE FROM user_metrics WHERE user_id = ? AND metric_name = 'revenue' AND recorded_date = ?
+            `).bind(user.userId, today).run();
+            await db.prepare(`
+              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
+              VALUES (?, 'revenue', ?, ?)
+            `).bind(user.userId, tractionData.revenue || 0, today).run();
+            
+            // Also create a goal for tracking
+            await db.prepare(`
+              INSERT INTO goals (
+                user_id, category, description, task,
+                priority, priority_label, cadence, goal_status,
+                week_number, year_number, status, created_at
+              )
+              VALUES (?, 'traction', ?, 'Weekly traction metrics', 'P1', 'Urgent & important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
+            `).bind(
+              user.userId,
+              message, // strongest signal as description
+              weekNumber,
+              now.getFullYear()
+            ).run();
+            
+            await db.prepare(`
+              DELETE FROM agent_chat_messages 
+              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
+            `).bind(user.userId).run();
+            
+            goalCreated = true;
+            responseMessage = '🎉 **Friday Update Complete!**\n\n' +
+              '---\n\n' +
+              '💰 **Revenue:** €' + tractionData.revenue + '\n\n' +
+              '👥 **New users:** ' + tractionData.new_users + '\n\n' +
+              '📱 **Active users:** ' + tractionData.active_users + '\n\n' +
+              '📉 **Churned:** ' + tractionData.churned_users + '\n\n' +
+              '🚀 **Strongest signal:**\n"' + message + '"\n\n' +
+              '---\n\n' +
+              '📋 Saved to **weekly traction** metrics\n' +
+              '📊 This data will be used for the Weekly Leaderboard!\n\n' +
+              'Great week! See you on the leaderboard! 🏆';
+            nextFlowState = 'complete';
           }
           break;
         }
         
         case 'reflexion': {
-          // Crear goal con los aprendizajes
+          // Saturday - Weekly reflection: simple save
+          const now = new Date();
+          const startOfYear = new Date(now.getFullYear(), 0, 1);
+          const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+          
           const result = await db.prepare(`
             INSERT INTO goals (
-              user_id, category, description, task, priority, priority_label, 
-              cadence, dri, goal_status, week_of, status, created_at
+              user_id, category, description, task,
+              priority, priority_label, cadence, goal_status,
+              week_number, year_number, status, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+            VALUES (?, 'reflect', ?, 'Weekly reflection', 'P2', 'Urgent or important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
           `).bind(
             user.userId,
-            'ASTAR',
             message,
-            'Aprendizaje/Reflexión',
-            'P2',
-            'Medium Priority',
-            'One time',
-            null,
-            'To start',
-            null
+            weekNumber,
+            now.getFullYear()
           ).run();
           
           goalCreated = true;
-          responseMessage = '✅ ¡Excelente reflexión! He registrado tus aprendizajes:\n\n' +
-            '🤔 "' + message + '"\n\n' +
-            '📋 Lo puedes revisar en tu dashboard.\n' +
-            '🎯 ID: ' + result.meta?.last_row_id + '\n\n' +
-            '¿Hay algo más que quieras compartir?';
+          responseMessage = '🎉 **Reflection Saved!**\n\n' +
+            '---\n\n' +
+            '🤔 **Your insight:**\n"' + message + '"\n\n' +
+            '---\n\n' +
+            '📋 Saved with category **reflect**\n' +
+            '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
+            '📊 Week ' + weekNumber + ' reflection complete!\n\n' +
+            'Have a restful weekend and come back strong on Monday! 💪';
+          nextFlowState = 'complete';
           break;
         }
       }
@@ -584,7 +1068,9 @@ app.post('/message', jwtMiddleware, async (c) => {
       return c.json({ 
         message: responseMessage,
         goalCreated: goalCreated,
-        emailContextProcessed: true
+        emailContextProcessed: true,
+        flowState: nextFlowState,
+        emailContext: emailContext
       });
       
     } catch (error) {

@@ -53,8 +53,10 @@ const jwtMiddleware = async (c: any, next: any) => {
   }
 
   try {
-    const secret = c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var';
-    const payload = await verify(authToken, secret);
+    if (!c.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is not configured');
+    }
+    const payload = await verify(authToken, c.env.JWT_SECRET);
     console.log('[AI-CMO] JWT payload:', JSON.stringify(payload));
     
     const userId = payload.id || payload.userId || payload.sub || payload.user_id;
