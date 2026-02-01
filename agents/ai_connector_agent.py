@@ -108,14 +108,32 @@ class AIConnectorTeam:
     ) -> List[Dict[str, Any]]:
         """
         Find the best matches for a user based on criteria
-        Uses AI to score and explain matches
+        Uses AI to score and explain matches, with proper type filtering
         """
         if not potential_matches:
             return []
         
-        # Build prompt for AI matching
+        # First, filter by type if specified to reduce OpenAI processing
+        target_type = search_criteria.get('target_type', '').lower()
+        if target_type:
+            print(f"🔍 Pre-filtering for type: {target_type}")
+            filtered_matches = self._simple_matching(current_user, potential_matches, search_criteria)
+            
+            if len(filtered_matches) == 0:
+                print(f"❌ No users of type '{target_type}' found after filtering")
+                return []
+            
+            print(f"✅ Pre-filtered to {len(filtered_matches)} users of type '{target_type}'")
+            # Use filtered matches for OpenAI analysis
+            matches_for_ai = filtered_matches[:20]  # Limit to 20 for OpenAI
+        else:
+            matches_for_ai = potential_matches[:20]
+        
+        # Build prompt for AI matching with explicit instruction to preserve user_type
         prompt = f"""
 Analyze these potential connections for the current user and rank them by relevance.
+
+CRITICAL: You MUST preserve the exact 'user_type' field from each user in your response.
 
 CURRENT USER:
 - Type: {current_user.get('user_type', 'entrepreneur')}
@@ -128,14 +146,17 @@ SEARCH CRITERIA:
 {json.dumps(search_criteria, indent=2)}
 
 POTENTIAL MATCHES:
-{json.dumps(potential_matches[:20], indent=2, default=str)}
+{json.dumps(matches_for_ai, indent=2, default=str)}
 
 For each match, provide:
-1. A relevance score (0-100)
-2. A brief explanation of why they're a good match (in Spanish)
-3. Suggested conversation starters
+1. id - the user ID (required)
+2. name - the user name (required)
+3. user_type - EXACT user_type from the input data (required)
+4. score - relevance score 0-100 (required)
+5. reason - brief explanation in Spanish (required)
+6. conversation_starters - array of 2-3 suggestions (required)
 
-Return as JSON array with fields: id, name, score, reason, conversation_starters
+Return ONLY a JSON array with these exact fields.
 Only include matches with score >= 50.
 Sort by score descending.
 """
@@ -144,7 +165,7 @@ Sort by score descending.
             response = openai.chat.completions.create(
                 model=self.config.openai_model,
                 messages=[
-                    {"role": "system", "content": "You are a networking expert. Analyze profiles and find the best matches. Respond in JSON format only."},
+                    {"role": "system", "content": "You are a networking expert. Analyze profiles and find the best matches. Respond in JSON format only. ALWAYS preserve the user_type field exactly as provided."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
@@ -158,12 +179,40 @@ Sort by score descending.
             elif "```" in result_text:
                 result_text = result_text.split("```")[1].split("```")[0]
             
-            matches = json.loads(result_text.strip())
-            return matches
+            ai_matches = json.loads(result_text.strip())
+            
+            # Enrich AI matches with full user data from original matches
+            enriched_matches = []
+            for ai_match in ai_matches:
+                # Find original user data
+                user_id = ai_match.get('id')
+                original_user = next((u for u in matches_for_ai if u.get('id') == user_id), None)
+                
+                if original_user:
+                    # Merge AI analysis with original user data
+                    enriched_match = {
+                        "id": user_id,
+                        "name": ai_match.get('name', original_user.get('name')),
+                        "user_type": original_user.get('user_type'),  # Always use original
+                        "score": ai_match.get('score', 50),
+                        "reason": ai_match.get('reason', 'Perfil relevante'),
+                        "conversation_starters": ai_match.get('conversation_starters', []),
+                        "industry": original_user.get('industry'),
+                        "stage": original_user.get('stage'),
+                        "country": original_user.get('country'),
+                        "avatar_url": original_user.get('avatar_url'),
+                        "bio": original_user.get('bio', ''),
+                        "ai_detected": original_user.get('ai_detected', False)
+                    }
+                    enriched_matches.append(enriched_match)
+                    print(f"  ✅ Enriched match: {enriched_match['name']} (type={enriched_match['user_type']})")
+            
+            return enriched_matches
             
         except Exception as e:
-            print(f"Error finding matches: {e}")
-            # Fallback: simple matching by industry
+            print(f"❌ Error with OpenAI matching: {e}")
+            print(f"🔄 Falling back to _simple_matching")
+            # Fallback: simple matching
             return self._simple_matching(current_user, potential_matches, search_criteria)
     
     def _analyze_user_type_with_ai(self, user: Dict[str, Any]) -> str:
