@@ -59,6 +59,7 @@ dashboard.get('/goals', requireAuth, async (c) => {
         SELECT 
           g.id, g.user_id, g.description, g.status, g.target_value, g.current_value, 
           g.deadline, g.category, g.task, g.priority, g.priority_label, g.cadence, g.dri, 
+          g.assigned_to_user_id, g.priority_order,
           g.goal_status, g.day_mon, g.day_tue, g.day_wed, g.day_thu, g.day_fri, g.day_sat, g.day_sun,
           g.week_1, g.week_2, g.week_3, g.week_4, g.week_5,
           g.scheduled_dates,
@@ -72,22 +73,27 @@ dashboard.get('/goals', requireAuth, async (c) => {
           gwt.strongest_signal as traction_signal,
           g.week_of, g.order_index, g.created_at, g.updated_at,
           u.name as creator_name,
-          u.avatar_url as creator_avatar
+          u.avatar_url as creator_avatar,
+          assigned_user.name as assigned_user_name,
+          assigned_user.email as assigned_user_email,
+          assigned_user.avatar_url as assigned_user_avatar
         FROM goals g
         INNER JOIN startup_team_members stm ON g.user_id = stm.user_id
         LEFT JOIN users u ON g.user_id = u.id
+        LEFT JOIN users assigned_user ON g.assigned_to_user_id = assigned_user.id
         LEFT JOIN goal_weekly_traction gwt ON g.week_number = gwt.week_number 
                                            AND g.year_number = gwt.year 
                                            AND g.user_id = gwt.user_id
                                            AND g.category = 'traction'
         WHERE stm.team_id = ?
-        ORDER BY g.order_index ASC, g.priority ASC, g.created_at DESC
+        ORDER BY g.priority_order ASC, g.order_index ASC, g.priority ASC, g.created_at DESC
       `).bind(teamMembership.team_id).all();
     } else {
       // Fallback to user's own goals if not in a team
       results = await c.env.DB.prepare(`
         SELECT g.id, g.user_id, g.description, g.status, g.target_value, g.current_value, 
                g.deadline, g.category, g.task, g.priority, g.priority_label, g.cadence, g.dri, 
+               g.assigned_to_user_id, g.priority_order,
                g.goal_status, g.day_mon, g.day_tue, g.day_wed, g.day_thu, g.day_fri, g.day_sat, g.day_sun,
                g.scheduled_dates,
                g.hypothesis_expected_behavior, g.hypothesis_validation_signal, g.hypothesis_status,
@@ -98,14 +104,18 @@ dashboard.get('/goals', requireAuth, async (c) => {
                gwt.revenue_amount as traction_revenue, gwt.new_users as traction_new_users,
                gwt.active_users as traction_active_users, gwt.churned_users as traction_churned,
                gwt.strongest_signal as traction_signal,
-               g.week_of, g.order_index, g.created_at, g.updated_at
+               g.week_of, g.order_index, g.created_at, g.updated_at,
+               assigned_user.name as assigned_user_name,
+               assigned_user.email as assigned_user_email,
+               assigned_user.avatar_url as assigned_user_avatar
         FROM goals g
+        LEFT JOIN users assigned_user ON g.assigned_to_user_id = assigned_user.id
         LEFT JOIN goal_weekly_traction gwt ON g.week_number = gwt.week_number 
                                            AND g.year_number = gwt.year 
                                            AND g.user_id = gwt.user_id
                                            AND g.category = 'traction'
         WHERE g.user_id = ? 
-        ORDER BY g.order_index ASC, g.priority ASC, g.created_at DESC
+        ORDER BY g.priority_order ASC, g.order_index ASC, g.priority ASC, g.created_at DESC
       `).bind(userId).all();
     }
 
@@ -172,6 +182,7 @@ dashboard.post('/goals', requireAuth, async (c) => {
     priority_label,
     cadence,
     dri,
+    assigned_to_user_id,
     goal_status,
     week_of,
     order_index
@@ -182,13 +193,35 @@ dashboard.post('/goals', requireAuth, async (c) => {
   }
 
   try {
+    // If assigned_to_user_id is provided, validate that this user is in the same team
+    if (assigned_to_user_id) {
+      const teamMembership = await c.env.DB.prepare(`
+        SELECT team_id
+        FROM startup_team_members
+        WHERE user_id = ?
+        LIMIT 1
+      `).bind(userId).first();
+
+      if (teamMembership) {
+        const assignedUserInTeam = await c.env.DB.prepare(`
+          SELECT user_id
+          FROM startup_team_members
+          WHERE team_id = ? AND user_id = ?
+        `).bind(teamMembership.team_id, assigned_to_user_id).first();
+
+        if (!assignedUserInTeam) {
+          return c.json({ error: 'Assigned user is not in your team' }, 400);
+        }
+      }
+    }
+
     const result = await c.env.DB.prepare(`
       INSERT INTO goals (
         user_id, description, target_value, current_value, deadline, category, 
-        task, priority, priority_label, cadence, dri, goal_status, week_of, 
-        order_index, status
+        task, priority, priority_label, cadence, dri, assigned_to_user_id, 
+        goal_status, week_of, order_index, status
       ) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active') 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active') 
       RETURNING *
     `).bind(
       userId, 
@@ -196,12 +229,13 @@ dashboard.post('/goals', requireAuth, async (c) => {
       target_value || 100, 
       current_value || 0, 
       deadline || null, 
-      category || 'ASTAR',
+      category || 'Build',
       task || description.trim(),
       priority || 'P0',
       priority_label || 'Urgent & important',
       cadence || 'One time',
-      dri,
+      dri || null,
+      assigned_to_user_id || null,
       goal_status || 'To start',
       week_of || null,
       order_index || 0
@@ -238,6 +272,7 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
     priority_label,
     cadence,
     dri,
+    assigned_to_user_id,
     goal_status,
     day_mon,
     day_tue,
@@ -258,6 +293,28 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
   } = body;
 
   try {
+    // If assigned_to_user_id is being updated, validate that this user is in the same team
+    if (assigned_to_user_id !== undefined) {
+      const teamMembership = await c.env.DB.prepare(`
+        SELECT team_id
+        FROM startup_team_members
+        WHERE user_id = ?
+        LIMIT 1
+      `).bind(userId).first();
+
+      if (teamMembership && assigned_to_user_id !== null) {
+        const assignedUserInTeam = await c.env.DB.prepare(`
+          SELECT user_id
+          FROM startup_team_members
+          WHERE team_id = ? AND user_id = ?
+        `).bind(teamMembership.team_id, assigned_to_user_id).first();
+
+        if (!assignedUserInTeam) {
+          return c.json({ error: 'Assigned user is not in your team' }, 400);
+        }
+      }
+    }
+
     // Build dynamic update query
     const updates: string[] = [];
     const values: any[] = [];
@@ -297,6 +354,10 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
     if (dri !== undefined) {
       updates.push('dri = ?');
       values.push(dri);
+    }
+    if (assigned_to_user_id !== undefined) {
+      updates.push('assigned_to_user_id = ?');
+      values.push(assigned_to_user_id);
     }
     if (goal_status !== undefined) {
       updates.push('goal_status = ?');
@@ -596,6 +657,140 @@ dashboard.delete('/metrics/:id', requireAuth, async (c) => {
   } catch (error) {
     console.error('Error deleting metric:', error);
     return c.json({ error: 'Failed to delete metric' }, 500);
+  }
+});
+
+// ============================================
+// GOAL DAILY COMPLETION API
+// ============================================
+
+// Get daily completion status for a goal
+dashboard.get('/goals/:id/daily-completion', requireAuth, async (c) => {
+  const goalId = c.req.param('id');
+
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT completion_date, is_completed, completed_at
+      FROM goal_daily_completion
+      WHERE goal_id = ?
+      ORDER BY completion_date ASC
+    `).bind(goalId).all();
+
+    return c.json({ dailyCompletion: results || [] });
+  } catch (error) {
+    console.error('Error fetching daily completion:', error);
+    return c.json({ dailyCompletion: [] });
+  }
+});
+
+// Toggle daily completion status for a specific date
+dashboard.post('/goals/:id/daily-completion', requireAuth, async (c) => {
+  const goalId = c.req.param('id');
+  const { completion_date } = await c.req.json();
+
+  if (!completion_date) {
+    return c.json({ error: 'completion_date is required' }, 400);
+  }
+
+  try {
+    // Check current status
+    const current = await c.env.DB.prepare(`
+      SELECT is_completed FROM goal_daily_completion
+      WHERE goal_id = ? AND completion_date = ?
+    `).bind(goalId, completion_date).first();
+
+    if (current) {
+      // Toggle existing status
+      const newStatus = current.is_completed === 1 ? 0 : 1;
+      await c.env.DB.prepare(`
+        UPDATE goal_daily_completion
+        SET is_completed = ?, 
+            completed_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE goal_id = ? AND completion_date = ?
+      `).bind(newStatus, newStatus, goalId, completion_date).run();
+
+      return c.json({ success: true, is_completed: newStatus === 1 });
+    } else {
+      // Create new record (mark as completed)
+      await c.env.DB.prepare(`
+        INSERT INTO goal_daily_completion (goal_id, completion_date, is_completed, completed_at)
+        VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+      `).bind(goalId, completion_date).run();
+
+      return c.json({ success: true, is_completed: true });
+    }
+  } catch (error) {
+    console.error('Error toggling daily completion:', error);
+    return c.json({ error: 'Failed to update daily completion' }, 500);
+  }
+});
+
+// Update priority order for a goal
+dashboard.put('/goals/:id/priority-order', requireAuth, async (c) => {
+  const goalId = c.req.param('id');
+  const { priority_order } = await c.req.json();
+
+  if (priority_order === undefined) {
+    return c.json({ error: 'priority_order is required' }, 400);
+  }
+
+  try {
+    await c.env.DB.prepare(`
+      UPDATE goals
+      SET priority_order = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(priority_order, goalId).run();
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error updating priority order:', error);
+    return c.json({ error: 'Failed to update priority order' }, 500);
+  }
+});
+
+// ============================================
+// TEAM MEMBERS API
+// ============================================
+
+// Get team members for goal assignment
+dashboard.get('/team-members', requireAuth, async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    // Get user's team
+    const teamMembership = await c.env.DB.prepare(`
+      SELECT team_id
+      FROM startup_team_members
+      WHERE user_id = ?
+      ORDER BY is_creator DESC, joined_at ASC
+      LIMIT 1
+    `).bind(userId).first();
+
+    if (!teamMembership || !teamMembership.team_id) {
+      return c.json({ teamMembers: [] });
+    }
+
+    // Get all team members
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        u.id as user_id,
+        u.name,
+        u.email,
+        u.avatar_url,
+        stm.role,
+        stm.is_creator
+      FROM startup_team_members stm
+      INNER JOIN users u ON stm.user_id = u.id
+      WHERE stm.team_id = ?
+      ORDER BY stm.is_creator DESC, u.name ASC
+    `).bind(teamMembership.team_id).all();
+
+    console.log('[TEAM-MEMBERS] Found', results?.length || 0, 'team members for team', teamMembership.team_id);
+    return c.json({ teamMembers: results || [] });
+  } catch (error) {
+    console.error('Error fetching team members:', error);
+    return c.json({ teamMembers: [] });
   }
 });
 

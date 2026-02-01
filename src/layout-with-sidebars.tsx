@@ -131,12 +131,12 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 
         // Goal questions for bootstrap flow handling
         var bootstrapGoalQuestions = [
-            { field: 'category', question: 'What category does this goal belong to?', options: ['ASTAR', 'MAGCIENT', 'OTHER'] },
+            { field: 'category', question: 'What category does this goal belong to?', options: ['Build', 'Test', 'Traction'] },
             { field: 'description', question: 'Describe the goal briefly (What do you want to achieve?)', type: 'text' },
             { field: 'task', question: 'What is the specific task to achieve this goal? (Optional - press Enter to skip)', type: 'text', optional: true },
             { field: 'priority', question: 'What priority does this goal have?', options: ['P0', 'P1', 'P2', 'P3'] },
             { field: 'cadence', question: 'Is this a one-time or recurring goal?', options: ['One time', 'Recurrent'] },
-            { field: 'dri', question: 'Who is the Directly Responsible Individual (DRI)? (Optional - press Enter to skip)', type: 'text', optional: true },
+            { field: 'assigned_to', question: 'Who should be assigned to this task?', type: 'team_member', optional: true },
             { field: 'goal_status', question: 'What is the current status of this goal?', options: ['To start', 'WIP', 'On Hold', 'Delayed', 'Blocked', 'Done'] },
             { field: 'week_of', question: 'For which week is this goal? (Optional - Example: "January 6")', type: 'text', optional: true }
         ];
@@ -219,7 +219,25 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
           var currentQuestion = bootstrapGoalQuestions[currentStep];
           
           if (currentQuestion) {
-            window.goalCreationFlow.data[currentQuestion.field] = answer;
+            // Handle team_member type - save user_id instead of name
+            if (currentQuestion.type === 'team_member') {
+              var teamMembers = window.currentTeamMembers || [];
+              var selectedMember = teamMembers.find(function(m) {
+                return (m.name || m.email) === answer;
+              });
+              
+              if (selectedMember) {
+                window.goalCreationFlow.data[currentQuestion.field] = selectedMember.user_id;
+                console.log('[BOOTSTRAP] Saved team member user_id:', selectedMember.user_id);
+              } else if (answer === 'Skip (No assignment)') {
+                window.goalCreationFlow.data[currentQuestion.field] = null;
+                console.log('[BOOTSTRAP] No team member assigned');
+              } else {
+                window.goalCreationFlow.data[currentQuestion.field] = answer;
+              }
+            } else {
+              window.goalCreationFlow.data[currentQuestion.field] = answer;
+            }
           }
           
           // Move to next step
@@ -231,13 +249,64 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             var nextQuestion = bootstrapGoalQuestions[window.goalCreationFlow.step];
             bootstrapAddMessageToChat('assistant', nextQuestion.question);
             
-            if (nextQuestion.options) {
+            // Check if this question needs team members options
+            if (nextQuestion.type === 'team_member') {
+              console.log('[BOOTSTRAP] Loading team members for assignment...');
+              bootstrapLoadTeamMembers();
+            } else if (nextQuestion.options) {
               bootstrapShowQuickOptions(nextQuestion.options);
             }
           } else {
             // All questions answered - submit goal
             bootstrapCompleteGoalCreation();
           }
+        }
+
+        function bootstrapLoadTeamMembers() {
+          var authToken = bootstrapGetAuthToken();
+          var headers = { 'Content-Type': 'application/json' };
+          if (authToken) {
+            headers['Authorization'] = 'Bearer ' + authToken;
+          }
+          
+          fetch('/api/dashboard/team-members', {
+            credentials: 'include',
+            headers: headers
+          })
+          .then(function(response) {
+            if (!response.ok) {
+              console.error('[BOOTSTRAP] Failed to load team members, status:', response.status);
+              bootstrapShowQuickOptions(['Skip (No assignment)']);
+              return null;
+            }
+            return response.json();
+          })
+          .then(function(data) {
+            if (!data) return;
+            
+            var teamMembers = data.teamMembers || [];
+            if (teamMembers.length === 0) {
+              console.log('[BOOTSTRAP] No team members found');
+              bootstrapShowQuickOptions(['Skip (No assignment)']);
+              return;
+            }
+            
+            // Create options with member names and IDs
+            var options = teamMembers.map(function(member) {
+              return member.name || member.email;
+            });
+            options.push('Skip (No assignment)');
+            
+            // Store team members for later use
+            window.currentTeamMembers = teamMembers;
+            
+            console.log('[BOOTSTRAP] Showing', teamMembers.length, 'team members');
+            bootstrapShowQuickOptions(options);
+          })
+          .catch(function(error) {
+            console.error('[BOOTSTRAP] Error loading team members:', error);
+            bootstrapShowQuickOptions(['Skip (No assignment)']);
+          });
         }
 
         function bootstrapCompleteGoalCreation() {
@@ -258,12 +327,12 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             headers: headers,
             credentials: 'include',
             body: JSON.stringify({
-              category: goalData.category || 'OTHER',
+              category: goalData.category || 'Build',
               description: goalData.description || '',
               task: goalData.task || '',
               priority: goalData.priority || 'P2',
               cadence: goalData.cadence || 'One time',
-              dri: goalData.dri || '',
+              assigned_to_user_id: goalData.assigned_to || null,
               goal_status: goalData.goal_status || 'To start',
               week_of: goalData.week_of || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
             })
@@ -685,7 +754,7 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         <div class="max-w-full mx-auto px-6 py-3">
             <div class="flex justify-between items-center">
                 <div class="flex items-center space-x-2">
-                    <span class="text-xl font-bold text-white">ASTAR*</span>
+                    <span class="text-xl font-bold text-white">ASTAR</span>
                     <span class="text-gray-400 text-xs hidden sm:inline">Hub</span>
                 </div>
                 
@@ -1532,10 +1601,10 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
         // (goalCreationFlow is already defined at the top of the script)
 
         const goalQuestions = [
-            { 
+            {
                 field: 'category', 
-                question: 'What category does this goal belong to? (ASTAR: Blockchain/ASTAR related projects | MAGCIENT: AI/Machine Learning projects | OTHER: Other projects)', 
-                options: ['ASTAR', 'MAGCIENT', 'OTHER'] 
+                question: 'What category does this goal belong to? (Build: Building features | Test: Testing hypotheses | Traction: Growth & metrics)', 
+                options: ['Build', 'Test', 'Traction']
             },
             { 
                 field: 'description', 
@@ -1559,9 +1628,9 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 options: ['One time', 'Recurrent'] 
             },
             { 
-                field: 'dri', 
-                question: 'Who is the Directly Responsible Individual (DRI)? Enter the name of the responsible person.', 
-                type: 'text',
+                field: 'assigned_to', 
+                question: 'Who should be assigned to this task? Select a team member.', 
+                type: 'team_member',
                 optional: true 
             },
             { 
@@ -1638,7 +1707,27 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
             
             const currentQuestion = goalQuestions[goalCreationFlow.step];
             console.log('[GOAL-FLOW] Current question field:', currentQuestion.field);
-            goalCreationFlow.data[currentQuestion.field] = value;
+            
+            // Handle team_member type - save user_id instead of name
+            if (currentQuestion.type === 'team_member') {
+                const teamMembers = window.currentTeamMembers || [];
+                const selectedMember = teamMembers.find(m => 
+                    (m.name || m.email) === value
+                );
+                
+                if (selectedMember) {
+                    goalCreationFlow.data[currentQuestion.field] = selectedMember.user_id;
+                    console.log('[GOAL-FLOW] Saved team member user_id:', selectedMember.user_id);
+                } else if (value === 'Skip (No assignment)') {
+                    goalCreationFlow.data[currentQuestion.field] = null;
+                    console.log('[GOAL-FLOW] No team member assigned');
+                } else {
+                    goalCreationFlow.data[currentQuestion.field] = value;
+                }
+            } else {
+                goalCreationFlow.data[currentQuestion.field] = value;
+            }
+            
             console.log('[GOAL-FLOW] Updated data:', JSON.stringify(goalCreationFlow.data));
             
             goalCreationFlow.step++;
@@ -1650,13 +1739,57 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 console.log('[GOAL-FLOW] Next question:', nextQuestion.question);
                 addMessageToChat('assistant', nextQuestion.question);
                 
-                if (nextQuestion.options) {
+                // Check if this question needs team members options
+                if (nextQuestion.type === 'team_member') {
+                    console.log('[GOAL-FLOW] Loading team members for assignment...');
+                    await loadTeamMembersForGoalFlow();
+                } else if (nextQuestion.options) {
                     console.log('[GOAL-FLOW] Showing options:', nextQuestion.options);
                     showQuickReplyOptions(nextQuestion.options);
                 }
             } else {
                 console.log('[GOAL-FLOW] All questions answered, completing goal creation');
                 await completeGoalCreation();
+            }
+        }
+
+        // Function to load and show team members as options
+        async function loadTeamMembersForGoalFlow() {
+            try {
+                const response = await fetch('/api/dashboard/team-members', {
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    console.error('[TEAM-MEMBERS] Failed to load team members');
+                    showQuickReplyOptions(['Skip (No assignment)']);
+                    return;
+                }
+                
+                const data = await response.json();
+                const teamMembers = data.teamMembers || [];
+                
+                if (teamMembers.length === 0) {
+                    console.log('[TEAM-MEMBERS] No team members found');
+                    showQuickReplyOptions(['Skip (No assignment)']);
+                    return;
+                }
+                
+                // Create options with member names and IDs
+                const options = teamMembers.map(member => member.name || member.email);
+                options.push('Skip (No assignment)');
+                
+                // Store team members for later use
+                window.currentTeamMembers = teamMembers;
+                
+                console.log('[TEAM-MEMBERS] Showing', teamMembers.length, 'team members');
+                showQuickReplyOptions(options);
+            } catch (error) {
+                console.error('[TEAM-MEMBERS] Error loading team members:', error);
+                showQuickReplyOptions(['Skip (No assignment)']);
             }
         }
 
@@ -1712,7 +1845,27 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                     input.value = '';
                     
                     const currentQuestion = goalQuestions[goalCreationFlow.step];
-                    goalCreationFlow.data[currentQuestion.field] = message;
+                    
+                    // Handle team_member type - check if message matches a team member
+                    if (currentQuestion.type === 'team_member') {
+                        const teamMembers = window.currentTeamMembers || [];
+                        const selectedMember = teamMembers.find(m => 
+                            (m.name || m.email) === message
+                        );
+                        
+                        if (selectedMember) {
+                            goalCreationFlow.data[currentQuestion.field] = selectedMember.user_id;
+                            console.log('[CHAT] Saved team member user_id:', selectedMember.user_id);
+                        } else if (message === 'Skip (No assignment)') {
+                            goalCreationFlow.data[currentQuestion.field] = null;
+                            console.log('[CHAT] No team member assigned');
+                        } else {
+                            goalCreationFlow.data[currentQuestion.field] = message;
+                        }
+                    } else {
+                        goalCreationFlow.data[currentQuestion.field] = message;
+                    }
+                    
                     console.log('[CHAT] Saved answer for field:', currentQuestion.field);
                     
                     goalCreationFlow.step++;
@@ -1723,7 +1876,11 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                         console.log('[CHAT] Asking next question for field:', nextQuestion.field);
                         addMessageToChat('assistant', nextQuestion.question);
                         
-                        if (nextQuestion.options) {
+                        // Check if this question needs team members options
+                        if (nextQuestion.type === 'team_member') {
+                            console.log('[CHAT] Loading team members for assignment...');
+                            await loadTeamMembersForGoalFlow();
+                        } else if (nextQuestion.options) {
                             showQuickReplyOptions(nextQuestion.options);
                         }
                     } else {
@@ -1816,13 +1973,13 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 console.log('[GOAL-FLOW] Using category from user selection:', goalCreationFlow.data.category);
                 
                 const goalData = {
-                    category: goalCreationFlow.data.category || 'ASTAR',
+                    category: goalCreationFlow.data.category || 'Build',
                     description: goalCreationFlow.data.description,
                     task: goalCreationFlow.data.task || null,
                     priority: goalCreationFlow.data.priority,
                     priority_label: priorityLabels[goalCreationFlow.data.priority],
                     cadence: goalCreationFlow.data.cadence,
-                    dri: goalCreationFlow.data.dri || null,
+                    assigned_to_user_id: goalCreationFlow.data.assigned_to || null,
                     goal_status: goalCreationFlow.data.goal_status,
                     week_of: goalCreationFlow.data.week_of || null
                 };

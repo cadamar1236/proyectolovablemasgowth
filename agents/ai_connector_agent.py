@@ -173,48 +173,180 @@ Sort by score descending.
         search_criteria: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
-        Simple fallback matching based on basic criteria
+        Enhanced matching based on multiple criteria with weighted scoring
         """
-        matches = []
-        user_industry = current_user.get('industry', '').lower()
-        user_type = search_criteria.get('target_type', 'entrepreneur')
+        # DEBUG: Log user types available
+        user_types_count = {}
+        for u in potential_matches:
+            utype = (u.get('user_type') or 'unknown').lower()
+            user_types_count[utype] = user_types_count.get(utype, 0) + 1
+        print(f"🔍 Available user types: {user_types_count}")
         
-        for match in potential_matches[:10]:
+        matches = []
+        user_industry = (current_user.get('industry') or '').lower()
+        user_stage = (current_user.get('stage') or '').lower()
+        user_location = (current_user.get('country') or '').lower()
+        target_type = search_criteria.get('target_type', 'entrepreneur')
+        
+        print(f"🎯 Looking for: {target_type}")
+        
+        search_industry = search_criteria.get('industry', '').lower()
+        search_stage = search_criteria.get('stage', '').lower()
+        search_location = search_criteria.get('location', '').lower()
+        keywords = search_criteria.get('keywords', [])
+        
+        for match in potential_matches:
             if match.get('id') == current_user.get('id'):
                 continue
             
-            score = 50  # Base score
+            # CRITICAL: Filter by user_type first (mandatory filter)
+            match_type = (match.get('user_type') or '').lower()
+            if not match_type:
+                continue  # Skip users without type
+            
+            # If searching for specific type, ONLY show that type
+            if target_type and match_type != target_type.lower():
+                continue  # Skip if not the requested type
+            
+            # DEBUG: Log match that passes filter
+            print(f"  ✓ Match passed filter: {match.get('name')} is {match_type} (looking for {target_type})")
+            
+            score = 0
             reasons = []
+            match_name = match.get('name') or match.get('full_name') or 'Usuario'
             
-            # Industry match
+            # User type match (35 points - already matched above)
+            score += 35
+            type_labels = {
+                'entrepreneur': 'emprendedor',
+                'investor': 'inversor',
+                'validator': 'validador',
+                'partner': 'partner',
+                'mentor': 'mentor'
+            }
+            reasons.append(f"✓ Es {type_labels.get(match_type, match_type)}")
+            
+            # Industry match (30 points max)
             match_industry = (match.get('industry') or '').lower()
-            if user_industry and match_industry and user_industry in match_industry:
+            if search_industry and match_industry:
+                if search_industry in match_industry or match_industry in search_industry:
+                    score += 30
+                    reasons.append(f"🎯 Industria: {match.get('industry')}")
+                elif user_industry and (user_industry in match_industry or match_industry in user_industry):
+                    score += 20
+                    reasons.append(f"📊 Similar industria: {match.get('industry')}")
+            elif user_industry and match_industry and (user_industry in match_industry or match_industry in user_industry):
                 score += 25
-                reasons.append(f"Misma industria: {match.get('industry')}")
+                reasons.append(f"📊 Misma industria: {match.get('industry')}")
             
-            # Type match
-            if match.get('user_type', '').lower() == user_type.lower():
-                score += 15
-                reasons.append(f"Es {user_type}")
+            # Stage match (15 points max)
+            match_stage = (match.get('stage') or '').lower()
+            if search_stage and match_stage:
+                if search_stage == match_stage:
+                    score += 15
+                    reasons.append(f"🚀 Etapa: {match.get('stage')}")
+                elif abs(self._stage_value(search_stage) - self._stage_value(match_stage)) <= 1:
+                    score += 10
+                    reasons.append(f"📈 Etapa similar: {match.get('stage')}")
+            elif user_stage and match_stage and user_stage == match_stage:
+                score += 12
+                reasons.append(f"🚀 Misma etapa: {match.get('stage')}")
             
-            # Location match
-            if current_user.get('country') == match.get('country'):
-                score += 10
-                reasons.append(f"Mismo país: {match.get('country')}")
+            # Location match (10 points max)
+            match_location = (match.get('country') or '').lower()
+            if search_location and match_location:
+                if search_location in match_location or match_location in search_location:
+                    score += 10
+                    reasons.append(f"🌍 Ubicación: {match.get('country')}")
+            elif user_location and match_location and user_location == match_location:
+                score += 8
+                reasons.append(f"📍 Mismo país: {match.get('country')}")
             
-            if score >= 50:
+            # Keyword matching in profile (10 points max)
+            if keywords:
+                match_text = f"{match_name} {match_industry} {match_stage} {match.get('bio', '')} {match.get('interests', '')}".lower()
+                keyword_matches = [kw for kw in keywords if kw in match_text]
+                if keyword_matches:
+                    score += min(10, len(keyword_matches) * 3)
+                    reasons.append(f"🔍 Keywords: {', '.join(keyword_matches[:3])}")
+            
+            # Looking for / Can offer match (bonus 10 points)
+            looking_for = search_criteria.get('looking_for', '')
+            if looking_for:
+                can_offer = (match.get('can_offer') or '').lower()
+                if looking_for in can_offer:
+                    score += 10
+                    reasons.append(f"💡 Puede ofrecer: {looking_for}")
+            
+            # Apply minimum threshold
+            # Higher threshold when searching for specific non-entrepreneur types
+            min_threshold = 35 if target_type in ['investor', 'validator', 'mentor', 'partner'] else 40
+            
+            if score >= min_threshold:
                 matches.append({
                     "id": match.get('id'),
-                    "name": match.get('name') or match.get('full_name') or 'Usuario',
-                    "score": score,
-                    "reason": ". ".join(reasons) if reasons else "Perfil interesante para conectar",
-                    "conversation_starters": ["¡Hola! Vi tu perfil y me gustaría conectar contigo."],
+                    "name": match_name,
+                    "score": min(100, score),  # Cap at 100
+                    "reason": " • ".join(reasons) if reasons else "Perfil relevante para conectar",
+                    "conversation_starters": self._generate_conversation_starters(match, current_user, search_criteria),
                     "user_type": match.get('user_type'),
                     "industry": match.get('industry'),
-                    "avatar_url": match.get('avatar_url')
+                    "stage": match.get('stage'),
+                    "country": match.get('country'),
+                    "avatar_url": match.get('avatar_url'),
+                    "bio": match.get('bio', '')
                 })
         
         return sorted(matches, key=lambda x: x['score'], reverse=True)
+    
+    def _stage_value(self, stage: str) -> int:
+        """Convert stage to numeric value for comparison"""
+        stages = {
+            'idea': 0,
+            'mvp': 1,
+            'seed': 2,
+            'pre-seed': 2,
+            'series_a': 3,
+            'series a': 3,
+            'series_b': 4,
+            'series b': 4,
+            'growth': 5,
+            'scale': 6
+        }
+        return stages.get(stage.lower(), 2)
+    
+    def _generate_conversation_starters(
+        self, 
+        match: Dict[str, Any], 
+        current_user: Dict[str, Any],
+        search_criteria: Dict[str, Any]
+    ) -> List[str]:
+        """Generate personalized conversation starters"""
+        starters = []
+        match_name = match.get('name', 'Usuario').split()[0]
+        
+        # Based on industry
+        if match.get('industry'):
+            starters.append(f"Hola {match_name}! Vi que trabajas en {match.get('industry')}, me gustaría conocer más sobre tu proyecto.")
+        
+        # Based on stage
+        if match.get('stage'):
+            starters.append(f"Hola! Veo que estás en etapa {match.get('stage')}. ¿Cómo va el desarrollo?")
+        
+        # Based on search intent
+        looking_for = search_criteria.get('looking_for')
+        if looking_for == 'funding':
+            starters.append(f"Hola {match_name}! Estoy buscando financiación. ¿Tienes experiencia levantando capital?")
+        elif looking_for == 'validation':
+            starters.append(f"Hola! ¿Estarías interesado en dar feedback sobre mi producto?")
+        elif looking_for == 'partner':
+            starters.append(f"Hola {match_name}! Creo que podríamos colaborar. ¿Te interesaría explorar sinergias?")
+        
+        # Generic fallback
+        if not starters:
+            starters.append(f"Hola {match_name}! Vi tu perfil en ASTAR y me gustaría conectar contigo.")
+        
+        return starters[:3]  # Max 3 starters
     
     def chat(
         self,
@@ -260,21 +392,93 @@ Sort by score descending.
         
         # Generate SHORT response presenting the real matches
         if matches:
-            # Build list of real matches to show
-            matches_text = "\n".join([
-                f"- {m.get('name', 'Usuario')} ({m.get('user_type', 'emprendedor')})"
-                for m in matches[:5]
-            ])
+            # Build detailed list of real matches to show
+            top_matches = matches[:5]
+            matches_list = []
             
-            ai_message = f"""🎯 Encontré {len(matches)} conexiones relevantes para ti:
+            for i, m in enumerate(top_matches, 1):
+                match_lines = [
+                    f"{i}. **{m.get('name', 'Usuario')}**",
+                    f"   • Tipo: {m.get('user_type', 'usuario').title()}"
+                ]
+                if m.get('industry'):
+                    match_lines.append(f"   • Industria: {m.get('industry')}")
+                if m.get('stage'):
+                    match_lines.append(f"   • Etapa: {m.get('stage')}")
+                if m.get('country'):
+                    match_lines.append(f"   • País: {m.get('country')}")
+                match_lines.append(f"   • Match: {m.get('score', 0)}/100")
+                if m.get('reason'):
+                    match_lines.append(f"   • {m.get('reason', '')}")
+                
+                matches_list.extend(match_lines)
+                matches_list.append("")  # Empty line
+            
+            matches_text = "\n".join(matches_list)
+            
+            # Create criteria summary
+            criteria_parts = []
+            if search_criteria.get('target_type'):
+                type_labels = {
+                    'entrepreneur': 'emprendedores',
+                    'investor': 'inversores',
+                    'validator': 'validadores',
+                    'partner': 'partners',
+                    'mentor': 'mentores'
+                }
+                criteria_parts.append(type_labels.get(search_criteria['target_type'], search_criteria['target_type']))
+            if search_criteria.get('industry'):
+                criteria_parts.append(f"en {search_criteria['industry']}")
+            if search_criteria.get('stage'):
+                criteria_parts.append(f"etapa {search_criteria['stage']}")
+            if search_criteria.get('location'):
+                criteria_parts.append(f"en {search_criteria['location']}")
+            
+            criteria_text = " ".join(criteria_parts) if criteria_parts else "según tus preferencias"
+            
+            ai_message = f"""🎯 **Encontré {len(matches)} conexiones relevantes {criteria_text}:**
 
 {matches_text}
 
-💡 Estos son emprendedores reales de nuestra comunidad. ¡Conécta con ellos para hacer networking!"""
-        else:
-            ai_message = """🔍 Estoy analizando perfiles en nuestra comunidad. De momento no encontré matches exactos con esos criterios, pero pronto habrá más usuarios. 
+💡 **Estos son usuarios reales de nuestra comunidad ASTAR.** Puedes conectar con ellos directamente desde la plataforma.
 
-💡 ¡Invita a otros emprendedores a unirse a ASTAR! 🚀"""
+✨ ¿Quieres que refine la búsqueda o busques otro tipo de conexiones?"""
+        else:
+            # Build helpful no-results message with statistics
+            criteria_parts = []
+            if search_criteria.get('target_type'):
+                type_labels = {
+                    'entrepreneur': 'emprendedores',
+                    'investor': 'inversores',
+                    'validator': 'validadores',
+                    'partner': 'partners',
+                    'mentor': 'mentores'
+                }
+                criteria_parts.append(type_labels.get(search_criteria['target_type'], 'usuarios'))
+            if search_criteria.get('industry'):
+                criteria_parts.append(f"en {search_criteria['industry']}")
+            
+            criteria_text = " ".join(criteria_parts) if criteria_parts else "con esos criterios exactos"
+            
+            # Count available user types
+            user_types_available = {}
+            for user in available_users:
+                utype = user.get('user_type', 'unknown')
+                user_types_available[utype] = user_types_available.get(utype, 0) + 1
+            
+            stats_text = "\n".join([f"   • {count} {utype}s" for utype, count in user_types_available.items()]) if user_types_available else "   • No hay usuarios en la base de datos"
+            
+            ai_message = f"""🔍 No encontré {criteria_text} en este momento.
+
+📊 **Usuarios disponibles en la plataforma:**
+{stats_text}
+
+💡 **Sugerencias:**
+• Invita a inversores a unirse a ASTAR Labs
+• Busca emprendedores en tu industria mientras tanto
+• Comparte tu perfil para atraer el tipo de conexiones que buscas
+
+🚀 ¿Quieres que busque emprendedores en su lugar?"""
         
         # Add response to history
         session["history"].append({
@@ -299,28 +503,135 @@ Sort by score descending.
         return "\n".join(formatted)
     
     def _extract_search_criteria(self, message: str) -> Dict[str, Any]:
-        """Extract search criteria from user message"""
-        criteria = {}
+        """Extract search criteria from user message using AI"""
         message_lower = message.lower()
         
+        # Use OpenAI to better understand the search intent
+        try:
+            response = openai.chat.completions.create(
+                model=self.config.openai_model,
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": """Eres un experto en analizar búsquedas de networking. 
+Extrae criterios de búsqueda de mensajes de usuarios.
+Responde SOLO con JSON válido, sin explicaciones.
+Campos: target_type (entrepreneur/investor/validator/partner/mentor), 
+industry (fintech/healthtech/edtech/saas/ecommerce/ai/blockchain/gaming/foodtech/proptech/agritech/cleantech/biotech/legaltech/hrtech/martech), 
+stage (idea/mvp/seed/series_a/series_b/growth/scale),
+location (país o región),
+keywords (array de palabras clave relevantes),
+looking_for (qué busca: funding/cofounder/validation/customers/talent/partner/mentor)"""
+                    },
+                    {"role": "user", "content": f"Mensaje del usuario: '{message}'"}
+                ],
+                temperature=0.3,
+                max_tokens=300
+            )
+            
+            result_text = response.choices[0].message.content
+            # Parse JSON from response
+            if "```json" in result_text:
+                result_text = result_text.split("```json")[1].split("```")[0]
+            elif "```" in result_text:
+                result_text = result_text.split("```")[1].split("```")[0]
+            
+            criteria = json.loads(result_text.strip())
+            print(f"✓ AI extracted criteria: {criteria}")
+            return criteria
+            
+        except Exception as e:
+            print(f"⚠️ AI extraction failed, using fallback: {e}")
+            # Fallback to keyword matching
+            return self._extract_criteria_fallback(message_lower)
+    
+    def _extract_criteria_fallback(self, message_lower: str) -> Dict[str, Any]:
+        """Fallback keyword-based criteria extraction"""
+        criteria = {
+            "keywords": []
+        }
+        
         # Target type
-        if 'inversor' in message_lower or 'investor' in message_lower:
-            criteria['target_type'] = 'investor'
-        elif 'validador' in message_lower:
-            criteria['target_type'] = 'validator'
-        elif 'partner' in message_lower or 'socio' in message_lower:
-            criteria['target_type'] = 'partner'
-        elif 'mentor' in message_lower:
-            criteria['target_type'] = 'mentor'
-        else:
+        type_keywords = {
+            'investor': ['inversor', 'investor', 'inversión', 'capital', 'funding'],
+            'validator': ['validador', 'validator', 'feedback', 'validación'],
+            'partner': ['partner', 'socio', 'colaboración', 'colaborador', 'alianza'],
+            'mentor': ['mentor', 'mentora', 'asesor', 'consejero'],
+            'entrepreneur': ['emprendedor', 'founder', 'startup', 'empresa']
+        }
+        
+        for type_key, keywords in type_keywords.items():
+            if any(kw in message_lower for kw in keywords):
+                criteria['target_type'] = type_key
+                break
+        
+        if 'target_type' not in criteria:
             criteria['target_type'] = 'entrepreneur'
         
-        # Industry keywords
-        industries = ['fintech', 'healthtech', 'edtech', 'saas', 'ecommerce', 
-                     'ai', 'blockchain', 'gaming', 'foodtech', 'proptech']
-        for ind in industries:
-            if ind in message_lower:
+        # Industry keywords (expanded list)
+        industries = {
+            'fintech': ['fintech', 'financiero', 'banco', 'pagos', 'cripto', 'blockchain'],
+            'healthtech': ['healthtech', 'salud', 'médico', 'hospital', 'telemedicina'],
+            'edtech': ['edtech', 'educación', 'aprendizaje', 'e-learning', 'cursos'],
+            'saas': ['saas', 'software', 'cloud', 'plataforma'],
+            'ecommerce': ['ecommerce', 'e-commerce', 'tienda', 'marketplace', 'retail'],
+            'ai': ['inteligencia artificial', 'ai', 'machine learning', 'ml', 'deep learning'],
+            'blockchain': ['blockchain', 'crypto', 'web3', 'nft', 'defi'],
+            'gaming': ['gaming', 'juegos', 'videojuegos', 'esports'],
+            'foodtech': ['foodtech', 'comida', 'restaurante', 'delivery'],
+            'proptech': ['proptech', 'inmobiliario', 'bienes raíces', 'vivienda'],
+            'agritech': ['agritech', 'agricultura', 'farming', 'agrícola'],
+            'cleantech': ['cleantech', 'energía', 'sostenible', 'renovable', 'verde'],
+            'biotech': ['biotech', 'biotecnología', 'biología', 'farmacéutico'],
+            'legaltech': ['legaltech', 'legal', 'abogado', 'jurídico'],
+            'hrtech': ['hrtech', 'recursos humanos', 'rrhh', 'talento', 'reclutamiento'],
+            'martech': ['martech', 'marketing', 'publicidad', 'ads']
+        }
+        
+        for ind, keywords in industries.items():
+            if any(kw in message_lower for kw in keywords):
                 criteria['industry'] = ind
+                criteria['keywords'].extend([kw for kw in keywords if kw in message_lower])
+                break
+        
+        # Stage keywords
+        stages = {
+            'idea': ['idea', 'concepto', 'empezando'],
+            'mvp': ['mvp', 'prototipo', 'beta'],
+            'seed': ['seed', 'semilla', 'pre-seed'],
+            'series_a': ['series a', 'serie a', 'ronda a'],
+            'growth': ['crecimiento', 'growth', 'escalando', 'scale']
+        }
+        
+        for stage, keywords in stages.items():
+            if any(kw in message_lower for kw in keywords):
+                criteria['stage'] = stage
+                break
+        
+        # Looking for
+        looking_keywords = {
+            'funding': ['financiación', 'inversión', 'capital', 'funding'],
+            'cofounder': ['cofundador', 'cofounder', 'socio fundador'],
+            'validation': ['validación', 'feedback', 'testear', 'probar'],
+            'customers': ['clientes', 'customers', 'usuarios', 'ventas'],
+            'talent': ['talento', 'equipo', 'contratar', 'team'],
+            'partner': ['partner', 'alianza', 'colaboración'],
+            'mentor': ['mentor', 'asesoría', 'consejo']
+        }
+        
+        for looking, keywords in looking_keywords.items():
+            if any(kw in message_lower for kw in keywords):
+                criteria['looking_for'] = looking
+                criteria['keywords'].extend([kw for kw in keywords if kw in message_lower])
+                break
+        
+        # Extract location if mentioned
+        countries = ['españa', 'mexico', 'colombia', 'argentina', 'chile', 'peru', 
+                    'spain', 'usa', 'uk', 'brazil', 'france', 'germany']
+        for country in countries:
+            if country in message_lower:
+                criteria['location'] = country
+                criteria['keywords'].append(country)
                 break
         
         return criteria

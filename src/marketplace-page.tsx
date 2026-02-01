@@ -131,10 +131,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <div>
               <h3 class="font-bold text-gray-900 text-lg md:text-xl">GOAL OF THE WEEK:</h3>
               <div class="flex flex-wrap gap-2 mt-2 text-xs md:text-sm">
-                <span class="px-2 md:px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full font-medium">P0 - Urgent</span>
-                <span class="px-2 md:px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium hidden md:inline">P1 - Urgent or important</span>
-                <span class="px-2 md:px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium hidden md:inline">P2 - Urgent but not important</span>
-                <span class="px-2 md:px-3 py-1 bg-gray-100 text-gray-800 rounded-full font-medium hidden md:inline">P3 - Neither but cool</span>
+                <span class="px-2 md:px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">🔨 Build</span>
+                <span class="px-2 md:px-3 py-1 bg-purple-100 text-purple-800 rounded-full font-medium hidden md:inline">🧪 Test</span>
+                <span class="px-2 md:px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium hidden md:inline">📈 Traction</span>
               </div>
             </div>
             <button onclick="openGoalModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">
@@ -976,9 +975,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
                 <select id="goal-category" required class="w-full border border-gray-300 rounded-lg px-4 py-2">
-                  <option value="ASTAR">ASTAR</option>
-                  <option value="MAGCIENT">MAGCIENT</option>
-                  <option value="OTHER">OTHER</option>
+                  <option value="Build">🔨 Build</option>
+                  <option value="Test">🧪 Test</option>
+                  <option value="Traction">📈 Traction</option>
                 </select>
               </div>
               <div>
@@ -1008,8 +1007,11 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">DRI</label>
-                <input type="text" id="goal-dri" required placeholder="Responsible person" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
+                <select id="goal-assigned-to" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                  <option value="">Unassigned</option>
+                  <!-- Team members will be loaded dynamically -->
+                </select>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -1691,6 +1693,11 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
       
       function renderRecentSuggestions(suggestions) {
         const container = document.getElementById('recent-connections');
+        if (!container) {
+          console.warn('recent-connections element not found');
+          return;
+        }
+        
         if (!suggestions || suggestions.length === 0) {
           container.innerHTML = \`
             <div class="bg-white rounded-xl p-4 border border-gray-200 text-center text-gray-500">
@@ -1757,6 +1764,15 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
       function renderAllSuggestions(suggestions) {
         const container = document.getElementById('all-suggestions-list');
         const countEl = document.getElementById('all-suggestions-count');
+        
+        if (!container) {
+          console.warn('all-suggestions-list element not found');
+          return;
+        }
+        if (!countEl) {
+          console.warn('all-suggestions-count element not found');
+          return;
+        }
         
         if (!suggestions || suggestions.length === 0) {
           container.innerHTML = '<div class="bg-white rounded-xl p-6 border border-gray-200 text-center text-gray-500 col-span-full">' +
@@ -2373,10 +2389,10 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           return;
         }
         
-        // Group goals by DRI (Directly Responsible Individual)
+        // Group goals by assigned user
         const byDRI = {};
         allGoals.forEach(goal => {
-          const dri = goal.dri || 'Unassigned';
+          const dri = goal.assigned_user_name || goal.dri || 'Unassigned';
           if (!byDRI[dri]) byDRI[dri] = [];
           byDRI[dri].push(goal);
         });
@@ -2860,13 +2876,13 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         // Group goals by category and sort by priority
         const categories = {};
         filteredGoals.forEach(goal => {
-          const cat = goal.category || 'ASTAR';
+          const cat = goal.category || 'Build';
           if (!categories[cat]) categories[cat] = [];
           categories[cat].push(goal);
         });
 
         tbody.innerHTML = Object.entries(categories).map(([category, goals]) => {
-          const categoryColor = category === 'ASTAR' ? 'bg-blue-50' : category === 'MAGCIENT' ? 'bg-red-50' : 'bg-gray-50';
+          const categoryColor = category === 'Build' ? 'bg-blue-50' : category === 'Test' ? 'bg-purple-50' : 'bg-green-50';
           
           // Sort by priority (P0 > P1 > P2 > P3) then by order_index
           const categoryRows = goals.sort((a, b) => {
@@ -2875,6 +2891,11 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           });
 
           return categoryRows.map((goal, idx) => {
+            const categoryEmojis = {
+              'Build': '🔨',
+              'Test': '🧪',
+              'Traction': '📈'
+            };
             const priorityColors = {
               'P0': 'bg-yellow-100 text-yellow-800',
               'P1': 'bg-blue-100 text-blue-800',
@@ -2896,7 +2917,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
 
             return \`
               <tr class="\${idx === 0 ? categoryColor : 'hover:bg-gray-50'} group cursor-pointer" onclick="showGoalDetail(\${goal.id})">
-                <td class="px-3 py-3 text-sm font-medium text-gray-900">\${idx === 0 ? category : ''}</td>
+                <td class="px-3 py-3 text-sm font-medium text-gray-900">\${idx === 0 ? (categoryEmojis[category] || '') + ' ' + category : ''}</td>
                 <td class="px-3 py-3 text-sm text-gray-700 max-w-[150px]">
                   <div class="truncate hover:whitespace-normal hover:overflow-visible" title="\${goal.description || ''}">\${goal.description || ''}</div>
                 </td>
@@ -2909,7 +2930,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
                   </span>
                 </td>
                 <td class="px-2 py-3 text-sm text-gray-600 text-center">\${goal.cadence || 'One time'}</td>
-                <td class="px-2 py-3 text-sm text-gray-600 text-center">\${goal.dri || '-'}</td>
+                <td class="px-2 py-3 text-sm text-gray-600 text-center">\${goal.assigned_user_name || goal.dri || '-'}</td>
                 <td class="px-2 py-3 text-center">
                   <span class="px-2 py-1 text-xs font-medium rounded-full \${statusColors[goal.goal_status] || 'bg-gray-100 text-gray-800'}">
                     \${goal.goal_status || 'To start'}
@@ -2959,7 +2980,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         return allGoals.filter(goal => {
           // Search filter
           if (searchTerm) {
-            const searchable = (goal.description || '') + ' ' + (goal.task || '') + ' ' + (goal.dri || '');
+            const searchable = (goal.description || '') + ' ' + (goal.task || '') + ' ' + (goal.assigned_user_name || goal.dri || '');
             if (!searchable.toLowerCase().includes(searchTerm)) return false;
           }
           
@@ -2973,7 +2994,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           if (statusFilter && goal.goal_status !== statusFilter) return false;
           
           // DRI filter
-          if (driFilter && goal.dri !== driFilter) return false;
+          if (driFilter && (goal.assigned_user_name || goal.dri) !== driFilter) return false;
           
           return true;
         });
@@ -3342,7 +3363,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         document.getElementById('detail-priority').textContent = goal.priority || 'P0';
         document.getElementById('detail-status').textContent = goal.goal_status || 'To start';
         document.getElementById('detail-cadence').textContent = goal.cadence || 'One time';
-        document.getElementById('detail-dri').textContent = goal.dri || 'Not assigned';
+        document.getElementById('detail-dri').textContent = goal.assigned_user_name || goal.dri || 'Not assigned';
         
         // Populate scheduled dates
         let scheduledDates = parseScheduledDates(goal.scheduled_dates);
@@ -3739,15 +3760,23 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         document.getElementById('goal-modal').classList.remove('hidden'); 
         document.getElementById('goal-modal').classList.add('flex');
         
-        // Then populate with existing goal data
-        document.getElementById('goal-description').value = goal.description || '';
-        document.getElementById('goal-task').value = goal.task || '';
-        document.getElementById('goal-category').value = goal.category || 'OTHER';
-        document.getElementById('goal-priority').value = goal.priority || 'P2';
-        document.getElementById('goal-cadence').value = goal.cadence || 'One time';
-        document.getElementById('goal-dri').value = goal.dri || '';
-        document.getElementById('goal-status').value = goal.goal_status || 'To start';
-        document.getElementById('goal-week').value = goal.week_of || '';
+        // Load team members and then populate form
+        loadTeamMembers().then(() => {
+          // Then populate with existing goal data
+          document.getElementById('goal-description').value = goal.description || '';
+          document.getElementById('goal-task').value = goal.task || '';
+          document.getElementById('goal-category').value = goal.category || 'OTHER';
+          document.getElementById('goal-priority').value = goal.priority || 'P2';
+          document.getElementById('goal-cadence').value = goal.cadence || 'One time';
+          document.getElementById('goal-status').value = goal.goal_status || 'To start';
+          document.getElementById('goal-week').value = goal.week_of || '';
+          
+          // Set assigned user
+          const assignedToSelect = document.getElementById('goal-assigned-to');
+          if (assignedToSelect && goal.assigned_to_user_id) {
+            assignedToSelect.value = goal.assigned_to_user_id;
+          }
+        });
         
         // Change modal title and button text
         const modalTitle = document.querySelector('#goal-modal h3');
@@ -3919,6 +3948,32 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         }
       }
 
+      // Global variable to store team members
+      let teamMembers = [];
+
+      // Load team members for goal assignment
+      async function loadTeamMembers() {
+        try {
+          const response = await axios.get('/api/dashboard/team-members');
+          teamMembers = response.data.teamMembers || [];
+          
+          // Populate the dropdown
+          const select = document.getElementById('goal-assigned-to');
+          if (select) {
+            select.innerHTML = '<option value="">Unassigned</option>';
+            teamMembers.forEach(member => {
+              const option = document.createElement('option');
+              option.value = member.id;
+              option.textContent = member.name || member.email;
+              select.appendChild(option);
+            });
+          }
+        } catch (error) {
+          console.error('Error loading team members:', error);
+          teamMembers = [];
+        }
+      }
+
       // Goal CRUD
       function openGoalModal() { 
         // Reset modal to create mode
@@ -3931,6 +3986,9 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         const form = document.getElementById('goal-form');
         delete form.dataset.editingGoalId;
         form.reset();
+        
+        // Load team members
+        loadTeamMembers();
         
         document.getElementById('goal-modal').classList.remove('hidden'); 
         document.getElementById('goal-modal').classList.add('flex'); 
@@ -3956,6 +4014,8 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             'P3': 'Neither but cool'
           };
           
+          const assignedToUserId = document.getElementById('goal-assigned-to').value;
+          
           const goalData = {
             description: document.getElementById('goal-description').value,
             task: document.getElementById('goal-task').value,
@@ -3963,7 +4023,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             priority: priority,
             priority_label: priorityLabels[priority],
             cadence: document.getElementById('goal-cadence').value,
-            dri: document.getElementById('goal-dri').value,
+            assigned_to_user_id: assignedToUserId ? parseInt(assignedToUserId) : null,
             goal_status: document.getElementById('goal-status').value,
             week_of: document.getElementById('goal-week').value || null,
             target_value: 100,
