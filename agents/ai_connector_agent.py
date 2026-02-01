@@ -131,9 +131,7 @@ class AIConnectorTeam:
         
         # Build prompt for AI matching with explicit instruction to preserve user_type
         prompt = f"""
-Analyze these potential connections for the current user and rank them by relevance.
-
-CRITICAL: You MUST preserve the exact 'user_type' field from each user in your response.
+Analyze these potential connections for the current user and provide detailed, personalized recommendations.
 
 CURRENT USER:
 - Type: {current_user.get('user_type', 'entrepreneur')}
@@ -141,20 +139,35 @@ CURRENT USER:
 - Stage: {current_user.get('stage', 'Not specified')}
 - Location: {current_user.get('country', 'Not specified')}
 - Interests: {current_user.get('interests', [])}
+- Looking for: {search_criteria.get('looking_for', 'connections')}
 
 SEARCH CRITERIA:
 {json.dumps(search_criteria, indent=2)}
 
-POTENTIAL MATCHES:
+POTENTIAL MATCHES (already filtered by type):
 {json.dumps(matches_for_ai, indent=2, default=str)}
 
-For each match, provide:
+For each match, analyze WHY they would be a valuable connection. Consider:
+- Their experience and background
+- Industry alignment or complementary expertise
+- Stage compatibility
+- Geographic advantages
+- Specific value they can provide (funding, mentorship, validation, partnerships)
+- Common interests or goals
+
+Provide for each match:
 1. id - the user ID (required)
 2. name - the user name (required)
-3. user_type - EXACT user_type from the input data (required)
-4. score - relevance score 0-100 (required, calculate based on industry match, location, stage, etc.)
-5. reason - brief explanation in Spanish (required)
-6. conversation_starters - array of 2-3 suggestions (required)
+3. user_type - EXACT user_type from input (required)
+4. score - relevance score 60-100 based on match quality (required)
+5. reason - 2-3 specific, compelling reasons to connect in Spanish, highlighting their unique value (required, be specific and personalized)
+6. conversation_starters - array of 2-3 personalized opening messages in Spanish (required)
+
+IMPORTANT for 'reason' field:
+- Be SPECIFIC about what makes this person valuable (e.g., "Inversora especializada en fintech early-stage" not just "Es inversora")
+- Mention relevant experience, industry focus, or connections if available
+- Highlight alignment with user's needs (stage, industry, location)
+- Make it compelling and actionable
 
 Return ONLY a JSON array with these exact fields.
 Include ALL matches provided (they are already pre-filtered by type).
@@ -165,7 +178,7 @@ Sort by score descending.
             response = openai.chat.completions.create(
                 model=self.config.openai_model,
                 messages=[
-                    {"role": "system", "content": "You are a networking expert. Analyze profiles and find the best matches. Respond in JSON format only. ALWAYS preserve the user_type field exactly as provided."},
+                    {"role": "system", "content": "You are an expert networking advisor and investor relations specialist. Your job is to create compelling, personalized connection recommendations that highlight the unique value each person brings. Be specific, insightful, and actionable. Always respond in valid JSON format."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
