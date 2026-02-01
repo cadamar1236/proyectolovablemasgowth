@@ -152,12 +152,12 @@ For each match, provide:
 1. id - the user ID (required)
 2. name - the user name (required)
 3. user_type - EXACT user_type from the input data (required)
-4. score - relevance score 0-100 (required)
+4. score - relevance score 0-100 (required, calculate based on industry match, location, stage, etc.)
 5. reason - brief explanation in Spanish (required)
 6. conversation_starters - array of 2-3 suggestions (required)
 
 Return ONLY a JSON array with these exact fields.
-Only include matches with score >= 50.
+Include ALL matches provided (they are already pre-filtered by type).
 Sort by score descending.
 """
         
