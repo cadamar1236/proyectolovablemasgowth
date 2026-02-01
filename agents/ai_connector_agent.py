@@ -217,12 +217,14 @@ Respond with ONLY one word: INVESTOR or ENTREPRENEUR
         """
         Enhanced matching with AI-powered user type detection for investors
         """
-        # DEBUG: Log user types available
+        # DEBUG: Log ALL user types from database with names
+        print(f"\n📊 DATABASE USERS RECEIVED ({len(potential_matches)} total):")
         user_types_count = {}
         for u in potential_matches:
             utype = (u.get('user_type') or 'unknown').lower()
             user_types_count[utype] = user_types_count.get(utype, 0) + 1
-        print(f"🔍 Available user types: {user_types_count}")
+            print(f"  - {u.get('name')}: role='{utype}'")
+        print(f"🔍 Summary by type: {user_types_count}")
         
         matches = []
         user_industry = (current_user.get('industry') or '').lower()
@@ -256,24 +258,31 @@ Respond with ONLY one word: INVESTOR or ENTREPRENEUR
                 continue
             
             utype = (u.get('user_type') or '').lower()
+            original_type = utype  # Keep original for logging
             
-            # Normalize user type
+            # Normalize user type for comparison
             if utype in ['founder', 'startup founder']:
                 utype = 'entrepreneur'
             
+            print(f"  🔍 Checking user {u.get('name')}: DB role='{original_type}' normalized='{utype}' target='{normalized_target}'")
+            
             # Direct match with database role
-            if utype == normalized_target:
+            if utype == normalized_target or original_type == normalized_target:
                 filtered_by_type.append(u)
-                print(f"  ✅ Found {u.get('name')} with type={utype}")
+                print(f"    ✅ MATCH: Added {u.get('name')} (type={original_type})")
             # For investors specifically, also check with AI if role is ambiguous
             elif normalized_target == 'investor' and utype in ['entrepreneur', 'founder']:
+                print(f"    🤖 Analyzing {u.get('name')} with AI (ambiguous founder)...")
                 detected_type = self._analyze_user_type_with_ai(u)
                 if detected_type == 'investor':
                     u['user_type'] = 'investor'
                     u['ai_detected'] = True
                     filtered_by_type.append(u)
-                    print(f"  🤖 AI detected {u.get('name')} as investor (was {utype})")
-                    print(f"  🤖 AI detected {u.get('name')} as investor (was {utype})")
+                    print(f"    ✅ AI DETECTED as investor")
+                else:
+                    print(f"    ❌ AI confirmed as entrepreneur")
+            else:
+                print(f"    ❌ SKIP: Not a match")
         
         print(f"✓ Found {len(filtered_by_type)} users of type '{normalized_target}' (from {len(potential_matches)} total)")
         
