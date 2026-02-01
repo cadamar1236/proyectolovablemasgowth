@@ -166,6 +166,48 @@ Sort by score descending.
             # Fallback: simple matching by industry
             return self._simple_matching(current_user, potential_matches, search_criteria)
     
+    def _analyze_user_type_with_ai(self, user: Dict[str, Any]) -> str:
+        """
+        Use AI to analyze user profile and determine their REAL type
+        based on name, bio, company, interests, etc.
+        """
+        try:
+            prompt = f"""
+Analyze this user profile and determine if they are an INVESTOR or ENTREPRENEUR/FOUNDER.
+
+User Profile:
+- Name: {user.get('name', '')}
+- Company: {user.get('industry', '')}
+- Bio: {user.get('bio', '')}
+- Interests: {user.get('interests', '')}
+- Looking for: {user.get('looking_for', '')}
+- Stage: {user.get('stage', '')}
+
+Rules:
+1. If name/company contains words like: VC, Ventures, Capital, Investment, Fund, Angel → INVESTOR
+2. If bio/interests mention: investing, funding, capital, portfolio → INVESTOR  
+3. If they are looking for "investment opportunities" or "startups to fund" → INVESTOR
+4. Otherwise → ENTREPRENEUR
+
+Respond with ONLY one word: INVESTOR or ENTREPRENEUR
+"""
+            
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=10
+            )
+            
+            result = response.choices[0].message.content.strip().upper()
+            detected = 'investor' if 'INVESTOR' in result else 'entrepreneur'
+            print(f"  🤖 AI analyzed '{user.get('name')}': {detected}")
+            return detected
+            
+        except Exception as e:
+            print(f"Error analyzing user type with AI: {e}")
+            return user.get('user_type', 'entrepreneur').lower()
+    
     def _simple_matching(
         self,
         current_user: Dict[str, Any],
@@ -173,7 +215,7 @@ Sort by score descending.
         search_criteria: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
-        Enhanced matching based on multiple criteria with weighted scoring
+        Enhanced matching with AI-powered user type detection for investors
         """
         # DEBUG: Log user types available
         user_types_count = {}
@@ -190,23 +232,54 @@ Sort by score descending.
         
         print(f"🎯 Looking for: {target_type}")
         
-        # CRITICAL: First filter to ONLY users of requested type
+        # Normalize target type
+        type_mappings = {
+            'founder': 'entrepreneur',
+            'startup founder': 'entrepreneur',
+            'emprendedor': 'entrepreneur',
+            'investors': 'investor',
+            'inversores': 'investor',
+            'investor': 'investor',
+            'mentor': 'mentor',
+            'mentores': 'mentor',
+            'validator': 'validator',
+            'validadores': 'validator',
+            'partner': 'partner',
+            'partners': 'partner'
+        }
+        normalized_target = type_mappings.get(target_type, target_type)
+        
+        # CRITICAL: Filter to ONLY users of requested type
         filtered_by_type = []
         for u in potential_matches:
             if u.get('id') == current_user.get('id'):
                 continue
+            
             utype = (u.get('user_type') or '').lower()
-            # Normalize types: founder = entrepreneur
+            
+            # Normalize user type
             if utype in ['founder', 'startup founder']:
                 utype = 'entrepreneur'
-            if utype == target_type:
+            
+            # Direct match with database role
+            if utype == normalized_target:
                 filtered_by_type.append(u)
+                print(f"  ✅ Found {u.get('name')} with type={utype}")
+            # For investors specifically, also check with AI if role is ambiguous
+            elif normalized_target == 'investor' and utype in ['entrepreneur', 'founder']:
+                detected_type = self._analyze_user_type_with_ai(u)
+                if detected_type == 'investor':
+                    u['user_type'] = 'investor'
+                    u['ai_detected'] = True
+                    filtered_by_type.append(u)
+                    print(f"  🤖 AI detected {u.get('name')} as investor (was {utype})")
+                    print(f"  🤖 AI detected {u.get('name')} as investor (was {utype})")
         
-        print(f"✓ Found {len(filtered_by_type)} users of type '{target_type}' (from {len(potential_matches)} total)")
+        print(f"✓ Found {len(filtered_by_type)} users of type '{normalized_target}' (from {len(potential_matches)} total)")
         
         # If no users of requested type, return empty immediately
         if len(filtered_by_type) == 0:
-            print(f"❌ No users with type '{target_type}' found in database")
+            print(f"❌ No users with type '{normalized_target}' found in database")
             return []
         
         search_industry = search_criteria.get('industry', '').lower()
@@ -421,8 +494,11 @@ Sort by score descending.
                 }
                 type_display = type_labels.get(user_type_display.lower(), user_type_display.title())
                 
+                # Add AI badge if detected by AI
+                ai_badge = " 🤖" if m.get('ai_detected') else ""
+                
                 # Simplified format - just name, type, key info
-                parts = [f"{i}. **{m.get('name', 'Usuario')}** ({type_display})"]
+                parts = [f"{i}. **{m.get('name', 'Usuario')}** ({type_display}{ai_badge})"]
                 
                 if m.get('industry'):
                     parts.append(f"- {m.get('industry')}")
@@ -449,41 +525,41 @@ Sort by score descending.
 
 ✨ Puedes conectar con ellos desde la plataforma."""
         else:
-            # Build helpful no-results message with statistics
-            criteria_parts = []
-            if search_criteria.get('target_type'):
-                type_labels = {
-                    'entrepreneur': 'emprendedores',
-                    'investor': 'inversores',
-                    'validator': 'validadores',
-                    'partner': 'partners',
-                    'mentor': 'mentores'
-                }
-                criteria_parts.append(type_labels.get(search_criteria['target_type'], 'usuarios'))
-            if search_criteria.get('industry'):
-                criteria_parts.append(f"en {search_criteria['industry']}")
-            
-            criteria_text = " ".join(criteria_parts) if criteria_parts else "con esos criterios exactos"
-            
-            # Count available user types
-            user_types_available = {}
-            for user in available_users:
-                utype = user.get('user_type', 'unknown')
-                user_types_available[utype] = user_types_available.get(utype, 0) + 1
-            
-            stats_text = "\n".join([f"   • {count} {utype}s" for utype, count in user_types_available.items()]) if user_types_available else "   • No hay usuarios en la base de datos"
-            
-            ai_message = f"""🔍 No encontré {criteria_text} en este momento.
-
-📊 **Usuarios disponibles en la plataforma:**
-{stats_text}
+            # Special message for investors if none found
+            if search_criteria.get('target_type') and 'invest' in search_criteria.get('target_type', '').lower():
+                ai_message = """❌ **No hay inversores registrados** en la plataforma todavía.
 
 💡 **Sugerencias:**
 • Invita a inversores a unirse a ASTAR Labs
-• Busca emprendedores en tu industria mientras tanto
-• Comparte tu perfil para atraer el tipo de conexiones que buscas
+• Busca mentores o validadores que puedan darte feedback
+• Conecta con emprendedores en tu industria para compartir experiencias
 
-🚀 ¿Quieres que busque emprendedores en su lugar?"""
+🚀 ¿Quieres que busque emprendedores, mentores o validadores en su lugar?"""
+            else:
+                # Build helpful no-results message with statistics
+                criteria_parts = []
+                if search_criteria.get('target_type'):
+                    type_labels = {
+                        'entrepreneur': 'emprendedores',
+                        'investor': 'inversores',
+                        'validator': 'validadores',
+                        'partner': 'partners',
+                        'mentor': 'mentores'
+                    }
+                    criteria_parts.append(type_labels.get(search_criteria['target_type'], 'usuarios'))
+                if search_criteria.get('industry'):
+                    criteria_parts.append(f"en {search_criteria['industry']}")
+                
+                criteria_text = " ".join(criteria_parts) if criteria_parts else "con esos criterios exactos"
+                
+                ai_message = f"""🔍 No encontré {criteria_text} en este momento.
+
+💡 **Sugerencias:**
+• Intenta buscar con criterios más amplios
+• Busca usuarios en otras industrias o países
+• Comparte tu perfil para atraer conexiones relevantes
+
+🚀 ¿Quieres que busque con otros criterios?"""
         
         # Add response to history
         session["history"].append({
