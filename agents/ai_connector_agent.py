@@ -374,21 +374,26 @@ Respond with ONLY one word: INVESTOR or ENTREPRENEUR
             
             # Apply minimum threshold
             # Higher threshold when searching for specific non-entrepreneur types
-            min_threshold = 35 if target_type in ['investor', 'validator', 'mentor', 'partner'] else 40
+            min_threshold = 35 if normalized_target in ['investor', 'validator', 'mentor', 'partner'] else 40
             
             if score >= min_threshold:
+                # Ensure user_type is preserved from match (including AI-detected)
+                final_user_type = match.get('user_type')
+                print(f"    💾 Saving match with user_type='{final_user_type}' (score={score})")
+                
                 matches.append({
                     "id": match.get('id'),
                     "name": match_name,
                     "score": min(100, score),  # Cap at 100
                     "reason": " • ".join(reasons) if reasons else "Perfil relevante para conectar",
                     "conversation_starters": self._generate_conversation_starters(match, current_user, search_criteria),
-                    "user_type": match.get('user_type'),
+                    "user_type": final_user_type,
                     "industry": match.get('industry'),
                     "stage": match.get('stage'),
                     "country": match.get('country'),
                     "avatar_url": match.get('avatar_url'),
-                    "bio": match.get('bio', '')
+                    "bio": match.get('bio', ''),
+                    "ai_detected": match.get('ai_detected', False)
                 })
         
         return sorted(matches, key=lambda x: x['score'], reverse=True)
@@ -490,8 +495,11 @@ Respond with ONLY one word: INVESTOR or ENTREPRENEUR
             top_matches = matches[:5]
             matches_list = []
             
+            print(f"\n📋 FORMATTING {len(top_matches)} MATCHES FOR DISPLAY:")
             for i, m in enumerate(top_matches, 1):
                 user_type_display = m.get('user_type', 'usuario')
+                print(f"  Match {i}: name={m.get('name')}, user_type={user_type_display}")
+                
                 if user_type_display.lower() in ['founder', 'startup founder']:
                     user_type_display = 'entrepreneur'
                 type_labels = {
@@ -499,9 +507,13 @@ Respond with ONLY one word: INVESTOR or ENTREPRENEUR
                     'investor': 'Inversor',
                     'validator': 'Validador',
                     'partner': 'Partner',
-                    'mentor': 'Mentor'
+                    'mentor': 'Mentor',
+                    'admin': 'Admin',
+                    'scout': 'Scout',
+                    'job_seeker': 'Candidato'
                 }
-                type_display = type_labels.get(user_type_display.lower(), user_type_display.title())
+                type_display = type_labels.get(user_type_display.lower(), f"Usuario ({user_type_display})")
+                print(f"    -> Displaying as: {type_display}")
                 
                 # Add AI badge if detected by AI
                 ai_badge = " 🤖" if m.get('ai_detected') else ""
