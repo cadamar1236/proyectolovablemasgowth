@@ -186,30 +186,42 @@ Sort by score descending.
         user_industry = (current_user.get('industry') or '').lower()
         user_stage = (current_user.get('stage') or '').lower()
         user_location = (current_user.get('country') or '').lower()
-        target_type = search_criteria.get('target_type', 'entrepreneur')
+        target_type = (search_criteria.get('target_type') or 'entrepreneur').lower()
         
         print(f"🎯 Looking for: {target_type}")
+        
+        # CRITICAL: First filter to ONLY users of requested type
+        filtered_by_type = []
+        for u in potential_matches:
+            if u.get('id') == current_user.get('id'):
+                continue
+            utype = (u.get('user_type') or '').lower()
+            # Normalize types: founder = entrepreneur
+            if utype in ['founder', 'startup founder']:
+                utype = 'entrepreneur'
+            if utype == target_type:
+                filtered_by_type.append(u)
+        
+        print(f"✓ Found {len(filtered_by_type)} users of type '{target_type}' (from {len(potential_matches)} total)")
+        
+        # If no users of requested type, return empty immediately
+        if len(filtered_by_type) == 0:
+            print(f"❌ No users with type '{target_type}' found in database")
+            return []
         
         search_industry = search_criteria.get('industry', '').lower()
         search_stage = search_criteria.get('stage', '').lower()
         search_location = search_criteria.get('location', '').lower()
         keywords = search_criteria.get('keywords', [])
         
-        for match in potential_matches:
-            if match.get('id') == current_user.get('id'):
-                continue
-            
-            # CRITICAL: Filter by user_type first (mandatory filter)
+        for match in filtered_by_type:
             match_type = (match.get('user_type') or '').lower()
-            if not match_type:
-                continue  # Skip users without type
-            
-            # If searching for specific type, ONLY show that type
-            if target_type and match_type != target_type.lower():
-                continue  # Skip if not the requested type
+            # Normalize for display
+            if match_type in ['founder', 'startup founder']:
+                match_type = 'entrepreneur'
             
             # DEBUG: Log match that passes filter
-            print(f"  ✓ Match passed filter: {match.get('name')} is {match_type} (looking for {target_type})")
+            print(f"  ✓ Processing match: {match.get('name')} is {match_type}")
             
             score = 0
             reasons = []
@@ -397,52 +409,45 @@ Sort by score descending.
             matches_list = []
             
             for i, m in enumerate(top_matches, 1):
-                match_lines = [
-                    f"{i}. **{m.get('name', 'Usuario')}**",
-                    f"   • Tipo: {m.get('user_type', 'usuario').title()}"
-                ]
-                if m.get('industry'):
-                    match_lines.append(f"   • Industria: {m.get('industry')}")
-                if m.get('stage'):
-                    match_lines.append(f"   • Etapa: {m.get('stage')}")
-                if m.get('country'):
-                    match_lines.append(f"   • País: {m.get('country')}")
-                match_lines.append(f"   • Match: {m.get('score', 0)}/100")
-                if m.get('reason'):
-                    match_lines.append(f"   • {m.get('reason', '')}")
+                user_type_display = m.get('user_type', 'usuario')
+                if user_type_display.lower() in ['founder', 'startup founder']:
+                    user_type_display = 'entrepreneur'
+                type_labels = {
+                    'entrepreneur': 'Emprendedor',
+                    'investor': 'Inversor',
+                    'validator': 'Validador',
+                    'partner': 'Partner',
+                    'mentor': 'Mentor'
+                }
+                type_display = type_labels.get(user_type_display.lower(), user_type_display.title())
                 
-                matches_list.extend(match_lines)
-                matches_list.append("")  # Empty line
+                # Simplified format - just name, type, key info
+                parts = [f"{i}. **{m.get('name', 'Usuario')}** ({type_display})"]
+                
+                if m.get('industry'):
+                    parts.append(f"- {m.get('industry')}")
+                if m.get('country'):
+                    parts.append(f"- {m.get('country')}")
+                
+                matches_list.append(" ".join(parts))
             
             matches_text = "\n".join(matches_list)
             
-            # Create criteria summary
-            criteria_parts = []
-            if search_criteria.get('target_type'):
-                type_labels = {
-                    'entrepreneur': 'emprendedores',
-                    'investor': 'inversores',
-                    'validator': 'validadores',
-                    'partner': 'partners',
-                    'mentor': 'mentores'
-                }
-                criteria_parts.append(type_labels.get(search_criteria['target_type'], search_criteria['target_type']))
-            if search_criteria.get('industry'):
-                criteria_parts.append(f"en {search_criteria['industry']}")
-            if search_criteria.get('stage'):
-                criteria_parts.append(f"etapa {search_criteria['stage']}")
-            if search_criteria.get('location'):
-                criteria_parts.append(f"en {search_criteria['location']}")
+            # Create simple criteria text
+            type_labels_plural = {
+                'entrepreneur': 'emprendedores',
+                'investor': 'inversores',
+                'validator': 'validadores',
+                'partner': 'partners',
+                'mentor': 'mentores'
+            }
+            target_label = type_labels_plural.get(search_criteria.get('target_type', 'entrepreneur'), 'usuarios')
             
-            criteria_text = " ".join(criteria_parts) if criteria_parts else "según tus preferencias"
-            
-            ai_message = f"""🎯 **Encontré {len(matches)} conexiones relevantes {criteria_text}:**
+            ai_message = f"""🎯 **{len(matches)} {target_label} encontrados:**
 
 {matches_text}
 
-💡 **Estos son usuarios reales de nuestra comunidad ASTAR.** Puedes conectar con ellos directamente desde la plataforma.
-
-✨ ¿Quieres que refine la búsqueda o busques otro tipo de conexiones?"""
+✨ Puedes conectar con ellos desde la plataforma."""
         else:
             # Build helpful no-results message with statistics
             criteria_parts = []
