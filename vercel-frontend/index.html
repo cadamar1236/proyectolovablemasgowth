@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASTAR* Platform - Backup Frontend (Vercel)</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Axios para peticiones HTTP -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+  
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/public/css/style.css">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#6366f1',
+            secondary: '#8b5cf6',
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    * {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+  
+  <!-- Navigation Bar -->
+  <nav class="bg-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <!-- Logo -->
+        <div class="flex items-center">
+          <a href="/" class="flex items-center space-x-2">
+            <div class="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
+              <i class="fas fa-rocket text-white text-xl"></i>
+            </div>
+            <span class="text-xl font-bold text-gray-900">ASTAR* <span class="text-xs bg-orange-500 text-white px-2 py-1 rounded">BACKUP</span></span>
+          </a>
+        </div>
+        
+        <!-- Navigation Links -->
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="/" class="text-gray-700 hover:text-purple-600 font-medium transition">Inicio</a>
+          <a href="/marketplace.html" class="text-gray-700 hover:text-purple-600 font-medium transition">Marketplace</a>
+          <a href="/dashboard.html" class="text-gray-700 hover:text-purple-600 font-medium transition">Dashboard</a>
+        </div>
+        
+        <!-- Auth Buttons -->
+        <div class="flex items-center space-x-4">
+          <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-purple-600 font-medium transition">
+            Iniciar Sesión
+          </button>
+          <button onclick="showAuthModal('register')" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:opacity-90 transition">
+            Registrarse
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="relative bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-20">
+    <div class="absolute top-0 right-0 w-full h-full opacity-10">
+      <div class="absolute top-10 right-10 w-64 h-64 bg-white rounded-full blur-3xl"></div>
+      <div class="absolute bottom-10 left-10 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+    </div>
+    
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div class="text-center">
+        <!-- Badge de Backup -->
+        <div class="inline-flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-full mb-6">
+          <i class="fas fa-exclamation-triangle"></i>
+          <span class="font-semibold">Sitio de Respaldo - Frontend en Vercel + Backend en Railway</span>
+        </div>
+        
+        <h1 class="text-5xl md:text-6xl font-black mb-6">
+          Valida tu <span class="text-yellow-300">Startup</span><br>
+          con IA y Expertos
+        </h1>
+        <p class="text-xl md:text-2xl mb-8 text-purple-100 max-w-3xl mx-auto">
+          Conecta con inversores, obtén feedback de validadores expertos y acelera el crecimiento de tu startup
+        </p>
+        
+        <!-- Alert Box -->
+        <div class="bg-white text-gray-800 rounded-xl p-6 max-w-2xl mx-auto mb-8 shadow-2xl">
+          <div class="flex items-start space-x-4">
+            <i class="fas fa-info-circle text-blue-500 text-2xl mt-1"></i>
+            <div class="text-left">
+              <h3 class="font-bold text-lg mb-2">Este es el sitio de respaldo</h3>
+              <p class="text-gray-600">
+                El sitio principal está en Cloudflare. Este frontend está alojado en <strong class="text-purple-600">Vercel</strong> 
+                y se conecta al backend de <strong class="text-green-600">Railway</strong>.
+              </p>
+              <p class="text-sm text-gray-500 mt-2">
+                <strong>Backend API:</strong> <code class="bg-gray-100 px-2 py-1 rounded text-xs">https://proyectolovablemasgowth-production-813a.up.railway.app</code>
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <button onclick="showAuthModal('register')" class="bg-white text-purple-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition transform hover:scale-105 shadow-2xl">
+            <i class="fas fa-rocket mr-2"></i>Comenzar Ahora
+          </button>
+          <button onclick="window.location.href='/marketplace.html'" class="bg-purple-500 bg-opacity-30 backdrop-blur-sm text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-opacity-40 transition border-2 border-white">
+            <i class="fas fa-store mr-2"></i>Ver Marketplace
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          ¿Por qué elegir ASTAR*?
+        </h2>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+          La plataforma todo-en-uno para validar, crecer y escalar tu startup
+        </p>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Feature 1 -->
+        <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-8 hover:shadow-xl transition">
+          <div class="w-16 h-16 bg-purple-600 rounded-xl flex items-center justify-center mb-6">
+            <i class="fas fa-brain text-white text-3xl"></i>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900 mb-4">Validación con IA</h3>
+          <p class="text-gray-600">
+            Analiza tu idea con inteligencia artificial avanzada y obtén insights en minutos
+          </p>
+        </div>
+        
+        <!-- Feature 2 -->
+        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 hover:shadow-xl transition">
+          <div class="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mb-6">
+            <i class="fas fa-users text-white text-3xl"></i>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900 mb-4">Expertos Reales</h3>
+          <p class="text-gray-600">
+            Conecta con validadores expertos que darán feedback valioso a tu proyecto
+          </p>
+        </div>
+        
+        <!-- Feature 3 -->
+        <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 hover:shadow-xl transition">
+          <div class="w-16 h-16 bg-green-600 rounded-xl flex items-center justify-center mb-6">
+            <i class="fas fa-chart-line text-white text-3xl"></i>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900 mb-4">Crecimiento Acelerado</h3>
+          <p class="text-gray-600">
+            Accede a herramientas de marketing IA y estrategias de crecimiento probadas
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="py-20 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-4xl font-bold mb-6">
+        ¿Listo para validar tu startup?
+      </h2>
+      <p class="text-xl mb-8 text-purple-100 max-w-2xl mx-auto">
+        Únete a cientos de founders que ya están validando y escalando sus ideas
+      </p>
+      <button onclick="showAuthModal('register')" class="bg-white text-purple-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition transform hover:scale-105 shadow-2xl">
+        <i class="fas fa-rocket mr-2"></i>Comenzar Gratis
+      </button>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-gray-900 text-gray-300 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div>
+          <div class="flex items-center space-x-2 mb-4">
+            <div class="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
+              <i class="fas fa-rocket text-white"></i>
+            </div>
+            <span class="text-xl font-bold text-white">ASTAR*</span>
+          </div>
+          <p class="text-sm">
+            La plataforma líder para validar y escalar startups.
+          </p>
+        </div>
+        
+        <div>
+          <h4 class="text-white font-bold mb-4">Producto</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="/marketplace.html" class="hover:text-white transition">Marketplace</a></li>
+            <li><a href="/dashboard.html" class="hover:text-white transition">Dashboard</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h4 class="text-white font-bold mb-4">Compañía</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#" class="hover:text-white transition">Sobre nosotros</a></li>
+            <li><a href="#" class="hover:text-white transition">Contacto</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h4 class="text-white font-bold mb-4">Información Técnica</h4>
+          <p class="text-xs text-gray-400 mb-2">Frontend: Vercel</p>
+          <p class="text-xs text-gray-400">Backend: Railway</p>
+          <div class="mt-4 bg-orange-500 text-white px-3 py-1 rounded text-xs inline-block">
+            <i class="fas fa-exclamation-triangle mr-1"></i>Sitio de Respaldo
+          </div>
+        </div>
+      </div>
+      
+      <div class="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
+        <p>&copy; 2024 ASTAR* Platform. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Custom JavaScript -->
+  <script src="/public/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - ASTAR* Platform</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/public/css/style.css">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#6366f1',
+            secondary: '#8b5cf6',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-50">
+  
+  <!-- Navigation Bar -->
+  <nav class="bg-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center">
+          <a href="/" class="flex items-center space-x-2">
+            <div class="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
+              <i class="fas fa-rocket text-white text-xl"></i>
+            </div>
+            <span class="text-xl font-bold text-gray-900">ASTAR* <span class="text-xs bg-orange-500 text-white px-2 py-1 rounded">BACKUP</span></span>
+          </a>
+        </div>
+        
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="/" class="text-gray-700 hover:text-purple-600 font-medium transition">Inicio</a>
+          <a href="/marketplace.html" class="text-gray-700 hover:text-purple-600 font-medium transition">Marketplace</a>
+          <a href="/dashboard.html" class="text-purple-600 font-bold border-b-2 border-purple-600">Dashboard</a>
+        </div>
+        
+        <div class="flex items-center space-x-4">
+          <button onclick="showAuthModal('login')" class="text-gray-700 hover:text-purple-600 font-medium transition">
+            Iniciar Sesión
+          </button>
+          <button onclick="showAuthModal('register')" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:opacity-90 transition">
+            Registrarse
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Dashboard Header -->
+  <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-4xl font-bold mb-4">
+        <i class="fas fa-chart-line mr-3"></i>Mi Dashboard
+      </h1>
+      <p class="text-xl text-purple-100">
+        Gestiona tus proyectos, objetivos y crecimiento
+      </p>
+    </div>
+  </div>
+
+  <!-- Dashboard Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">Proyectos</p>
+            <p class="text-3xl font-bold text-gray-900">0</p>
+          </div>
+          <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+            <i class="fas fa-folder text-purple-600 text-xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">Validaciones</p>
+            <p class="text-3xl font-bold text-gray-900">0</p>
+          </div>
+          <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+            <i class="fas fa-check-circle text-blue-600 text-xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">Rating</p>
+            <p class="text-3xl font-bold text-gray-900">0.0</p>
+          </div>
+          <div class="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+            <i class="fas fa-star text-yellow-600 text-xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">Crecimiento</p>
+            <p class="text-3xl font-bold text-gray-900">0%</p>
+          </div>
+          <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+            <i class="fas fa-chart-line text-green-600 text-xl"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projects Section -->
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">
+          <i class="fas fa-folder-open mr-2 text-purple-600"></i>Mis Proyectos
+        </h2>
+        <button onclick="showValidationForm()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">
+          <i class="fas fa-plus mr-2"></i>Nuevo Proyecto
+        </button>
+      </div>
+      
+      <div id="projects-section">
+        <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="col-span-full text-center py-12">
+            <i class="fas fa-lightbulb text-6xl text-gray-300 mb-4"></i>
+            <p class="text-xl text-gray-600 mb-4">No tienes proyectos todavía</p>
+            <button onclick="showValidationForm()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition">
+              <i class="fas fa-plus mr-2"></i>Crear tu primer proyecto
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Validation Form (Hidden by default) -->
+      <div id="validation-form-section" class="hidden">
+        <form id="validation-form" class="space-y-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Título del Proyecto</label>
+            <input type="text" id="title" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
+            <textarea id="description" rows="4" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Mercado Objetivo</label>
+            <input type="text" id="target_market" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Propuesta de Valor</label>
+            <textarea id="value_proposition" rows="3" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"></textarea>
+          </div>
+          
+          <div class="flex gap-4">
+            <button type="submit" class="flex-1 bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition">
+              <i class="fas fa-check mr-2"></i>Crear Proyecto
+            </button>
+            <button type="button" onclick="hideValidationForm()" class="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Activity Section -->
+    <div class="bg-white rounded-xl shadow-lg p-8">
+      <h2 class="text-2xl font-bold text-gray-900 mb-6">
+        <i class="fas fa-clock mr-2 text-purple-600"></i>Actividad Reciente
+      </h2>
+      <div class="text-center py-12 text-gray-500">
+        <i class="fas fa-inbox text-4xl mb-4"></i>
+        <p>No hay actividad reciente</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-gray-900 text-gray-300 py-12 mt-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div>
+          <div class="flex items-center space-x-2 mb-4">
+            <div class="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
+              <i class="fas fa-rocket text-white"></i>
+            </div>
+            <span class="text-xl font-bold text-white">ASTAR*</span>
+          </div>
+          <p class="text-sm">La plataforma líder para validar y escalar startups.</p>
+        </div>
+        
+        <div>
+          <h4 class="text-white font-bold mb-4">Producto</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="/marketplace.html" class="hover:text-white transition">Marketplace</a></li>
+            <li><a href="/dashboard.html" class="hover:text-white transition">Dashboard</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h4 class="text-white font-bold mb-4">Compañía</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#" class="hover:text-white transition">Sobre nosotros</a></li>
+            <li><a href="#" class="hover:text-white transition">Contacto</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h4 class="text-white font-bold mb-4">Información Técnica</h4>
+          <p class="text-xs text-gray-400 mb-2">Frontend: Vercel</p>
+          <p class="text-xs text-gray-400">Backend: Railway</p>
+          <div class="mt-4 bg-orange-500 text-white px-3 py-1 rounded text-xs inline-block">
+            <i class="fas fa-exclamation-triangle mr-1"></i>Sitio de Respaldo
+          </div>
+        </div>
+      </div>
+      
+      <div class="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
+        <p>&copy; 2024 ASTAR* Platform. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/public/js/app.js"></script>
+</body>
+</html>
