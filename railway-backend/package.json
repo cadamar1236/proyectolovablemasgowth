@@ -6,9 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "npm run build:frontend && npm run build:backend",
-    "build:frontend": "cd .. && npm install && npm run build",
-    "build:backend": "tsc",
+    "build": "tsc",
     "start": "node dist/server.js",
     "db:migrate": "node dist/db/migrate.js",
     "db:sync": "node dist/db/sync-from-d1.js",

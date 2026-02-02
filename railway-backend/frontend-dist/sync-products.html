@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sync Products to Projects</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    button {
+      background: #6366f1;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #4f46e5;
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      background: #f3f4f6;
+    }
+    .success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    pre {
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔄 Sincronizar Productos con Proyectos</h1>
+  <p>Este script creará proyectos para todos los productos existentes que no tengan uno asociado y sincronizará sus votos.</p>
+  
+  <button id="syncBtn" onclick="syncProducts()">Ejecutar Sincronización</button>
+  
+  <div id="result"></div>
+
+  <script>
+    // Get auth token from cookie
+    function getAuthToken() {
+      const match = document.cookie.match(/authToken=([^;]+)/);
+      return match ? match[1] : null;
+    }
+
+    async function syncProducts() {
+      const btn = document.getElementById('syncBtn');
+      const resultDiv = document.getElementById('result');
+      
+      btn.disabled = true;
+      btn.textContent = 'Sincronizando...';
+      resultDiv.innerHTML = '<div class="result">⏳ Ejecutando sincronización...</div>';
+      
+      try {
+        const token = getAuthToken();
+        
+        if (!token) {
+          throw new Error('No se encontró token de autenticación. Por favor inicia sesión primero.');
+        }
+
+        const response = await axios.post(
+          '/api/marketplace/sync-existing-products',
+          {},
+          { headers: { Authorization: 'Bearer ' + token } }
+        );
+        
+        resultDiv.innerHTML = `
+          <div class="result success">
+            <h3>✅ Sincronización Exitosa</h3>
+            <p><strong>Productos sincronizados:</strong> ${response.data.synced_count}</p>
+            <pre>${JSON.stringify(response.data.products, null, 2)}</pre>
+          </div>
+        `;
+        
+        btn.textContent = '✓ Sincronización Completa';
+      } catch (error) {
+        console.error('Error:', error);
+        resultDiv.innerHTML = `
+          <div class="result error">
+            <h3>❌ Error</h3>
+            <p>${error.response?.data?.error || error.message}</p>
+            <pre>${JSON.stringify(error.response?.data || error.message, null, 2)}</pre>
+          </div>
+        `;
+        
+        btn.disabled = false;
+        btn.textContent = 'Reintentar Sincronización';
+      }
+    }
+  </script>
+</body>
+</html>

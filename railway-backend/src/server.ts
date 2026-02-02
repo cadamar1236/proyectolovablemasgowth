@@ -31,8 +31,8 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json());
 
-// Serve frontend static files from ../dist (built by Vite)
-const frontendPath = path.join(__dirname, '../../dist');
+// Serve frontend static files from frontend-dist (built by Vite)
+const frontendPath = path.join(__dirname, '../frontend-dist');
 app.use(express.static(frontendPath));
 
 // JWT Secret
