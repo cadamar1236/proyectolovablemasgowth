@@ -31,10 +31,6 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json());
 
-// Serve frontend static files from frontend-dist (built by Vite)
-const frontendPath = path.join(__dirname, '../frontend-dist');
-app.use(express.static(frontendPath));
-
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -445,20 +441,11 @@ app.get('/api/dashboard/leaderboard', async (req, res) => {
   }
 });
 
-// Catch-all route: serve index.html for any non-API routes (React Router)
-app.get('*', (req, res) => {
-  // Don't serve index.html for API routes
-  if (req.path.startsWith('/api/') || req.path === '/health') {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
-
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 ASTAR* Railway Backend running on port ${PORT}`);
+  console.log(`🚀 ASTAR* Railway Backend (API Only) running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🎨 Serving frontend from: ${frontendPath}`);
+  console.log(`🔌 APIs available at /api/*`);
 });
 
 export default app;
