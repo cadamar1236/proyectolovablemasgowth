@@ -729,6 +729,25 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
           margin-left: 0;
         }
         
+        /* Mobile top navbar adjustments */
+        .top-navbar {
+          padding: 0.75rem 1rem !important;
+        }
+        
+        .nav-link {
+          padding: 0.5rem 0.625rem !important;
+          font-size: 0.875rem !important;
+        }
+        
+        .nav-link span:not(.text-lg) {
+          font-size: 0.75rem !important;
+        }
+        
+        /* Show icons on mobile, optional text */
+        .nav-link .text-lg {
+          font-size: 1.125rem !important;
+        }
+        
         /* Chat sidebar as overlay on mobile */
         #chat-sidebar {
           position: fixed !important;
@@ -762,47 +781,48 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
 </head>
 <body class="bg-gray-50">
     <!-- Top Navigation Bar -->
-    <nav class="fixed top-0 w-full z-50 bg-gradient-to-b from-black to-gray-900 backdrop-blur-md border-b border-gray-700 shadow-xl">
-        <div class="max-w-7xl mx-auto px-6 py-4">
+    <nav class="fixed top-0 w-full z-50 bg-gradient-to-b from-black to-gray-900 backdrop-blur-md border-b border-gray-700 shadow-xl top-navbar">
+        <div class="max-w-7xl mx-auto px-3 md:px-6 py-3 md:py-4">
             <div class="flex justify-between items-center">
                 <div class="flex flex-col">
-                    <span class="text-2xl font-bold text-white tracking-tight">ASTAR<span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">*</span></span>
-                    <span class="text-gray-300 text-xs mt-0.5">Connecting the brightest minds in the world</span>
+                    <span class="text-xl md:text-2xl font-bold text-white tracking-tight">ASTAR<span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">*</span></span>
+                    <span class="text-gray-300 text-[0.65rem] md:text-xs mt-0.5 hidden sm:block">Connecting the brightest minds in the world</span>
                 </div>
                 
-                <div class="flex items-center space-x-4 md:space-x-6">
-                    <a href="/" class="nav-link text-gray-300 hover:text-white flex items-center space-x-2 transition-all">
-                        <span class="text-lg">🏠</span>
-                        <span class="hidden md:inline font-medium">Home</span>
+                <div class="flex items-center space-x-1 md:space-x-3 lg:space-x-6 overflow-x-auto scrollbar-hide">
+                    <a href="/" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                        <span class="text-base md:text-lg">🏠</span>
+                        <span class="text-xs md:text-sm font-medium">Home</span>
                     </a>
-                    <a href="/dashboard" class="nav-link bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white flex items-center space-x-2 border border-purple-500/30">
-                        <span class="text-lg">🎯</span>
-                        <span class="hidden md:inline font-medium">Hub</span>
+                    <a href="/dashboard" class="nav-link bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white flex items-center space-x-1 md:space-x-2 border border-purple-500/30 whitespace-nowrap">
+                        <span class="text-base md:text-lg">🎯</span>
+                        <span class="text-xs md:text-sm font-medium">Hub</span>
                     </a>
-                    <a href="/competitions" class="nav-link text-gray-300 hover:text-white flex items-center space-x-2 transition-all">
-                        <span class="text-lg">🏅</span>
-                        <span class="hidden md:inline font-medium">Competitions</span>
+                    <a href="/competitions" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                        <span class="text-base md:text-lg">🏅</span>
+                        <span class="hidden sm:inline text-xs md:text-sm font-medium">Comp</span>
                     </a>
-                    <a href="/events" class="nav-link text-gray-300 hover:text-white flex items-center space-x-2 transition-all">
-                        <span class="text-lg">📅</span>
-                        <span class="hidden md:inline font-medium">Events</span>
+                    <a href="/events" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                        <span class="text-base md:text-lg">📅</span>
+                        <span class="hidden sm:inline text-xs md:text-sm font-medium">Events</span>
                     </a>
-                    <a href="/leaderboard" class="nav-link text-gray-300 hover:text-white flex items-center space-x-2 transition-all">
-                        <span class="text-lg">🏆</span>
-                        <span class="hidden md:inline font-medium">Leaderboard</span>
+                    <a href="/leaderboard" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                        <span class="text-base md:text-lg">🏆</span>
+                        <span class="hidden lg:inline text-xs md:text-sm font-medium">Board</span>
                     </a>
                     ${userRole === 'founder' ? `
-                    <a href="/team" class="nav-link text-gray-300 hover:text-white flex items-center space-x-2 transition-all">
-                        <span class="text-lg">👥</span>
-                        <span class="hidden md:inline font-medium">Team</span>
+                    <a href="/team" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                        <span class="text-base md:text-lg">👥</span>
+                        <span class="hidden lg:inline text-xs md:text-sm font-medium">Team</span>
                     </a>
                     ` : ''}
-                    <a href="/dashboard?tab=directory" class="nav-link text-gray-300 hover:text-white flex items-center space-x-2 transition-all">
-                        <span class="text-lg">🔥</span>
-                        <span class="hidden md:inline font-medium">Trending</span>
+                    <a href="/dashboard?tab=directory" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                        <span class="text-base md:text-lg">🔥</span>
+                        <span class="hidden lg:inline text-xs md:text-sm font-medium">Trend</span>
                     </a>
-                    <button onclick="logout()" class="bg-white hover:bg-gray-100 text-gray-900 px-5 py-2 rounded-full font-semibold transition-all shadow-lg hover:shadow-xl text-sm">
-                        Sign Out
+                    <button onclick="logout()" class="bg-white hover:bg-gray-100 text-gray-900 px-3 md:px-5 py-1.5 md:py-2 rounded-full font-semibold transition-all shadow-lg hover:shadow-xl text-xs md:text-sm whitespace-nowrap">
+                        <span class="hidden sm:inline">Sign Out</span>
+                        <span class="sm:hidden">Exit</span>
                     </button>
                 </div>
             </div>
