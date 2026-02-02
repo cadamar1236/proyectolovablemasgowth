@@ -8,6 +8,7 @@ import { getNotFoundPage, getVotePage } from './html-templates';
 import { getDirectoryPage } from './marketplace-page';
 import { getOnboardingPage } from './onboarding-page';
 import { getCompetitionsPage } from './competitions-page';
+import { getEventsPage } from './events-page';
 import { getLeaderboardPage } from './leaderboard-page';
 import { getAdminDashboard } from './admin-dashboard';
 import { getCompetitionLeaderboard } from './competition-leaderboard';
@@ -43,6 +44,7 @@ import team from './api/team';
 import connector from './api/connector';
 import crm from './api/crm';
 import traction from './api/traction';
+import events from './api/events';
 import { renderAICMOPage } from './ai-cmo-page';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -80,6 +82,7 @@ app.route('/api/team', team);
 app.route('/api/connector', connector);
 app.route('/api/crm', crm);
 app.route('/api/traction', traction);
+app.route('/api/events', events);
 
 // Page Routes - Onboarding for new users
 app.get('/onboarding', async (c) => {
@@ -186,6 +189,48 @@ app.get('/competitions', async (c) => {
     userName: payload.userName || payload.name || payload.email || 'Guest',
     userAvatar: payload.avatar_url,
     userRole: payload.role || 'guest'
+  });
+
+  return c.html(html);
+});
+
+// Events page
+app.get('/events', async (c) => {
+  const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  const tokenInUrl = c.req.query('token');
+
+  let payload: any = null;
+  const tokenToVerify = authToken || tokenInUrl;
+  
+  if (tokenToVerify) {
+    try {
+      payload = await verify(tokenToVerify, c.env.JWT_SECRET) as any;
+    } catch (error) {
+      // Invalid token, continue as guest
+    }
+  }
+
+  // Allow viewing events as guest
+  if (!payload) {
+    payload = { userName: 'Guest', email: '', userId: 0, role: 'guest' };
+  }
+
+  // Get user role from database if user is logged in
+  let userRole = payload.role || 'guest';
+  if (payload.userId) {
+    const user = await c.env.DB.prepare(`
+      SELECT role FROM users WHERE id = ?
+    `).bind(payload.userId).first();
+    
+    if (user) {
+      userRole = user.role || 'guest';
+    }
+  }
+
+  const html = getEventsPage({
+    userName: payload.userName || payload.name || payload.email || 'Guest',
+    userAvatar: payload.avatar_url,
+    userRole: userRole
   });
 
   return c.html(html);
