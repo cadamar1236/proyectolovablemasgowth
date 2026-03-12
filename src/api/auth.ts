@@ -755,8 +755,27 @@ auth.get('/google/callback', async (c) => {
 
     // Set cookie and redirect
     const frontendUrl = new URL(c.req.url).origin;
-    // Redirect new users to onboarding, existing users to dashboard
-    const finalRedirect = existingUser.needsOnboarding ? '/onboarding' : (redirectPath || '/dashboard');
+    // Redirect strategy:
+    // - New users always go to onboarding first
+    // - After onboarding (or if no onboarding needed):
+    //   - Use redirectPath if provided (e.g., /pitch if came from pitch page)
+    //   - Otherwise: everyone goes to /dashboard
+    const defaultRedirect = '/dashboard';
+    let finalRedirect;
+    if (existingUser.needsOnboarding) {
+      // If needs onboarding, pass the redirectPath as URL parameter
+      finalRedirect = redirectPath ? `/onboarding?redirect=${encodeURIComponent(redirectPath)}` : '/onboarding';
+    } else {
+      finalRedirect = redirectPath || defaultRedirect;
+    }
+    
+    console.log('[GOOGLE-CALLBACK] Redirect decision:', { 
+      userRole, 
+      needsOnboarding: existingUser.needsOnboarding, 
+      redirectPath, 
+      defaultRedirect, 
+      finalRedirect 
+    });
     
     // SECURITY: Set secure cookie with proper flags
     // Note: Not using HttpOnly because client JS needs to read for API calls

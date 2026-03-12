@@ -1,1502 +1,720 @@
-import { Hono } from 'hono';
+﻿import { Hono } from 'hono';
 import { verify } from 'hono/jwt';
 import type { Bindings } from './types';
-import { jsx } from 'hono/jsx';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// Dashboard page with integrated chat
 app.get('/', async (c) => {
   const authToken = c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
   const tokenInUrl = c.req.query('token');
 
-  // If token is in URL (from OAuth redirect), ALWAYS let page load so client JS can save it
-  // Only redirect if there's NO token anywhere
   if (!authToken && !tokenInUrl) {
-    console.log('[DASHBOARD] No token found, redirecting to login');
     return c.redirect('/');
   }
 
-  // If we have tokenInUrl, verify it on the server side too
-  // This prevents issues with placeholder values
   let payload: any = null;
   const tokenToVerify = authToken || tokenInUrl;
-  
   if (tokenToVerify) {
     try {
       payload = await verify(tokenToVerify, c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var') as any;
-      console.log('[DASHBOARD] Token verified successfully for user:', payload.userId);
-    } catch (error) {
-      // Only redirect if BOTH tokens are invalid and there's no tokenInUrl to try
-      if (!tokenInUrl) {
-        console.error('[DASHBOARD] Invalid token, redirecting to login');
-        return c.redirect('/');
-      }
-      // If we have tokenInUrl but it failed to verify, use placeholder (client will retry)
-      console.warn('[DASHBOARD] Token in URL failed verification, using placeholder');
-      payload = { 
-        userId: 0, 
-        userName: 'Loading...', 
-        email: '', 
-        name: 'Loading...', 
-        role: 'founder' 
-      };
+    } catch {
+      if (!tokenInUrl) return c.redirect('/');
+      payload = { userId: 0, userName: 'Loading...', email: '', name: 'Loading...', role: 'founder' };
     }
   }
-
-  // If still no payload, use placeholder values (shouldn't happen due to earlier check)
   if (!payload) {
-    payload = { 
-      userId: 0, 
-      userName: 'Loading...', 
-      email: '', 
-      name: 'Loading...', 
-      role: 'founder' 
-    };
+    payload = { userId: 0, userName: 'Loading...', email: '', name: 'Loading...', role: 'founder' };
   }
 
-  try {
+  const safeUser = (payload.userName || payload.name || payload.email || 'Usuario').replace(/"/g, '\\"').replace(/`/g, '\\`');
+  const safeEmail = (payload.email || '').replace(/"/g, '\\"');
+  const safeRole = (payload.role || 'founder').replace(/"/g, '\\"');
+  const userId = payload.userId || 0;
 
-    return c.html(`
-<!DOCTYPE html>
+  return c.html(`<!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - ASTAR* Labs</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: '#6366f1',
-              secondary: '#8b5cf6',
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      * {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
-      
-      .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-      }
-      .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-
-      @keyframes bounce {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-5px); }
-      }
-      
-      .animate-bounce {
-        animation: bounce 1s infinite;
-      }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Startup OS · ASTAR*</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+  <style>
+    *{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+    .scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .dot-bounce{animation:bounce .9s infinite}.dot-bounce:nth-child(2){animation-delay:.15s}.dot-bounce:nth-child(3){animation-delay:.3s}
+    .msg-in{animation:fadeIn .2s ease-out}
+    .sidebar-btn{transition:background .15s,color .15s}
+    .sidebar-btn.active{background:#7c3aed;color:#fff;box-shadow:0 4px 14px rgba(124,58,237,.35)}
+    .sidebar-btn:not(.active):hover{background:rgba(255,255,255,.07);color:#e2e8f0}
+    .task-card{transition:background .15s,border-color .15s}
+    .task-card:hover{background:rgba(255,255,255,.08);border-color:rgba(167,139,250,.35)}
+    .task-card.done{opacity:.55}
+    .bubble-user{background:#7c3aed;border-radius:16px 16px 3px 16px}
+    .bubble-ai{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:16px 16px 16px 3px}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+    #chat-input{min-height:36px;max-height:120px;line-height:1.5}
+  </style>
 </head>
-<body class="bg-gray-50">
-    <div id="app"></div>
-
-    <script type="module">
-      // Check if token is in URL (from OAuth redirect)
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlToken = urlParams.get('token');
-      if (urlToken) {
-        console.log('[DASHBOARD] Token found in URL, saving...');
-        // Save token as cookie
-        document.cookie = \`authToken=\${urlToken}; path=/; max-age=\${60 * 60 * 24 * 7}; SameSite=Lax\`;
-        // Also save in localStorage as backup
-        localStorage.setItem('authToken', urlToken);
-        console.log('[DASHBOARD] Token saved successfully');
-        // Clean up URL
-        const cleanUrl = window.location.pathname + window.location.hash;
-        window.history.replaceState({}, document.title, cleanUrl);
-      } else {
-        console.log('[DASHBOARD] No token in URL');
-      }
-      
-      // Get token from cookie or localStorage
-      function getAuthToken() {
-        const cookieMatch = document.cookie.match(/authToken=([^;]+)/);
-        return cookieMatch ? cookieMatch[1] : localStorage.getItem('authToken');
-      }
-
-      const userId = ${payload.userId || 0};
-      const userName = "${(payload.userName || payload.name || payload.email || 'Usuario').replace(/"/g, '\\"')}";
-      const userEmail = "${(payload.email || '').replace(/"/g, '\\"')}";
-      const userRole = "${payload.role || 'founder'}";
-      
-      // Configure axios to send cookies automatically
-      axios.defaults.withCredentials = true;
-      axios.defaults.headers.common['Content-Type'] = 'application/json';
-      
-      // Add auth token to all requests
-      axios.interceptors.request.use(config => {
-        const token = getAuthToken();
-        if (token) {
-          config.headers.Authorization = \`Bearer \${token}\`;
-        }
-        return config;
-      }, error => Promise.reject(error));
-      
-      // Add request interceptor to log requests
-      axios.interceptors.request.use(config => {
-        console.log('Axios Request:', {
-          url: config.url,
-          method: config.method,
-          headers: config.headers,
-          withCredentials: config.withCredentials
-        });
-        return config;
-      }, error => {
-        console.error('Axios Request Error:', error);
-        return Promise.reject(error);
-      });
-      
-      // Add response interceptor to log responses
-      axios.interceptors.response.use(
-        response => {
-          console.log('Axios Response:', response.status, response.config.url);
-          return response;
-        },
-        error => {
-          console.error('Axios Response Error:', {
-            status: error.response?.status,
-            url: error.config?.url,
-            data: error.response?.data
-          });
-          return Promise.reject(error);
-        }
-      );
-      
-      // State management
-      let state = {
-        currentView: window.location.hash ? window.location.hash.substring(1) : 'dashboard', // dashboard, traction, inbox
-        messages: [],
-        goals: [],
-        metrics: {
-          completedGoals: 0,
-          overdueGoals: 0,
-          totalGoals: 0,
-          overallCompletion: 0
-        },
-        astarPendingMessages: [],
-        showAstarNotification: false,
-        astarResponse: '',
-        respondingToMessageId: null,
-        chatExpanded: false,
-        isLoading: false,
-        inputMessage: ''
-      };
-
-      // Load initial data
-      async function loadGoals() {
-        try {
-          const response = await axios.get(\`/api/dashboard/goals?userId=\${userId}\`, {
-            withCredentials: true
-          });
-          state.goals = response.data.goals || [];
-          calculateMetrics();
-          render();
-        } catch (error) {
-          console.error('Error loading goals:', error);
-        }
-      }
-
-      async function loadChatHistory() {
-        try {
-          const response = await axios.get('/api/chat-agent/history', {
-            withCredentials: true
-          });
-          state.messages = response.data.messages || [];
-          render();
-        } catch (error) {
-          console.error('Error loading chat:', error);
-        }
-      }
-
-      async function loadAstarPendingMessages() {
-        try {
-          console.log('[ASTAR] Loading pending messages...');
-          const response = await axios.get('/api/astar-messages/pending', {
-            withCredentials: true
-          });
-          console.log('[ASTAR] Response:', response.data);
-          state.astarPendingMessages = response.data.pending || [];
-          state.showAstarNotification = state.astarPendingMessages.length > 0;
-          console.log('[ASTAR] Pending messages:', state.astarPendingMessages.length);
-          render();
-        } catch (error) {
-          console.error('[ASTAR] Error loading messages:', error);
-        }
-      }
-
-      async function submitAstarResponse(messageId) {
-        if (!state.astarResponse.trim()) return;
-        
-        try {
-          state.isLoading = true;
-          render();
-          
-          // Obtener token de las cookies
-          var token = document.cookie.match(/authToken=([^;]+)/)?.[1];
-          
-          const response = await axios.post('/api/astar-messages/respond', {
-            sent_message_id: messageId,
-            response_text: state.astarResponse
-          }, {
-            headers: token ? {
-              'Authorization': 'Bearer ' + token
-            } : {},
-            withCredentials: true
-          });
-
-          if (response.status === 200) {
-            state.astarResponse = '';
-            state.respondingToMessageId = null;
-            
-            var data = response.data;
-            
-            // Mapear categorías a contextos de chat
-            var contextMap = {
-              'ideas': 'hipotesis',
-              'hypothesis': 'hipotesis',
-              'build': 'construccion',
-              'construction': 'construccion',
-              'measure': 'metricas',
-              'measurement': 'metricas',
-              'feedback': 'metricas',
-              'reflect': 'reflexion',
-              'reflection': 'reflexion',
-              'weekly_review': 'reflexion'
-            };
-            
-            var chatContext = contextMap[data.category] || 'general';
-            
-            // Redirigir al dashboard con el contexto del chat
-            window.location.href = '/dashboard?emailContext=' + chatContext + '&astarResponse=' + encodeURIComponent(data.response_text);
-          }
-        } catch (error) {
-          console.error('[ASTAR] Error submitting:', error);
-          alert('Error al enviar respuesta. Por favor intenta de nuevo.');
-        } finally {
-          state.isLoading = false;
-          render();
-        }
-      }
-
-      function calculateMetrics() {
-        const completed = state.goals.filter(g => g.status === 'completed').length;
-        const overdue = state.goals.filter(g => 
-          g.status !== 'completed' && new Date(g.deadline) < new Date()
-        ).length;
-        const total = state.goals.length;
-        const completion = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-        state.metrics = {
-          completedGoals: completed,
-          overdueGoals: overdue,
-          totalGoals: total,
-          overallCompletion: completion
-        };
-      }
-
-      async function sendMessage() {
-        if (!state.inputMessage.trim() || state.isLoading) return;
-
-        const userMessage = {
-          id: Date.now().toString(),
-          role: 'user',
-          content: state.inputMessage,
-          timestamp: new Date()
-        };
-
-        state.messages.push(userMessage);
-        const message = state.inputMessage;
-        state.inputMessage = '';
-        state.isLoading = true;
-        render();
-
-        try {
-          const response = await axios.post('/api/chat-agent/message', {
-            message,
-            context: {
-              goals: state.goals,
-              metrics: state.metrics
-            }
-          }, {
-            withCredentials: true
-          });
-
-          const assistantMessage = {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: response.data.message,
-            timestamp: new Date()
-          };
-
-          state.messages.push(assistantMessage);
-
-          if (response.data.goalsUpdated) {
-            await loadGoals();
-          }
-        } catch (error) {
-          console.error('Error sending message:', error);
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: 'Lo siento, ocurrió un error. Por favor intenta de nuevo.',
-            timestamp: new Date()
-          });
-        } finally {
-          state.isLoading = false;
-          render();
-          scrollChatToBottom();
-        }
-      }
-
-      function scrollChatToBottom() {
-        setTimeout(() => {
-          const chatMessages = document.getElementById('chat-messages');
-          if (chatMessages) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-          }
-        }, 100);
-      }
-
-      function formatTime(date) {
-        return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      }
-
-      function formatDate(dateString) {
-        return new Date(dateString).toLocaleDateString('es-ES', { 
-          day: '2-digit', 
-          month: '2-digit', 
-          year: 'numeric' 
-        });
-      }
-
-      // ============================================
-      // ASTAR AGENT FUNCTIONS (usando sistema multiagente)
-      // ============================================
-
-      async function analyzeGoals() {
-        if (state.isLoading) return;
-
-        state.isLoading = true;
-        
-        // Add user message
-        state.messages.push({
-          id: Date.now().toString(),
-          role: 'user',
-          content: '🎯 Analizar mis objetivos actuales con el agente de métricas',
-          timestamp: new Date()
-        });
-        
-        render();
-
-        try {
-          // Usar el nuevo endpoint del agente multiagente
-          const response = await axios.post('/api/chat-agent/message', {
-            message: 'Analiza mis objetivos actuales y dame un reporte detallado con recomendaciones. Usa los datos reales de la base de datos.',
-            useMetricsAgent: true // Flag para indicar que use el metrics agent
-          }, {
-            withCredentials: true
-          });
-
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: response.data.message,
-            timestamp: new Date()
-          });
-        } catch (error) {
-          console.error('Error analyzing goals:', error);
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: 'Lo siento, ocurrió un error al analizar los objetivos.',
-            timestamp: new Date()
-          });
-        } finally {
-          state.isLoading = false;
-          render();
-          scrollChatToBottom();
-        }
-      }
-
-      async function generateMarketingPlan() {
-        if (state.isLoading) return;
-
-        const websiteUrl = prompt('¿Cuál es tu sitio web? (para analizar tu marca)', '');
-        if (!websiteUrl) return;
-
-        state.isLoading = true;
-        
-        state.messages.push({
-          id: Date.now().toString(),
-          role: 'user',
-          content: \`🎨 Generar análisis de marca y plan de marketing para \${websiteUrl}\`,
-          timestamp: new Date()
-        });
-        
-        render();
-
-        try {
-          // Usar el brand marketing agent de Railway
-          const response = await axios.post('/api/chat-agent/message', {
-            message: \`Analiza la identidad de marca de \${websiteUrl} y genera un plan de marketing detallado con estrategias de contenido, colores, tono y mensajes clave. Sé específico y creativo.\`,
-            useBrandAgent: true,
-            websiteUrl: websiteUrl
-          }, {
-            withCredentials: true
-          });
-
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: response.data.message,
-            timestamp: new Date()
-          });
-        } catch (error) {
-          console.error('Error generating plan:', error);
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: '⚠️ No pude generar el plan de marketing. Por favor intenta de nuevo.',
-            timestamp: new Date()
-          });
-        } finally {
-          state.isLoading = false;
-          render();
-          scrollChatToBottom();
-        }
-      }
-
-      async function generateContentIdeas() {
-        if (state.isLoading) return;
-
-        const websiteUrl = prompt('¿Cuál es tu sitio web? (para entender tu marca)', '');
-        if (!websiteUrl) return;
-
-        const platform = prompt('¿Para qué plataforma? (Instagram, LinkedIn, Twitter, TikTok, Blog)', 'Instagram');
-        if (!platform) return;
-
-        state.isLoading = true;
-        
-        state.messages.push({
-          id: Date.now().toString(),
-          role: 'user',
-          content: \`🎬 Generar ideas de contenido para \${platform}\`,
-          timestamp: new Date()
-        });
-        
-        render();
-
-        try {
-          // Usar el brand marketing agent para generar ideas de contenido
-          const response = await axios.post('/api/chat-agent/message', {
-            message: \`Basándote en la identidad de marca de \${websiteUrl}, genera 10 ideas creativas de contenido para \${platform}. Incluye títulos atractivos, descripciones, hashtags relevantes y el mejor momento para publicar. Sé específico y creativo.\`,
-            useBrandAgent: true,
-            websiteUrl: websiteUrl
-          }, {
-            withCredentials: true
-          });
-
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: response.data.message,
-            timestamp: new Date()
-          });
-        } catch (error) {
-          console.error('Error generating ideas:', error);
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: '⚠️ No pude generar las ideas de contenido. Por favor intenta de nuevo.',
-            timestamp: new Date()
-          });
-        } finally {
-          state.isLoading = false;
-          render();
-          scrollChatToBottom();
-        }
-      }
-
-      async function analyzeCompetition() {
-        if (state.isLoading) return;
-
-        const industry = prompt('¿En qué industria estás? (SaaS, fintech, ecommerce, etc.)', 'SaaS');
-        if (!industry) return;
-
-        const stage = prompt('¿En qué etapa está tu startup? (seed, series_a, series_b)', 'seed');
-        if (!stage) return;
-
-        state.isLoading = true;
-        
-        state.messages.push({
-          id: Date.now().toString(),
-          role: 'user',
-          content: \`📊 Comparar mis métricas con benchmarks de \${industry} (\${stage})\`,
-          timestamp: new Date()
-        });
-        
-        render();
-
-        try {
-          // Usar el metrics agent para comparar con benchmarks de la industria
-          const response = await axios.post('/api/chat-agent/message', {
-            message: \`Compara mis métricas actuales con los benchmarks de la industria \${industry} en etapa \${stage}. Dame un análisis detallado de qué métricas están por encima o debajo del promedio, y recomendaciones específicas para mejorar. Incluye gráficos y porcentajes.\`,
-            useMetricsAgent: true,
-            industry: industry,
-            stage: stage
-          }, {
-            withCredentials: true
-          });
-
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: response.data.message,
-            timestamp: new Date()
-          });
-        } catch (error) {
-          console.error('Error analyzing competition:', error);
-          state.messages.push({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: '⚠️ No pude analizar la competencia. Por favor intenta de nuevo.',
-            timestamp: new Date()
-          });
-        } finally {
-          state.isLoading = false;
-          render();
-          scrollChatToBottom();
-        }
-      }
-
-      // Render function
-      function render() {
-        const { messages, goals, metrics, chatExpanded, isLoading, inputMessage } = state;
-
-        document.getElementById('app').innerHTML = \`
-          <div class="flex h-screen bg-gray-50">
-            <!-- Main Content Area with Top Nav -->
-            <div class="flex-1 overflow-y-auto">
-              <!-- Header -->
-              <div class="bg-white border-b border-gray-200 px-6 py-4">
-                <div class="max-w-7xl mx-auto flex items-center justify-between">
-                  <div class="flex items-center space-x-4">
-                    <h1 class="text-2xl font-bold flex items-center">
-                      <span class="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">ASTAR</span>
-                      <span class="text-blue-500 ml-1">✦</span>
-                    </h1>
-                    <div class="text-sm">
-                      <p class="font-semibold text-gray-900">\${userName}</p>
-                      <p class="text-xs text-gray-500">\${userRole}</p>
-                    </div>
-                  </div>
-                  <div class="flex items-center space-x-4">
-                    <button onclick="toggleChat()" class="text-gray-600 hover:text-primary transition">
-                      <i class="fas fa-robot text-xl"></i>
-                    </button>
-                    <button class="text-gray-600 hover:text-primary transition">
-                      <i class="fas fa-bell text-xl"></i>
-                    </button>
-                    <a href="#settings" class="text-gray-600 hover:text-primary transition">
-                      <i class="fas fa-cog text-xl"></i>
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Tab Navigation -->
-              <div class="bg-white border-b border-gray-200">
-                <div class="max-w-7xl mx-auto px-6">
-                  <div class="flex space-x-8">
-                    <button onclick="switchView(\\'dashboard\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'dashboard' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
-                      <i class="fas fa-home mr-2"></i>Home
-                    </button>
-                    <button onclick="switchView(\\'traction\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'traction' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
-                      <i class="fas fa-chart-line mr-2"></i>Traction
-                    </button>
-                    <button onclick="switchView(\\'inbox\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'inbox' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
-                      <i class="fas fa-inbox mr-2"></i>Inbox
-                    </button>
-                    <button onclick="switchView(\\'directory\\')" class="tab-btn px-1 py-4 text-sm font-semibold border-b-2 transition \${state.currentView === 'directory' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'}">
-                      <i class="fas fa-users mr-2"></i>Validators
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Content Area -->
-              <div class="max-w-7xl mx-auto p-6" id="main-content">
-                <!-- Content will be rendered here based on state.currentView -->
-              </div>
-            </div>
-
-            <!-- AI Chat Modal (Floating) -->
-            <div class="fixed bottom-6 right-6 z-50 \${chatExpanded ? '' : 'hidden'}">
-              <div class="bg-gray-900 text-white rounded-2xl shadow-2xl w-96 h-[600px] flex flex-col">
-                <!-- Chat Header -->
-                <div class="p-4 border-b border-gray-700 flex items-center justify-between">
-                  <div>
-                    <h3 class="text-lg font-bold">AI Assistant</h3>
-                    <p class="text-xs text-gray-400">Gestiona tus objetivos</p>
-                  </div>
-                  <button onclick="toggleChat()" class="text-gray-400 hover:text-white">
-                    <i class="fas fa-times"></i>
-                  </button>
-                </div>
-
-                <!-- Quick Actions -->
-                <div class="p-3 border-b border-gray-700">
-                  <div class="grid grid-cols-2 gap-2">
-                    <button onclick="analyzeGoals()" class="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-xs font-medium transition">
-                      <i class="fas fa-chart-line mr-1"></i>Analizar
-                    </button>
-                    <button onclick="generateMarketingPlan()" class="px-2 py-1.5 bg-purple-600 hover:bg-purple-700 rounded text-xs font-medium transition">
-                      <i class="fas fa-clipboard-list mr-1"></i>Plan
-                    </button>
-                    <button onclick="generateContentIdeas()" class="px-2 py-1.5 bg-green-600 hover:bg-green-700 rounded text-xs font-medium transition">
-                      <i class="fas fa-lightbulb mr-1"></i>Ideas
-                    </button>
-                    <button onclick="analyzeCompetition()" class="px-2 py-1.5 bg-orange-600 hover:bg-orange-700 rounded text-xs font-medium transition">
-                      <i class="fas fa-users mr-1"></i>Competencia
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Chat Messages -->
-                <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
-                  \${messages.length === 0 ? \`
-                    <div class="text-center text-gray-400 mt-8">
-                      <i class="fas fa-robot text-4xl mb-4"></i>
-                      <p class="text-sm">¡Hola! Soy tu asistente de IA.</p>
-                      <p class="text-xs mt-2">Puedo ayudarte a:</p>
-                      <ul class="text-xs mt-2 space-y-1 text-left mx-4">
-                        <li>• Crear y actualizar objetivos</li>
-                        <li>• Registrar progreso</li>
-                        <li>• Ver estadísticas</li>
-                        <li>• Analizar tu rendimiento</li>
-                      </ul>
-                    </div>
-                  \` : messages.map(message => \`
-                    <div class="flex \${message.role === 'user' ? 'justify-end' : 'justify-start'}">
-                      <div class="max-w-[80%] rounded-lg p-3 \${
-                        message.role === 'user'
-                          ? 'bg-primary text-white'
-                          : 'bg-gray-800 text-gray-100'
-                      }">
-                        <p class="text-sm whitespace-pre-wrap">\${message.content}</p>
-                        <p class="text-xs opacity-60 mt-1">\${formatTime(message.timestamp)}</p>
-                      </div>
-                    </div>
-                  \`).join('')}
-                  \${isLoading ? \`
-                    <div class="flex justify-start">
-                      <div class="bg-gray-800 rounded-lg p-3">
-                        <div class="flex space-x-2">
-                          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
-                        </div>
-                      </div>
-                    </div>
-                  \` : ''}
-                </div>
-
-                <!-- Chat Input -->
-                <div class="p-4 border-t border-gray-700">
-                  <div class="flex items-end space-x-2">
-                    <textarea
-                      id="chat-input"
-                      value="\${inputMessage}"
-                      oninput="updateInput(this.value)"
-                      onkeypress="handleKeyPress(event)"
-                      placeholder="Escribe un mensaje..."
-                      class="flex-1 bg-gray-800 text-white rounded-lg px-4 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                      rows="1"
-                      \${isLoading ? 'disabled' : ''}
-                    ></textarea>
-                    <button
-                      onclick="sendMessage()"
-                      \${isLoading || !inputMessage.trim() ? 'disabled' : ''}
-                      class="bg-primary hover:bg-primary/90 disabled:bg-gray-600 text-white p-2 rounded-lg transition"
-                    >
-                      <i class="fas fa-paper-plane"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Floating Chat Button (when chat is closed) -->
-            <button
-              onclick="toggleChat()"
-              class="fixed bottom-6 right-6 z-50 \${chatExpanded ? 'hidden' : ''} bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl hover:shadow-purple-500/50 transition-all hover:scale-110"
-            >
-              <i class="fas fa-comment-dots text-2xl"></i>
-            </button>
-          </div>
-        \`;
-        
-        // Update main content based on current view after DOM is ready
-        requestAnimationFrame(() => {
-          updateMainContent();
-        });
-      }
-
-      // Update main content based on view
-      async function updateMainContent() {
-        const contentDiv = document.getElementById('main-content');
-        console.log('updateMainContent called', { contentDiv, currentView: state.currentView });
-        if (!contentDiv) {
-          console.error('main-content div not found!');
-          return;
-        }
-        
-        const { goals, metrics } = state;
-        console.log('Updating content', { goals: goals.length, metrics });
-        
-        if (state.currentView === 'dashboard') {
-          contentDiv.innerHTML = getDashboardHTML(goals, metrics);
-        } else if (state.currentView === 'traction') {
-          contentDiv.innerHTML = getTractionHTML(goals, metrics);
-        } else if (state.currentView === 'inbox') {
-          contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-primary"></i><p class="text-gray-600 mt-4">Cargando conversaciones...</p></div>';
-          contentDiv.innerHTML = await getInboxHTML();
-        } else if (state.currentView === 'directory') {
-          contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-primary"></i><p class="text-gray-600 mt-4">Cargando validators...</p></div>';
-          contentDiv.innerHTML = await getDirectoryHTML();
-        }
-        console.log('Content updated');
-      }
-      
-      function getDashboardHTML(goals, metrics) {
-        console.log('[ASTAR] getDashboardHTML called', {
-          showNotification: state.showAstarNotification,
-          messagesCount: state.astarPendingMessages.length
-        });
-        
-        // ASTAR Notification Banner
-        const astarNotificationHTML = state.showAstarNotification && state.astarPendingMessages.length > 0 ? 
-          '<div class="mb-6 bg-gradient-to-r from-purple-900 to-indigo-900 rounded-xl shadow-2xl p-6 border-2 border-purple-500">' +
-            '<div class="flex items-center justify-between mb-4">' +
-              '<div class="flex items-center space-x-3">' +
-                '<span class="text-3xl">🌟</span>' +
-                '<h2 class="text-white text-xl font-bold">ASTAR te pregunta...</h2>' +
-                '<span class="bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-bold">' +
-                  state.astarPendingMessages.length + ' mensaje' + (state.astarPendingMessages.length > 1 ? 's' : '') +
-                '</span>' +
-              '</div>' +
-              '<button onclick="window.state.showAstarNotification = false; updateMainContent()" class="text-gray-300 hover:text-white text-xl">✕</button>' +
-            '</div>' +
-            state.astarPendingMessages.map(msg => 
-              '<div class="bg-gray-900 bg-opacity-50 rounded-lg p-4 mb-4 border-l-4 border-purple-500">' +
-                '<div class="text-white mb-3">' +
-                  '<div class="text-lg font-bold mb-2">' + msg.subject + '</div>' +
-                  '<div class="text-sm text-gray-300 mb-3">' +
-                    new Date(msg.sent_at).toLocaleDateString('es-ES', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    }) +
-                  '</div>' +
-                  '<div class="text-base text-gray-200 mb-4">' + msg.response_prompt + '</div>' +
-                '</div>' +
-                '<textarea ' +
-                  'id="astar-response-' + msg.sent_message_id + '" ' +
-                  'placeholder="Escribe tu respuesta aquí..." ' +
-                  'class="w-full min-h-[100px] p-3 rounded-lg border border-gray-600 bg-gray-800 text-white text-sm resize-vertical mb-3" ' +
-                  'onfocus="window.state.respondingToMessageId = ' + msg.sent_message_id + '; window.state.astarResponse = this.value" ' +
-                  'oninput="window.state.astarResponse = this.value"' +
-                '></textarea>' +
-                '<button ' +
-                  'onclick="submitAstarResponse(' + msg.sent_message_id + ')" ' +
-                  'class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-bold text-sm transition shadow-lg"' +
-                '>' +
-                  '📤 Enviar Respuesta' +
-                '</button>' +
-              '</div>'
-            ).join('') +
-          '</div>' 
-          : '';
-        
-        return astarNotificationHTML +
-        '<div class="mb-6">' +
-          '<h2 class="text-2xl font-bold text-gray-900">Welcome back! 👋</h2>' +
-          '<p class="text-gray-500">Manage your startup growth and connect with validators</p>' +
-        '</div>' +
-        '<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">' +
-          '<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">' +
-            '<div class="flex items-center justify-between">' +
-              '<div><p class="text-xs font-medium text-gray-500 uppercase">Goals</p><p class="text-2xl font-bold text-gray-900">' + metrics.totalGoals + '</p></div>' +
-              '<div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center"><i class="fas fa-bullseye text-blue-600 text-xl"></i></div>' +
-            '</div>' +
-            '<p class="text-xs text-gray-500 mt-2">' + goals.filter(g => g.status === 'in_progress').length + ' active</p>' +
-          '</div>' +
-          '<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">' +
-            '<div class="flex items-center justify-between">' +
-              '<div><p class="text-xs font-medium text-gray-500 uppercase">Completion</p><p class="text-2xl font-bold text-gray-900">' + metrics.overallCompletion + '%</p></div>' +
-              '<div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center"><i class="fas fa-check-circle text-green-600 text-xl"></i></div>' +
-            '</div>' +
-            '<p class="text-xs text-gray-500 mt-2">' + metrics.completedGoals + ' completed</p>' +
-          '</div>' +
-          '<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">' +
-            '<div class="flex items-center justify-between">' +
-              '<div><p class="text-xs font-medium text-gray-500 uppercase">Users</p><p class="text-2xl font-bold text-gray-900">-</p></div>' +
-              '<div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center"><i class="fas fa-users text-purple-600 text-xl"></i></div>' +
-            '</div>' +
-            '<p class="text-xs text-gray-500 mt-2">-</p>' +
-          '</div>' +
-          '<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200">' +
-            '<div class="flex items-center justify-between">' +
-              '<div><p class="text-xs font-medium text-gray-500 uppercase">Revenue</p><p class="text-2xl font-bold text-gray-900">-</p></div>' +
-              '<div class="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center"><i class="fas fa-dollar-sign text-yellow-600 text-xl"></i></div>' +
-            '</div>' +
-            '<p class="text-xs text-gray-500 mt-2">-</p>' +
-          '</div>' +
-        '</div>' +
-        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">' +
-          '<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">' +
-            '<div class="flex items-center justify-between mb-4">' +
-              '<h3 class="font-bold text-gray-900">Active Goals</h3>' +
-              '<button onclick="switchView(\\'traction\\')" class="text-primary text-sm font-medium hover:underline">View all →</button>' +
-            '</div>' +
-            '<div class="space-y-3">' +
-              (goals.length === 0 ? 
-                '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">No active goals</p></div>' :
-                goals.slice(0, 3).map(goal => 
-                  '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
-                    '<div class="flex-1"><div class="flex items-center mb-1">' +
-                      '<span class="w-2 h-2 rounded-full mr-2 ' + (goal.status === 'completed' ? 'bg-green-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400') + '"></span>' +
-                      '<h4 class="font-semibold text-gray-900 text-sm">' + goal.description + '</h4>' +
-                    '</div><div class="ml-4">' +
-                      '<div class="w-full bg-gray-200 rounded-full h-1.5"><div class="h-1.5 rounded-full ' + (goal.status === 'completed' ? 'bg-green-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400') + '" style="width: ' + Math.min((goal.current_value / goal.target_value) * 100, 100) + '%"></div></div>' +
-                    '</div></div>' +
-                    '<div class="text-right ml-3"><div class="text-xs text-gray-600">' + Math.round((goal.current_value / goal.target_value) * 100) + '%</div></div>' +
-                  '</div>'
-                ).join('')
-              ) +
-            '</div>' +
-          '</div>' +
-          '<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">' +
-            '<div class="flex items-center justify-between mb-4">' +
-              '<h3 class="font-bold text-gray-900">Recent Messages</h3>' +
-              '<button onclick="switchView(\\'inbox\\')" class="text-primary text-sm font-medium hover:underline">View all →</button>' +
-            '</div>' +
-            '<div class="space-y-3">' +
-              '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">No messages</p></div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        // LinkedIn Connector Terminal
-        '<div class="mt-8">' +
-          '<h2 class="text-2xl font-bold text-gray-900 mb-6">🔗 LinkedIn Connector</h2>' +
-          '<div class="bg-gray-900 rounded-lg shadow-lg overflow-hidden">' +
-            '<div class="bg-gray-800 px-4 py-2 flex items-center space-x-2">' +
-              '<div class="flex space-x-2"><div class="w-3 h-3 rounded-full bg-red-500"></div><div class="w-3 h-3 rounded-full bg-yellow-500"></div><div class="w-3 h-3 rounded-full bg-green-500"></div></div>' +
-              '<span class="text-gray-400 text-sm ml-4">linkedin-connector-terminal</span>' +
-            '</div>' +
-            '<div class="p-6 text-gray-100 font-mono text-sm">' +
-              '<div class="mb-6">' +
-                '<div class="flex items-center mb-4">' +
-                  '<span class="text-green-400 mr-2">$</span>' +
-                  '<span class="text-gray-400 mr-2">search --type</span>' +
-                  '<select id="linkedinSearchType" class="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700 mr-2">' +
-                    '<option value="investor">investor</option>' +
-                    '<option value="talent">talent</option>' +
-                    '<option value="customer">customer</option>' +
-                    '<option value="partner">partner</option>' +
-                  '</select>' +
-                  '<span class="text-gray-400 mr-2">--query</span>' +
-                  '<input type="text" id="linkedinQuery" placeholder=\'"venture capital" OR "AI startup"\' class="bg-gray-800 text-gray-100 px-3 py-1 rounded border border-gray-700 flex-1" onkeypress="if(event.key===\'Enter\')searchLinkedInProfiles()"/>' +
-                  '<button onclick="searchLinkedInProfiles()" class="ml-2 bg-blue-600 hover:bg-blue-700 px-4 py-1 rounded">🔍 Search</button>' +
-                '</div>' +
-                '<div class="text-xs text-gray-500 mb-4"><span class="text-yellow-400">💡 Tips:</span> Use keywords like "seed investor", "full stack engineer", "CTO SaaS", etc.</div>' +
-              '</div>' +
-              '<div id="linkedinResults" class="hidden">' +
-                '<div class="flex items-center justify-between mb-4">' +
-                  '<div class="text-gray-400"><span class="text-green-400">✓</span> Found <span id="totalProfiles">0</span> profiles | <span class="text-blue-400"><span id="selectedCount">0</span> selected</span></div>' +
-                  '<div class="space-x-2" id="linkedinActions" style="display:none">' +
-                    '<button onclick="generateConnectionMessages()" class="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-xs">📧 Generate Messages</button>' +
-                    '<button onclick="saveSelectedConnections()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs">💾 Save to Campaign</button>' +
-                  '</div>' +
-                '</div>' +
-                '<div id="profilesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto"></div>' +
-              '</div>' +
-              '<div id="linkedinEmpty" class="text-center py-8 text-gray-500">' +
-                '<div class="text-4xl mb-4">🔍</div>' +
-                '<p>No searches yet. Start by typing a query and clicking Search.</p>' +
-                '<div class="mt-4 text-xs"><p class="mb-2">Example queries:</p>' +
-                  '<div class="space-y-1 text-left max-w-md mx-auto">' +
-                    '<div class="bg-gray-800 px-3 py-2 rounded">investor: "seed stage venture capital AI"</div>' +
-                    '<div class="bg-gray-800 px-3 py-2 rounded">talent: "senior react developer"</div>' +
-                    '<div class="bg-gray-800 px-3 py-2 rounded">customer: "CTO fintech company"</div>' +
-                  '</div>' +
-                '</div>' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
-      }
-      
-      function getTractionHTML(goals, metrics) {
-        return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Traction & Analytics</h2><p class="text-gray-600 mt-1">Visualiza todas tus métricas y el crecimiento de tu proyecto</p></div>' +
-        '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">' +
-          '<div class="bg-white rounded-xl shadow-lg p-6"><div class="flex items-center justify-between mb-4"><i class="fas fa-bullseye text-blue-500 text-3xl"></i><span class="text-xs text-green-600 font-semibold">↗ Progress</span></div>' +
-          '<div class="text-3xl font-bold text-gray-900 mb-1">' + metrics.overallCompletion + '%</div><div class="text-sm text-gray-600">Goal Completion</div></div>' +
-          '<div class="bg-white rounded-xl shadow-lg p-6"><div class="flex items-center justify-between mb-4"><i class="fas fa-check-circle text-green-500 text-3xl"></i><span class="text-xs text-green-600 font-semibold">✓ Done</span></div>' +
-          '<div class="text-3xl font-bold text-gray-900 mb-1">' + metrics.completedGoals + '</div><div class="text-sm text-gray-600">Completed Goals</div></div>' +
-          '<div class="bg-white rounded-xl shadow-lg p-6"><div class="flex items-center justify-between mb-4"><i class="fas fa-tasks text-purple-500 text-3xl"></i><span class="text-xs text-blue-600 font-semibold">⚡ Active</span></div>' +
-          '<div class="text-3xl font-bold text-gray-900 mb-1">' + goals.filter(g => g.status === 'in_progress').length + '</div><div class="text-sm text-gray-600">In Progress</div></div>' +
-          '<div class="bg-white rounded-xl shadow-lg p-6"><div class="flex items-center justify-between mb-4"><i class="fas fa-exclamation-triangle text-red-500 text-3xl"></i><span class="text-xs text-red-600 font-semibold">⚠ Urgent</span></div>' +
-          '<div class="text-3xl font-bold text-gray-900 mb-1">' + metrics.overdueGoals + '</div><div class="text-sm text-gray-600">Overdue</div></div>' +
-        '</div>' +
-        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">' +
-          '<div class="bg-white rounded-2xl shadow-lg p-6">' +
-            '<div class="flex items-center mb-4"><i class="fas fa-bullseye text-blue-500 text-xl mr-3"></i><h3 class="text-xl font-bold text-gray-900">Goals Status</h3></div>' +
-            '<div class="flex items-center justify-center"><div class="relative w-48 h-48">' +
-              '<svg class="w-full h-full transform -rotate-90"><circle cx="96" cy="96" r="80" stroke="#e5e7eb" stroke-width="16" fill="none"/>' +
-              '<circle cx="96" cy="96" r="80" stroke="#10b981" stroke-width="16" fill="none" stroke-dasharray="' + ((metrics.overallCompletion / 100) * 502.4) + ' 502.4" stroke-linecap="round"/></svg>' +
-              '<div class="absolute inset-0 flex items-center justify-center"><div class="text-center"><div class="text-4xl font-bold text-gray-900">' + metrics.overallCompletion + '%</div><div class="text-sm text-gray-600">Overall</div></div></div>' +
-            '</div></div>' +
-            '<div class="mt-6 grid grid-cols-3 gap-4">' +
-              '<div class="text-center"><div class="text-2xl font-bold text-green-600">' + metrics.completedGoals + '</div><div class="text-xs text-gray-600">Completed</div></div>' +
-              '<div class="text-center"><div class="text-2xl font-bold text-blue-600">' + goals.filter(g => g.status === 'in_progress').length + '</div><div class="text-xs text-gray-600">In Progress</div></div>' +
-              '<div class="text-center"><div class="text-2xl font-bold text-red-600">' + metrics.overdueGoals + '</div><div class="text-xs text-gray-600">Overdue</div></div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="bg-white rounded-2xl shadow-lg p-6"><div class="flex items-center mb-4"><i class="fas fa-chart-line text-purple-500 text-xl mr-3"></i><h3 class="text-xl font-bold text-gray-900">Progress Over Time</h3></div>' +
-          '<div class="h-64 flex items-end justify-around space-x-2">' +
-            goals.slice(0, 7).map((goal, index) => {
-              const progress = (goal.current_value / goal.target_value) * 100;
-              return '<div class="flex-1 flex flex-col items-center"><div class="w-full bg-gray-200 rounded-t-lg overflow-hidden" style="height: 200px">' +
-                '<div class="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all" style="height: ' + Math.min(progress, 100) + '%; margin-top: ' + (100 - Math.min(progress, 100)) + '%"></div>' +
-                '</div><div class="text-xs text-gray-600 mt-2">Day ' + (index + 1) + '</div></div>';
-            }).join('') +
-          '</div></div>' +
-        '</div>' +
-        '<div class="bg-white rounded-2xl shadow-lg p-6"><div class="flex items-center mb-6"><i class="fas fa-list-check text-indigo-500 text-xl mr-3"></i><h3 class="text-xl font-bold text-gray-900">All Goals Overview</h3></div>' +
-        '<div class="space-y-3">' +
-          (goals.length === 0 ? 
-            '<div class="text-center py-12 text-gray-400"><i class="fas fa-inbox text-4xl mb-4"></i><p>No hay objetivos para mostrar</p></div>' :
-            goals.map(goal => 
-              '<div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
-                '<div class="flex-1"><div class="flex items-center mb-2">' +
-                  '<span class="w-3 h-3 rounded-full mr-3 ' + (goal.status === 'completed' ? 'bg-green-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400') + '"></span>' +
-                  '<h4 class="font-semibold text-gray-900">' + goal.description + '</h4>' +
-                  '<span class="ml-2 px-2 py-1 text-xs font-bold rounded ' + (goal.status === 'completed' ? 'bg-green-100 text-green-800' : goal.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800') + '">' +
-                  (goal.status === 'completed' ? 'Completed' : goal.status === 'in_progress' ? 'In Progress' : 'Pending') + '</span>' +
-                '</div><div class="ml-6">' +
-                  '<div class="flex items-center text-sm text-gray-600 mb-2"><span class="mr-4">Target: ' + goal.target_value + '</span><span>Current: ' + goal.current_value + '</span>' +
-                  '<span class="ml-4 text-primary font-semibold">' + Math.round((goal.current_value / goal.target_value) * 100) + '%</span></div>' +
-                  '<div class="w-full bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full ' + (goal.status === 'completed' ? 'bg-green-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400') + '" style="width: ' + Math.min((goal.current_value / goal.target_value) * 100, 100) + '%"></div></div>' +
-                '</div></div>' +
-                '<div class="text-right ml-4"><div class="text-sm font-semibold text-gray-900">' + formatDate(goal.deadline) + '</div><div class="text-xs text-gray-500 mt-1">Deadline</div></div>' +
-              '</div>'
-            ).join('')
-          ) +
-        '</div></div>';
-      }
-      
-      async function getInboxHTML() {
-        try {
-          // Load real conversations from API
-          const response = await axios.get('/api/chat/conversations');
-          const conversations = response.data.conversations || [];
-          
-          let conversationsHTML = '';
-          if (conversations.length === 0) {
-            conversationsHTML = '<div class="p-4 text-center text-gray-500"><p>No tienes conversaciones aún</p></div>';
-          } else {
-            conversationsHTML = conversations.map(conv => {
-              const unreadBadge = conv.unread_count > 0 
-                ? \`<span class="bg-primary text-white text-xs px-2 py-1 rounded-full">\${conv.unread_count}</span>\`
-                : '';
-              const timeAgo = formatTimeAgo(conv.last_message_at);
-              const avatarUrl = conv.other_user_avatar || \`https://ui-avatars.com/api/?name=\${encodeURIComponent(conv.other_user_name)}&background=6366f1&color=fff\`;
-              
-              return \`<div class="p-4 hover:bg-gray-50 rounded-lg cursor-pointer transition" onclick="loadConversation(\${conv.id})">
-                <div class="flex items-center mb-2">
-                  <img src="\${avatarUrl}" class="w-10 h-10 rounded-full mr-3"/>
-                  <div class="flex-1">
-                    <div class="font-semibold text-gray-900">\${conv.other_user_name}</div>
-                    <div class="text-xs text-gray-600">\${timeAgo}</div>
-                  </div>
-                  \${unreadBadge}
-                </div>
-                <p class="text-sm text-gray-600 truncate">\${conv.last_message || 'Sin mensajes'}</p>
-              </div>\`;
-            }).join('');
-          }
-          
-          return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Inbox</h2><p class="text-gray-600 mt-1">Mensajes entre validadores y startups</p></div>' +
-          '<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">' +
-            '<div class="lg:col-span-1 bg-white rounded-2xl shadow-lg p-4">' +
-              '<div class="mb-4"><input type="text" placeholder="Buscar conversaciones..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"/></div>' +
-              '<div class="space-y-2">' +
-                conversationsHTML +
-              '</div>' +
-            '</div>' +
-            '<div class="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6">' +
-              '<div class="flex items-center justify-center h-96 text-gray-400">' +
-                '<div class="text-center">' +
-                  '<i class="fas fa-comments text-5xl mb-4"></i>' +
-                  '<p>Selecciona una conversación para ver los mensajes</p>' +
-                '</div>' +
-              '</div>' +
-            '</div>' +
-          '</div>';
-        } catch (error) {
-          console.error('Error loading conversations:', error);
-          return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Inbox</h2><p class="text-red-600 mt-1">Error cargando conversaciones</p></div>';
-        }
-      }
-      
-      function formatTimeAgo(dateStr) {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const seconds = Math.floor((now - date) / 1000);
-        
-        if (seconds < 60) return 'hace un momento';
-        if (seconds < 3600) return \`hace \${Math.floor(seconds / 60)} min\`;
-        if (seconds < 86400) return \`hace \${Math.floor(seconds / 3600)} horas\`;
-        if (seconds < 604800) return \`hace \${Math.floor(seconds / 86400)} días\`;
-        return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-      }
-      
-      window.loadConversation = async function(conversationId) {
-        console.log('Loading conversation:', conversationId);
-        // TODO: Implement conversation loading
-        alert('Funcionalidad de conversación en desarrollo');
-      };
-      
-      async function getDirectoryHTML() {
-        try {
-          // Load validators from API
-          const response = await axios.get('/api/validation/validators');
-          const validators = response.data || [];
-          
-          let validatorsHTML = '';
-          if (validators.length === 0) {
-            validatorsHTML = '<div class="col-span-full text-center p-12 text-gray-500"><i class="fas fa-users text-5xl mb-4"></i><p>No hay validadores disponibles</p></div>';
-          } else {
-            validatorsHTML = validators.map(validator => {
-              const avatarUrl = validator.avatar_url || \`https://ui-avatars.com/api/?name=\${encodeURIComponent(validator.name)}&background=6366f1&color=fff\`;
-              const expertise = Array.isArray(validator.expertise) ? validator.expertise : JSON.parse(validator.expertise || '[]');
-              const expertiseHTML = expertise.slice(0, 3).map(exp => 
-                \`<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1">\${exp}</span>\`
-              ).join('');
-              
-              return \`<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
-                <div class="flex items-start mb-4">
-                  <img src="\${avatarUrl}" class="w-16 h-16 rounded-full mr-4"/>
-                  <div class="flex-1">
-                    <h3 class="font-bold text-gray-900 text-lg">\${validator.name}</h3>
-                    <p class="text-sm text-gray-600">\${validator.title || 'Validator'}</p>
-                    <div class="flex items-center mt-2">
-                      <div class="flex text-yellow-400">
-                        \${Array(5).fill(0).map((_, i) => \`<i class="fas fa-star\${i < Math.round(validator.rating || 0) ? '' : '-o'}"></i>\`).join('')}
-                      </div>
-                      <span class="text-sm text-gray-500 ml-2">(\${validator.total_validations || 0} validaciones)</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="mb-4">
-                  <p class="text-sm text-gray-600 line-clamp-2">\${validator.bio || 'Validator experto en startups'}</p>
-                </div>
-                <div class="mb-4">
-                  \${expertiseHTML}
-                </div>
-                <div class="flex gap-2">
-                  <button onclick="startChatWithValidator(\${validator.user_id})" class="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
-                    <i class="fas fa-comment mr-2"></i>Chatear
-                  </button>
-                  <button onclick="viewValidatorProfile(\${validator.user_id})" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
-                    <i class="fas fa-user"></i>
-                  </button>
-                </div>
-              </div>\`;
-            }).join('');
-          }
-          
-          return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Validators</h2><p class="text-gray-600 mt-1">Conecta con expertos que pueden validar tu startup</p></div>' +
-          '<div class="mb-6"><input type="text" placeholder="Buscar validators por nombre o expertise..." class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"/></div>' +
-          '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">' +
-            validatorsHTML +
-          '</div>';
-        } catch (error) {
-          console.error('Error loading validators:', error);
-          return '<div class="mb-8"><h2 class="text-3xl font-bold text-gray-900">Validators</h2><p class="text-red-600 mt-1">Error cargando validators</p></div>';
-        }
-      }
-      
-      window.startChatWithValidator = async function(validatorUserId) {
-        try {
-          console.log('Starting chat with validator:', validatorUserId);
-          // Create or get conversation
-          const response = await axios.post('/api/chat/conversations', {
-            other_user_id: validatorUserId
-          });
-          const conversationId = response.data.conversation_id;
-          // Switch to inbox and load conversation
-          state.currentView = 'inbox';
-          render();
-          setTimeout(() => {
-            window.loadConversation(conversationId);
-          }, 500);
-        } catch (error) {
-          console.error('Error starting chat:', error);
-          alert('Error al iniciar conversación');
-        }
-      };
-      
-      window.viewValidatorProfile = function(validatorUserId) {
-        console.log('Viewing validator profile:', validatorUserId);
-        alert('Perfil de validator en desarrollo');
-      };
-
-      // Event handlers
-      window.toggleChat = () => {
-        state.chatExpanded = !state.chatExpanded;
-        render();
-        if (state.chatExpanded) {
-          scrollChatToBottom();
-        }
-      };
-
-      window.updateInput = (value) => {
-        state.inputMessage = value;
-      };
-
-      window.handleKeyPress = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          sendMessage();
-        }
-      };
-
-      window.sendMessage = sendMessage;
-
-      window.state = state;
-
-      window.submitAstarResponse = submitAstarResponse;
-
-      window.clearChat = async () => {
-        if (confirm('¿Limpiar el historial del chat?')) {
-          try {
-            await axios.delete('/api/chat-agent/history', {
-              withCredentials: true
-            });
-            state.messages = [];
-            render();
-          } catch (error) {
-            console.error('Error clearing chat:', error);
-          }
-        }
-      };
-
-      window.createGoal = () => {
-        state.inputMessage = 'Quiero crear un nuevo objetivo';
-        state.chatExpanded = true;
-        render();
-        setTimeout(() => {
-          document.getElementById('chat-input')?.focus();
-        }, 100);
-      };
-
-      window.switchView = (view) => {
-        console.log('Switching to view:', view);
-        state.currentView = view;
-        // Re-render everything to update navigation highlight
-        render();
-        // Content will be updated by render() -> requestAnimationFrame -> updateMainContent()
-      };
-
-      // LinkedIn Connector functions
-      let linkedinProfiles = [];
-      let selectedProfiles = new Set();
-
-      window.searchLinkedInProfiles = async function() {
-        const query = document.getElementById('linkedinQuery').value;
-        const type = document.getElementById('linkedinSearchType').value;
-        
-        if (!query.trim()) {
-          alert('Por favor ingresa términos de búsqueda');
-          return;
-        }
-
-        try {
-          const token = localStorage.getItem('token');
-          const response = await axios.post('/api/linkedin-connector/search', {
-            type: type,
-            query: query,
-            maxResults: 20
-          }, {
-            headers: { 'Authorization': \`Bearer \${token}\` }
-          });
-
-          if (response.data.success) {
-            linkedinProfiles = response.data.profiles;
-            selectedProfiles = new Set();
-            renderLinkedInProfiles();
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          alert('Error al buscar perfiles');
-        }
-      };
-
-      function renderLinkedInProfiles() {
-        const resultsDiv = document.getElementById('linkedinResults');
-        const emptyDiv = document.getElementById('linkedinEmpty');
-        const profilesGrid = document.getElementById('profilesGrid');
-        const totalSpan = document.getElementById('totalProfiles');
-        const selectedSpan = document.getElementById('selectedCount');
-        const actionsDiv = document.getElementById('linkedinActions');
-
-        if (linkedinProfiles.length === 0) {
-          resultsDiv.classList.add('hidden');
-          emptyDiv.classList.remove('hidden');
-          return;
-        }
-
-        resultsDiv.classList.remove('hidden');
-        emptyDiv.classList.add('hidden');
-        totalSpan.textContent = linkedinProfiles.length;
-        selectedSpan.textContent = selectedProfiles.size;
-        actionsDiv.style.display = selectedProfiles.size > 0 ? 'block' : 'none';
-
-        profilesGrid.innerHTML = linkedinProfiles.map(profile => \`
-          <div class="bg-gray-800 border rounded p-4 cursor-pointer transition-all \${selectedProfiles.has(profile.id) ? 'border-blue-500 bg-gray-750' : 'border-gray-700 hover:border-gray-600'}" 
-               onclick="toggleProfileSelection('\${profile.id}')">
-            <div class="flex items-start space-x-3">
-              <input type="checkbox" \${selectedProfiles.has(profile.id) ? 'checked' : ''} 
-                     onclick="event.stopPropagation(); toggleProfileSelection('\${profile.id}')" class="mt-1"/>
-              <div class="flex-1">
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-white font-semibold">\${profile.name}</h3>
-                  <span class="text-xs px-2 py-1 rounded \${profile.compatibilityScore >= 90 ? 'bg-green-600' : profile.compatibilityScore >= 75 ? 'bg-blue-600' : 'bg-yellow-600'}">
-                    \${profile.compatibilityScore}% match
-                  </span>
-                </div>
-                <p class="text-gray-400 text-xs mb-2">\${profile.headline}</p>
-                <div class="flex items-center text-xs text-gray-500 space-x-3">
-                  <span>📍 \${profile.location}</span>
-                  <span>🏢 \${profile.industry}</span>
-                  \${profile.connections ? \`<span>🤝 \${profile.connections}+</span>\` : ''}
-                </div>
-                <div class="mt-2 text-xs">
-                  \${profile.matchReasons.slice(0, 2).map(reason => \`<div class="text-green-400">✓ \${reason}</div>\`).join('')}
-                </div>
-              </div>
-            </div>
-          </div>
-        \`).join('');
-      }
-
-      window.toggleProfileSelection = function(profileId) {
-        if (selectedProfiles.has(profileId)) {
-          selectedProfiles.delete(profileId);
-        } else {
-          selectedProfiles.add(profileId);
-        }
-        renderLinkedInProfiles();
-      };
-
-      window.generateConnectionMessages = async function() {
-        if (selectedProfiles.size === 0) {
-          alert('Selecciona al menos un perfil');
-          return;
-        }
-
-        try {
-          const token = localStorage.getItem('token');
-          const type = document.getElementById('linkedinSearchType').value;
-          const purpose = type === 'investor' ? 'investment' : 
-                         type === 'talent' ? 'hiring' : 
-                         type === 'customer' ? 'partnership' : 'partnership';
-
-          const response = await axios.post('/api/linkedin-connector/generate-message', {
-            profileIds: Array.from(selectedProfiles),
-            purpose: purpose,
-            senderInfo: {
-              name: 'Your Name',
-              company: 'Your Company',
-              title: 'Your Title'
-            }
-          }, {
-            headers: { 'Authorization': \`Bearer \${token}\` }
-          });
-
-          if (response.data.success) {
-            alert(\`✅ \${response.data.totalMessages} mensajes generados exitosamente\`);
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          alert('Error al generar mensajes');
-        }
-      };
-
-      window.saveSelectedConnections = async function() {
-        if (selectedProfiles.size === 0) {
-          alert('Selecciona al menos un perfil');
-          return;
-        }
-
-        const campaignName = prompt('Nombre de la campaña:');
-        if (!campaignName) return;
-
-        try {
-          const token = localStorage.getItem('token');
-          const profilesArray = linkedinProfiles.filter(p => selectedProfiles.has(p.id));
-          
-          const response = await axios.post('/api/linkedin-connector/save-connections', {
-            profiles: profilesArray,
-            campaign: campaignName
-          }, {
-            headers: { 'Authorization': \`Bearer \${token}\` }
-          });
-
-          if (response.data.success) {
-            alert(\`✅ \${response.data.saved} conexiones guardadas en campaña: \${campaignName}\`);
-            selectedProfiles = new Set();
-            renderLinkedInProfiles();
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          alert('Error al guardar conexiones');
-        }
-      };
-
-      // Initialize
-      loadGoals();
-      loadChatHistory();
-      loadAstarPendingMessages();
-      
-      // Check for ASTAR email response parameters
-      var emailContext = urlParams.get('emailContext');
-      var astarResponseText = urlParams.get('astarResponse');
-      
-      console.log('[ASTAR-INIT] URL params check:', { 
-        emailContext: emailContext, 
-        astarResponseText: astarResponseText ? astarResponseText.substring(0, 50) + '...' : null,
-        fullUrl: window.location.href 
-      });
-      
-      if (emailContext && astarResponseText) {
-        console.log('[ASTAR-INIT] ✅ Email response detected! Opening chat...');
-        
-        // Decode the response text
-        var decodedResponse = decodeURIComponent(astarResponseText);
-        console.log('[ASTAR-INIT] Decoded response:', decodedResponse);
-        
-        // Open chat immediately
-        state.chatExpanded = true;
-        render();
-        
-        // Show user message in chat immediately
-        state.messages.push({
-          id: Date.now().toString(),
-          role: 'user',
-          content: decodedResponse,
-          timestamp: new Date().toISOString()
-        });
-        render();
-        
-        // Wait a moment then send to backend
-        setTimeout(async function() {
-          try {
-            console.log('[ASTAR-INIT] Sending to backend with emailContext:', emailContext);
-            
-            // Send the user's response directly to the chat agent with email context
-            var response = await axios.post('/api/chat-agent/message', {
-              message: decodedResponse,
-              emailContext: emailContext
-            }, {
-              withCredentials: true
-            });
-            
-            console.log('[ASTAR-INIT] Backend response:', response.data);
-            
-            if (response.data && response.data.message) {
-              // Add assistant response to chat
-              state.messages.push({
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: response.data.message,
-                timestamp: new Date().toISOString()
-              });
-              render();
-              
-              // Reload goals after a short delay
-              setTimeout(function() {
-                loadGoals();
-              }, 2000);
-            }
-            
-            // Clean URL
-            var cleanUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, cleanUrl);
-            
-          } catch (error) {
-            console.error('[ASTAR-INIT] Error processing email response:', error);
-            state.messages.push({
-              id: (Date.now() + 2).toString(),
-              role: 'assistant',
-              content: '❌ Error al procesar tu respuesta. Por favor intenta de nuevo.',
-              timestamp: new Date().toISOString()
-            });
-            render();
-          }
-        }, 500);
-      }
-
-      // Handle hash changes
-      window.addEventListener('hashchange', () => {
-        const view = window.location.hash ? window.location.hash.substring(1) : 'dashboard';
-        if (['dashboard', 'traction', 'inbox', 'directory'].includes(view)) {
-          window.switchView(view);
-        }
-      });
-    </script>
-</body>
-</html>
-    `);
-  } catch (error) {
-    console.error('[DASHBOARD] Error rendering page:', error);
-    console.error('[DASHBOARD] Error stack:', error instanceof Error ? error.stack : 'No stack');
-    // Don't redirect, show error instead
-    return c.html(`
-      <!DOCTYPE html>
-      <html>
-      <head><title>Error</title></head>
-      <body>
-        <h1>Dashboard Error</h1>
-        <pre>${error instanceof Error ? error.message : String(error)}</pre>
-        <a href="/">Go back to home</a>
-      </body>
-      </html>
-    `);
+<body class="bg-gray-950 text-white overflow-hidden" style="height:100vh">
+<div class="flex h-screen overflow-hidden bg-gradient-to-br from-gray-950 via-purple-950 to-gray-950">
+
+<!-- ═══ SIDEBAR ═══════════════════════════════════════════════════════════════ -->
+<aside id="sidebar" class="flex flex-col bg-black/60 backdrop-blur-2xl border-r border-white/8 transition-all duration-300 shrink-0 overflow-hidden" style="width:13rem">
+  <div class="flex items-center gap-2 px-3 py-4 border-b border-white/8 shrink-0">
+    <button onclick="toggleSidebar()" class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white shrink-0 hover:opacity-90 transition">⚡</button>
+    <span id="sb-brand" class="font-bold text-white text-sm tracking-wide truncate">ASTAR*</span>
+  </div>
+  <nav class="flex-1 px-2 py-3 space-y-1 overflow-y-auto scrollbar-hide">
+    <button class="sidebar-btn active w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm" onclick="switchSection('os')" id="nav-os"><span class="text-base shrink-0">🚀</span><span class="nl truncate">Startup OS</span></button>
+    <button class="sidebar-btn w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm text-gray-400" onclick="switchSection('traction')" id="nav-traction"><span class="text-base shrink-0">📈</span><span class="nl truncate">Traction</span></button>
+    <button class="sidebar-btn w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm text-gray-400" onclick="switchSection('team')" id="nav-team"><span class="text-base shrink-0">👥</span><span class="nl truncate">Team</span></button>
+    <button class="sidebar-btn w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm text-gray-400" onclick="switchSection('investors')" id="nav-investors"><span class="text-base shrink-0">💰</span><span class="nl truncate">Investors</span></button>
+    <button class="sidebar-btn w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm text-gray-400" onclick="switchSection('linkedin')" id="nav-linkedin"><span class="text-base shrink-0">🔗</span><span class="nl truncate">LinkedIn</span></button>
+    <button class="sidebar-btn w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm text-gray-400" onclick="switchSection('docs')" id="nav-docs"><span class="text-base shrink-0">📝</span><span class="nl truncate">Docs</span></button>
+  </nav>
+  <div class="px-2 py-3 border-t border-white/8 shrink-0 space-y-1">
+    <div class="flex items-center gap-2 px-2 py-2">
+      <div class="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white shrink-0">${safeUser[0]||'U'}</div>
+      <div class="flex-1 min-w-0 nl"><p class="text-xs font-medium text-white truncate">${safeUser}</p><p class="text-xs text-gray-400 capitalize truncate">${safeRole}</p></div>
+    </div>
+    <a href="/" class="w-full flex items-center gap-2 px-2 py-2 rounded-xl text-xs text-gray-400 hover:text-red-300 hover:bg-red-500/10 transition"><span>↩</span><span class="nl">Sign out</span></a>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ════════════════════════════════════════════════════════════════ -->
+<main class="flex-1 flex overflow-hidden">
+
+<!-- ── STARTUP OS ──────────────────────────────────────────────────────── -->
+<section id="section-os" class="flex-1 flex gap-3 p-3 overflow-hidden">
+
+  <!-- LEFT: Objective board -->
+  <div class="w-2/5 min-w-64 max-w-md flex flex-col overflow-hidden bg-black/40 backdrop-blur-xl rounded-2xl border border-white/8">
+    <div class="px-4 py-3 border-b border-white/8 bg-black/20 shrink-0">
+      <div class="flex items-center justify-between mb-2">
+        <div><h2 class="font-bold text-white text-sm">Objetivos</h2><p id="task-count" class="text-xs text-gray-400">0 tareas</p></div>
+        <div class="flex gap-1">
+          <button onclick="setView('list')" id="view-list" class="px-2 py-1 rounded text-xs bg-purple-600 text-white">☰</button>
+          <button onclick="setView('kanban')" id="view-kanban" class="px-2 py-1 rounded text-xs text-gray-400 hover:text-white">⊞</button>
+        </div>
+      </div>
+      <div id="progress-wrap" class="mb-2 hidden">
+        <div class="flex justify-between text-xs text-gray-400 mb-1"><span>Progreso</span><span id="progress-pct" class="text-purple-300 font-medium">0%</span></div>
+        <div class="h-1.5 bg-white/5 rounded-full overflow-hidden"><div id="progress-bar" class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500" style="width:0%"></div></div>
+      </div>
+      <input id="task-search" oninput="renderTasks()" placeholder="Buscar tareas…" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-purple-500/50 placeholder-gray-500 mb-2">
+      <div class="flex gap-1 overflow-x-auto scrollbar-hide">
+        <button onclick="setFilter('all')" id="filter-all" class="px-2.5 py-1 rounded-full text-xs whitespace-nowrap bg-purple-600 text-white">Todo</button>
+        <button onclick="setFilter('todo')" id="filter-todo" class="px-2.5 py-1 rounded-full text-xs whitespace-nowrap bg-white/5 text-gray-400 hover:text-white">Por hacer</button>
+        <button onclick="setFilter('doing')" id="filter-doing" class="px-2.5 py-1 rounded-full text-xs whitespace-nowrap bg-white/5 text-gray-400 hover:text-white">En curso</button>
+        <button onclick="setFilter('done')" id="filter-done" class="px-2.5 py-1 rounded-full text-xs whitespace-nowrap bg-white/5 text-gray-400 hover:text-white">Hecho</button>
+        <button onclick="setFilter('blocked')" id="filter-blocked" class="px-2.5 py-1 rounded-full text-xs whitespace-nowrap bg-white/5 text-gray-400 hover:text-white">Bloqueado</button>
+      </div>
+    </div>
+    <div id="task-list" class="flex-1 overflow-y-auto px-3 py-3 space-y-2 scrollbar-hide"></div>
+    <div class="px-3 pb-3 shrink-0">
+      <button onclick="openQuickAdd()" id="quick-add-btn" class="w-full flex items-center gap-2 p-2.5 rounded-xl border border-dashed border-white/15 hover:border-purple-500/40 text-gray-500 hover:text-gray-300 text-sm transition">
+        <span>＋</span> Añadir tarea
+      </button>
+      <div id="quick-add-form" class="hidden rounded-xl border border-purple-500/30 bg-white/5 p-3 space-y-2">
+        <input id="qa-title" placeholder="Título de la tarea…" class="w-full bg-transparent border-b border-white/10 pb-1 text-sm text-white outline-none placeholder-gray-500 focus:border-purple-500/50" onkeydown="if(event.key==='Enter')addTask();if(event.key==='Escape')closeQuickAdd()">
+        <div class="flex items-center gap-2">
+          <select id="qa-area" class="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none flex-1">
+            <option value="">Área…</option>
+            <option>Product</option><option>Growth</option><option>Fundraising</option>
+            <option>Team</option><option>Legal</option><option>Finance</option>
+            <option>Marketing</option><option>Otro</option>
+          </select>
+          <select id="qa-priority" class="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none">
+            <option value="medium">Media</option><option value="high">Alta</option><option value="low">Baja</option>
+          </select>
+          <button onclick="addTask()" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-lg transition">✓</button>
+          <button onclick="closeQuickAdd()" class="px-2 py-1 bg-white/5 text-gray-400 text-xs rounded-lg transition">✕</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Astro chat -->
+  <div class="flex-1 flex flex-col overflow-hidden bg-black/40 backdrop-blur-xl rounded-2xl border border-white/8">
+    <div class="flex items-center px-4 py-3 border-b border-white/8 bg-black/20 shrink-0">
+      <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-lg mr-3 shrink-0">⚡</div>
+      <div>
+        <div class="font-bold text-white text-sm">Astro</div>
+        <div class="text-xs text-green-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>AI Cofounder · online</div>
+      </div>
+      <div class="ml-auto flex gap-2">
+        <button onclick="clearChat()" title="Nueva conversación" class="text-gray-500 hover:text-gray-300 transition text-xs px-2 py-1 rounded-lg hover:bg-white/5">🗑 Limpiar</button>
+      </div>
+    </div>
+    <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-hide"></div>
+    <div id="quick-prompts" class="px-4 pb-2 flex flex-wrap gap-2">
+      <button onclick="sendQuick('\\u00bfCu\\u00e1l debería ser mi objetivo #1 esta semana?')" class="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-full px-3 py-1.5 transition">🎯 Objetivo esta semana</button>
+      <button onclick="sendQuick('Dame un plan para conseguir mis primeros 100 usuarios')" class="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-full px-3 py-1.5 transition">🚀 100 primeros usuarios</button>
+      <button onclick="sendQuick('Ay\\u00fadame a mejorar mi pitch para inversores')" class="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-full px-3 py-1.5 transition">💡 Mejorar pitch</button>
+      <button onclick="sendQuick('Analiza mis objetivos y dame recomendaciones')" class="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-full px-3 py-1.5 transition">📊 Analizar objetivos</button>
+    </div>
+    <div class="px-3 pb-3 shrink-0">
+      <div class="flex items-end gap-2 bg-white/5 border border-white/10 rounded-2xl px-3 py-2 focus-within:border-purple-500/50 transition">
+        <textarea id="chat-input" rows="1" placeholder="Cu\\u00e9ntale a Astro qu\\u00e9 est\\u00e1 pasando…"
+          class="flex-1 bg-transparent text-white text-sm resize-none outline-none placeholder-gray-500 overflow-y-auto scrollbar-hide"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <div class="flex items-center gap-1 shrink-0 pb-0.5">
+          <button onclick="toggleRecording()" id="mic-btn" title="Voz" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition text-sm">🎙</button>
+          <button onclick="sendMessage()" class="w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-500 flex items-center justify-center transition">
+            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="text-center text-gray-600 text-xs mt-1">Enter envía · Shift+Enter nueva línea</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── TRACTION ─────────────────────────────────────────────────────────── -->
+<section id="section-traction" class="flex-1 overflow-y-auto p-6 space-y-6 hidden scrollbar-hide">
+  <div class="flex items-center justify-between">
+    <div><h2 class="text-2xl font-bold text-white">Traction</h2><p class="text-gray-400 text-sm">Métricas de tu startup</p></div>
+    <button onclick="toggleMetricsEdit()" id="metrics-edit-btn" class="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-lg text-sm transition">✏️ Actualizar</button>
+  </div>
+  <div id="metrics-edit-form" class="hidden bg-black/30 border border-purple-500/20 rounded-2xl p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div><label class="text-xs text-gray-400">👤 Usuarios</label><input id="m-users" type="number" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" value="0"></div>
+    <div><label class="text-xs text-gray-400">💰 MRR ($)</label><input id="m-revenue" type="number" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" value="0"></div>
+    <div><label class="text-xs text-gray-400">📈 Crecimiento %</label><input id="m-growth" type="number" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" value="0"></div>
+    <div><label class="text-xs text-gray-400">⭐ NPS</label><input id="m-nps" type="number" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" value="0"></div>
+    <div><label class="text-xs text-gray-400">🔁 Sesiones/sem</label><input id="m-sessions" type="number" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" value="0"></div>
+    <div><label class="text-xs text-gray-400">🔻 Churn %</label><input id="m-churn" type="number" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" value="0"></div>
+    <div class="col-span-full"><button onclick="saveMetrics()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition">Guardar</button></div>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+    <div class="bg-gradient-to-br from-purple-600/20 to-purple-800/20 backdrop-blur-xl rounded-2xl p-5 border border-purple-500/30"><div class="flex items-center justify-between mb-2"><span class="text-gray-300 text-xs font-medium">Usuarios</span><span class="text-2xl">👤</span></div><div id="card-users" class="text-3xl font-bold text-white">0</div></div>
+    <div class="bg-gradient-to-br from-green-600/20 to-green-800/20 backdrop-blur-xl rounded-2xl p-5 border border-green-500/30"><div class="flex items-center justify-between mb-2"><span class="text-gray-300 text-xs font-medium">MRR</span><span class="text-2xl">💰</span></div><div id="card-revenue" class="text-3xl font-bold text-white">$0</div></div>
+    <div class="bg-gradient-to-br from-blue-600/20 to-blue-800/20 backdrop-blur-xl rounded-2xl p-5 border border-blue-500/30"><div class="flex items-center justify-between mb-2"><span class="text-gray-300 text-xs font-medium">Crecimiento</span><span class="text-2xl">📈</span></div><div id="card-growth" class="text-3xl font-bold text-white">0%</div></div>
+    <div class="bg-gradient-to-br from-yellow-600/20 to-yellow-800/20 backdrop-blur-xl rounded-2xl p-5 border border-yellow-500/30"><div class="flex items-center justify-between mb-2"><span class="text-gray-300 text-xs font-medium">NPS</span><span class="text-2xl">⭐</span></div><div id="card-nps" class="text-3xl font-bold text-white">0</div></div>
+    <div class="bg-gradient-to-br from-pink-600/20 to-pink-800/20 backdrop-blur-xl rounded-2xl p-5 border border-pink-500/30"><div class="flex items-center justify-between mb-2"><span class="text-gray-300 text-xs font-medium">Sesiones/sem</span><span class="text-2xl">🔁</span></div><div id="card-sessions" class="text-3xl font-bold text-white">0</div></div>
+    <div class="bg-gradient-to-br from-red-600/20 to-red-800/20 backdrop-blur-xl rounded-2xl p-5 border border-red-500/30"><div class="flex items-center justify-between mb-2"><span class="text-gray-300 text-xs font-medium">Churn</span><span class="text-2xl">🔻</span></div><div id="card-churn" class="text-3xl font-bold text-white">0%</div></div>
+  </div>
+  <div class="bg-black/30 border border-white/10 rounded-2xl p-5">
+    <h3 class="text-sm font-bold text-white mb-4">Completion de objetivos</h3>
+    <div id="traction-goals"></div>
+  </div>
+</section>
+
+<!-- ── TEAM ─────────────────────────────────────────────────────────────── -->
+<section id="section-team" class="flex-1 overflow-y-auto p-6 space-y-6 hidden scrollbar-hide">
+  <div><h2 class="text-2xl font-bold text-white">Team</h2><p class="text-gray-400 text-sm">Tu equipo fundador</p></div>
+  <div class="bg-black/20 border border-white/10 rounded-2xl p-4 flex gap-2 flex-wrap">
+    <select id="tm-emoji" class="bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-sm text-white outline-none">
+      <option>👤</option><option>👩‍💻</option><option>👨‍💻</option><option>🎨</option><option>📊</option><option>🚀</option><option>💡</option><option>🔧</option>
+    </select>
+    <input id="tm-name" placeholder="Nombre" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50 min-w-24" onkeydown="if(event.key==='Enter')addMember()">
+    <input id="tm-role" placeholder="Rol (CTO, CPO…)" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50 min-w-24" onkeydown="if(event.key==='Enter')addMember()">
+    <button onclick="addMember()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition">+ Añadir</button>
+  </div>
+  <div id="team-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+</section>
+
+<!-- ── INVESTORS ──────────────────────────────────────────────────────── -->
+<section id="section-investors" class="flex-1 overflow-y-auto p-6 space-y-6 hidden scrollbar-hide">
+  <div><h2 class="text-2xl font-bold text-white">Investor Pipeline</h2><p class="text-gray-400 text-sm">Seguimiento de fundraising</p></div>
+  <div class="bg-black/20 border border-white/10 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+    <input id="inv-name" placeholder="Nombre del inversor" class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50">
+    <input id="inv-fund" placeholder="Fondo / firma" class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50">
+    <input id="inv-notes" placeholder="Notas" class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50">
+    <button onclick="addInvestor()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition">+ Añadir</button>
+  </div>
+  <div id="investors-list" class="space-y-2"></div>
+</section>
+
+<!-- ── LINKEDIN ───────────────────────────────────────────────────────── -->
+<section id="section-linkedin" class="flex-1 overflow-y-auto p-6 space-y-6 hidden scrollbar-hide">
+  <div><h2 class="text-2xl font-bold text-white">🔗 LinkedIn Connector</h2><p class="text-gray-400 text-sm">Busca inversores, talento y clientes</p></div>
+  <div class="bg-gray-900/80 rounded-2xl border border-white/10 overflow-hidden">
+    <div class="bg-gray-800/80 px-4 py-2 flex items-center space-x-2 border-b border-white/10">
+      <div class="flex space-x-1.5"><div class="w-3 h-3 rounded-full bg-red-500"></div><div class="w-3 h-3 rounded-full bg-yellow-500"></div><div class="w-3 h-3 rounded-full bg-green-500"></div></div>
+      <span class="text-gray-400 text-xs ml-3">linkedin-connector</span>
+    </div>
+    <div class="p-5">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-green-400 text-sm font-mono">$</span>
+        <select id="li-type" class="bg-gray-800 text-gray-100 px-3 py-1.5 rounded border border-gray-700 text-sm">
+          <option value="investor">investor</option><option value="talent">talent</option>
+          <option value="customer">customer</option><option value="partner">partner</option>
+        </select>
+        <input id="li-query" placeholder='"venture capital" OR "AI startup"' class="bg-gray-800 text-gray-100 px-3 py-1.5 rounded border border-gray-700 text-sm flex-1 outline-none focus:border-blue-500" onkeydown="if(event.key==='Enter')searchLinkedIn()">
+        <button onclick="searchLinkedIn()" class="bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded text-sm transition">🔍 Search</button>
+      </div>
+      <div id="li-results" class="mt-5 text-center py-10 text-gray-500">
+        <div class="text-4xl mb-3">🔍</div><p>Introduce una búsqueda para empezar.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── DOCS ──────────────────────────────────────────────────────────── -->
+<section id="section-docs" class="flex-1 overflow-y-auto p-6 space-y-6 hidden scrollbar-hide">
+  <div><h2 class="text-2xl font-bold text-white">Docs & Templates</h2><p class="text-gray-400 text-sm">Frameworks y documentos para tu startup</p></div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <button class="text-left p-5 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-purple-500/30 rounded-2xl transition group" onclick="openDocTemplate('one-pager')">
+      <div class="text-3xl mb-3">📄</div><h3 class="font-semibold text-white group-hover:text-purple-300 transition">One-Pager</h3>
+      <p class="text-xs text-gray-400 mt-1">Resumen rápido para inversores</p><div class="mt-3 text-xs text-purple-400">Abrir con Astro →</div>
+    </button>
+    <button class="text-left p-5 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-purple-500/30 rounded-2xl transition group" onclick="openDocTemplate('pitch')">
+      <div class="text-3xl mb-3">📊</div><h3 class="font-semibold text-white group-hover:text-purple-300 transition">Pitch Deck</h3>
+      <p class="text-xs text-gray-400 mt-1">Plantilla de 10 slides</p><div class="mt-3 text-xs text-purple-400">Abrir con Astro →</div>
+    </button>
+    <button class="text-left p-5 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-purple-500/30 rounded-2xl transition group" onclick="openDocTemplate('gtm')">
+      <div class="text-3xl mb-3">🗺</div><h3 class="font-semibold text-white group-hover:text-purple-300 transition">Go-to-Market</h3>
+      <p class="text-xs text-gray-400 mt-1">Framework GTM strategy</p><div class="mt-3 text-xs text-purple-400">Abrir con Astro →</div>
+    </button>
+    <button class="text-left p-5 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-purple-500/30 rounded-2xl transition group" onclick="openDocTemplate('okrs')">
+      <div class="text-3xl mb-3">🎯</div><h3 class="font-semibold text-white group-hover:text-purple-300 transition">OKRs</h3>
+      <p class="text-xs text-gray-400 mt-1">Objectives & Key Results</p><div class="mt-3 text-xs text-purple-400">Abrir con Astro →</div>
+    </button>
+    <button class="text-left p-5 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-purple-500/30 rounded-2xl transition group" onclick="openDocTemplate('term-sheet')">
+      <div class="text-3xl mb-3">📋</div><h3 class="font-semibold text-white group-hover:text-purple-300 transition">Term Sheet</h3>
+      <p class="text-xs text-gray-400 mt-1">Plantilla de term sheet</p><div class="mt-3 text-xs text-purple-400">Abrir con Astro →</div>
+    </button>
+    <button class="text-left p-5 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-purple-500/30 rounded-2xl transition group" onclick="openDocTemplate('cap-table')">
+      <div class="text-3xl mb-3">📈</div><h3 class="font-semibold text-white group-hover:text-purple-300 transition">Cap Table</h3>
+      <p class="text-xs text-gray-400 mt-1">Tabla de equity simplificada</p><div class="mt-3 text-xs text-purple-400">Abrir con Astro →</div>
+    </button>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+// ═══ AUTH ══════════════════════════════════════════════════════════════════
+const _urlParams = new URLSearchParams(window.location.search);
+const _urlToken = _urlParams.get('token');
+if (_urlToken) {
+  document.cookie = 'authToken=' + _urlToken + '; path=/; max-age=' + (60*60*24*7) + '; SameSite=Lax';
+  localStorage.setItem('authToken', _urlToken);
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+function getToken() {
+  const m = document.cookie.match(/authToken=([^;]+)/);
+  return m ? m[1] : localStorage.getItem('authToken');
+}
+axios.defaults.withCredentials = true;
+axios.interceptors.request.use(cfg => { const t=getToken(); if(t) cfg.headers.Authorization='Bearer '+t; return cfg; });
+
+// ═══ SIDEBAR ═══════════════════════════════════════════════════════════════
+let _sbOpen = true;
+window.toggleSidebar = function() {
+  _sbOpen = !_sbOpen;
+  const sb = document.getElementById('sidebar');
+  sb.style.width = _sbOpen ? '13rem' : '3.5rem';
+  document.querySelectorAll('.nl').forEach(el => { el.style.display = _sbOpen ? '' : 'none'; });
+};
+
+// ═══ SECTIONS ══════════════════════════════════════════════════════════════
+const SECS = ['os','traction','team','investors','linkedin','docs'];
+window.switchSection = function(id) {
+  SECS.forEach(s => {
+    const sec = document.getElementById('section-'+s);
+    const nav = document.getElementById('nav-'+s);
+    if (sec) sec.classList.toggle('hidden', s!==id);
+    if (nav) { nav.classList.toggle('active',s===id); nav.classList.toggle('text-gray-400',s!==id); }
+  });
+  if (id==='traction') renderTractionGoals();
+  if (id==='team') renderTeam();
+  if (id==='investors') renderInvestors();
+};
+
+// ═══ TASKS ════════════════════════════════════════════════════════════════
+const TK = 'sos_tasks';
+let tasks = [];
+let _filter = 'all', _view = 'list';
+try { tasks = JSON.parse(localStorage.getItem(TK)||'[]'); } catch{}
+function saveTasks() { localStorage.setItem(TK, JSON.stringify(tasks)); }
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+window.setFilter = function(f) {
+  _filter = f;
+  ['all','todo','doing','done','blocked'].forEach(k => {
+    const b = document.getElementById('filter-'+k); if(!b) return;
+    b.className = 'px-2.5 py-1 rounded-full text-xs whitespace-nowrap ' + (k===f ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:text-white');
+  });
+  renderTasks();
+};
+
+window.setView = function(v) {
+  _view = v;
+  document.getElementById('view-list').className = 'px-2 py-1 rounded text-xs '+(v==='list'?'bg-purple-600 text-white':'text-gray-400 hover:text-white');
+  document.getElementById('view-kanban').className = 'px-2 py-1 rounded text-xs '+(v==='kanban'?'bg-purple-600 text-white':'text-gray-400 hover:text-white');
+  renderTasks();
+};
+
+window.renderTasks = function() {
+  const search = (document.getElementById('task-search')?.value||'').toLowerCase();
+  let filtered = tasks.filter(t => {
+    if (_filter!=='all' && t.status!==_filter) return false;
+    if (search && !t.title.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  const done = tasks.filter(t=>t.status==='done').length, total = tasks.length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('task-count').textContent = total+' tareas · '+done+' hechas';
+  const pw = document.getElementById('progress-wrap');
+  if (total) { pw.classList.remove('hidden'); document.getElementById('progress-pct').textContent=pct+'%'; document.getElementById('progress-bar').style.width=pct+'%'; }
+  else pw.classList.add('hidden');
+
+  const c = document.getElementById('task-list'); if(!c) return;
+  if (_view==='kanban') {
+    c.className = 'flex-1 overflow-x-auto overflow-y-auto px-3 py-3 scrollbar-hide';
+    const cols={todo:'Por hacer',doing:'En curso',done:'Hecho',blocked:'Bloqueado'};
+    const cd={todo:'bg-gray-400',doing:'bg-blue-400',done:'bg-green-400',blocked:'bg-red-400'};
+    c.innerHTML = '<div class="flex gap-3 min-h-full">'+
+      Object.entries(cols).map(([st,lb])=>{
+        const ct=filtered.filter(t=>t.status===st);
+        return '<div class="min-w-40 flex-1"><div class="flex items-center gap-1.5 mb-2"><span class="w-2 h-2 rounded-full '+cd[st]+'"></span><span class="text-xs font-medium text-gray-300">'+lb+'</span><span class="text-xs text-gray-500 ml-auto">'+ct.length+'</span></div><div class="space-y-2">'+ct.map(t=>taskCard(t)).join('')+'</div></div>';
+      }).join('') + '</div>';
+    return;
   }
+  c.className = 'flex-1 overflow-y-auto px-3 py-3 space-y-2 scrollbar-hide';
+  if (!filtered.length) { c.innerHTML='<div class="text-center py-12 text-gray-500"><div class="text-4xl mb-2">📋</div><p class="text-sm">Sin tareas. Pídele a Astro que genere un plan.</p></div>'; return; }
+  const sorted=[...filtered].sort((a,b)=>{
+    const sp={doing:0,todo:1,blocked:2,done:3},pp={high:0,medium:1,low:2};
+    return (sp[a.status]||1)-(sp[b.status]||1)||(pp[a.priority]||1)-(pp[b.priority]||1);
+  });
+  c.innerHTML = sorted.map(t=>taskCard(t)).join('');
+};
+
+function taskCard(t) {
+  const sc={todo:'bg-gray-500/20 text-gray-300 border-gray-500/30',doing:'bg-blue-500/20 text-blue-300 border-blue-500/30',done:'bg-green-500/20 text-green-300 border-green-500/30',blocked:'bg-red-500/20 text-red-300 border-red-500/30'};
+  const sd={todo:'bg-gray-400',doing:'bg-blue-400',done:'bg-green-400',blocked:'bg-red-400'};
+  const sl={todo:'Por hacer',doing:'En curso',done:'Hecho',blocked:'Bloqueado'};
+  const pc={high:'text-red-400',medium:'text-yellow-400',low:'text-green-400'};
+  const pl={high:'🔴 Alta',medium:'🟡 Media',low:'🟢 Baja'};
+  const id=t.id, isDone=t.status==='done';
+  const st=(t.title||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return '<div class="task-card group rounded-xl border border-white/10 bg-white/5 p-3 '+(isDone?'done':'')+'">'+
+    '<div class="flex items-start gap-2">'+
+      '<button onclick="toggleDone(\''+id+'\')" class="w-5 h-5 rounded-md border-2 mt-0.5 shrink-0 flex items-center justify-center transition '+(isDone?'bg-green-500 border-green-500 text-white':'border-white/20 hover:border-purple-400')+'">'+
+        (isDone?'<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>':'')+
+      '</button>'+
+      '<div class="flex-1 min-w-0">'+
+        '<div class="text-sm font-medium '+(isDone?'line-through text-gray-500':'text-white')+'">'+( t.emoji||'🎯')+' '+st+'</div>'+
+        '<div class="flex items-center gap-1.5 mt-1.5 flex-wrap">'+
+          '<span class="text-xs border rounded-full px-2 py-0.5 '+(sc[t.status]||sc.todo)+'"><span class="w-1.5 h-1.5 rounded-full '+(sd[t.status]||'bg-gray-400')+' inline-block mr-1"></span>'+(sl[t.status]||'')+'</span>'+
+          (t.priority?'<span class="text-xs '+(pc[t.priority]||'text-gray-400')+'">'+(pl[t.priority]||'')+'</span>':'')+
+          (t.area?'<span class="text-xs text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-2 py-0.5">'+t.area+'</span>':'')+
+          (t.fromAI?'<span class="text-xs text-pink-300 bg-pink-500/10 border border-pink-500/20 rounded-full px-2 py-0.5">⚡ Astro</span>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">'+
+        '<button onclick="cycleStatus(\''+id+'\')" class="w-6 h-6 text-gray-400 hover:text-blue-300 text-xs flex items-center justify-center rounded" title="Cambiar estado">🔄</button>'+
+        '<button onclick="delTask(\''+id+'\')" class="w-6 h-6 text-gray-500 hover:text-red-400 text-xs flex items-center justify-center rounded">✕</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+window.toggleDone = function(id) {
+  const t=tasks.find(x=>x.id===id); if(!t) return;
+  t.status = t.status==='done'?'todo':'done';
+  saveTasks(); renderTasks();
+};
+window.cycleStatus = function(id) {
+  const ord=['todo','doing','done','blocked'];
+  const t=tasks.find(x=>x.id===id); if(!t) return;
+  t.status=ord[(ord.indexOf(t.status)+1)%4];
+  saveTasks(); renderTasks();
+};
+window.delTask = function(id) { tasks=tasks.filter(x=>x.id!==id); saveTasks(); renderTasks(); };
+window.openQuickAdd = function() {
+  document.getElementById('quick-add-btn').classList.add('hidden');
+  document.getElementById('quick-add-form').classList.remove('hidden');
+  document.getElementById('qa-title').focus();
+};
+window.closeQuickAdd = function() {
+  document.getElementById('quick-add-btn').classList.remove('hidden');
+  document.getElementById('quick-add-form').classList.add('hidden');
+  document.getElementById('qa-title').value='';
+};
+window.addTask = function() {
+  const title=document.getElementById('qa-title').value.trim(); if(!title) return;
+  const emj=['🎯','📦','🚀','💰','📊','🔗','💬','🤝','🏗','📣'];
+  tasks.unshift({id:uid(),title,area:document.getElementById('qa-area').value,priority:document.getElementById('qa-priority').value,status:'todo',emoji:emj[Math.floor(Math.random()*emj.length)],fromAI:false,createdAt:Date.now()});
+  saveTasks(); renderTasks(); closeQuickAdd();
+};
+
+function addAITasks(items) {
+  if (!items?.length) return;
+  const emj=['⚡','🎯','🚀','💡','📌'];
+  const nw=items.filter(t=>!tasks.some(x=>x.title.toLowerCase()===t.toLowerCase()));
+  if (!nw.length) return;
+  nw.forEach((title,i)=>tasks.unshift({id:uid(),title,status:'todo',priority:'high',emoji:emj[i%emj.length],fromAI:true,area:'',createdAt:Date.now()}));
+  saveTasks(); renderTasks();
+  const bl=document.getElementById('task-list');
+  if (bl) { bl.style.outline='2px solid rgba(167,139,250,.5)'; setTimeout(()=>{bl.style.outline='';},1200); }
+}
+
+// ═══ CHAT ══════════════════════════════════════════════════════════════════
+let _msgs = [], _loading = false;
+let _sid = localStorage.getItem('astroSid');
+
+function renderMsgs() {
+  const c=document.getElementById('chat-messages'); if(!c) return;
+  const qp=document.getElementById('quick-prompts');
+  if (_msgs.length>1 && qp) qp.style.display='none';
+  else if (qp) qp.style.display='';
+  let h='';
+  _msgs.forEach(m=>{
+    if (m.role==='user') {
+      h+='<div class="flex justify-end mb-3 msg-in"><div class="max-w-xs lg:max-w-sm bubble-user px-4 py-2.5 text-sm text-white leading-relaxed">'+esc(m.content)+'</div><div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white ml-2 shrink-0 mt-1">Tú</div></div>';
+    } else {
+      h+='<div class="flex justify-start mb-3 msg-in"><div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm text-white mr-2 shrink-0 mt-1">⚡</div><div class="max-w-sm lg:max-w-md bubble-ai px-4 py-2.5 text-sm text-gray-100 leading-relaxed">'+fmtAI(m.content)+'</div></div>';
+    }
+  });
+  if (_loading) h+='<div class="flex justify-start mb-3"><div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm text-white mr-2 shrink-0 mt-1">⚡</div><div class="bubble-ai px-4 py-3 flex items-center space-x-1.5"><span class="w-2 h-2 bg-purple-400 rounded-full dot-bounce"></span><span class="w-2 h-2 bg-purple-400 rounded-full dot-bounce"></span><span class="w-2 h-2 bg-purple-400 rounded-full dot-bounce"></span></div></div>';
+  c.innerHTML=h; c.scrollTop=c.scrollHeight;
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtAI(text){
+  let t=String(text||'');
+  t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  t=t.replace(/\*([^*]+?)\*/g,'<em>$1</em>');
+  t=t.replace(/^#{1,3}\s+(.+)$/gm,'<strong class="text-white">$1</strong>');
+  t=t.replace(/^[-*]\s+/gm,'• ');
+  t=t.replace(/\n{3,}/g,'\n\n');
+  t=t.replace(/\n/g,'<br>');
+  return t;
+}
+
+window.sendMessage = async function(override) {
+  const inp=document.getElementById('chat-input');
+  const text=(override||inp.value||'').trim();
+  if (!text||_loading) return;
+  if (!override){inp.value='';inp.style.height='auto';}
+  _msgs.push({role:'user',content:text});
+  _loading=true; renderMsgs();
+  try {
+    const hist=_msgs.slice(-14,_msgs.length-1).map(m=>({role:m.role,content:m.content}));
+    const res=await fetch('/api/astro-chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+(getToken()||'')},
+      body:JSON.stringify({message:text,history:hist,sessionId:_sid,userId:${userId},language:navigator.language?.startsWith('es')?'es':'en'})
+    });
+    const data=await res.json();
+    const reply=data.response||data.message||'No pude procesar eso. ¿Puedes reformularlo?';
+    if (data.sessionId&&data.sessionId!==_sid){_sid=data.sessionId;localStorage.setItem('astroSid',_sid);}
+    _msgs.push({role:'assistant',content:reply});
+    if (data.extractedData?.action_items?.length) addAITasks(data.extractedData.action_items);
+  } catch(e) {
+    console.error(e);
+    _msgs.push({role:'assistant',content:'Error de conexión. Verifica tu red e intenta de nuevo.'});
+  }
+  _loading=false; renderMsgs();
+};
+window.sendQuick=function(t){sendMessage(t);};
+window.clearChat=function(){
+  _msgs=[{role:'assistant',content:'Hey! \\u00bfQu\\u00e9 est\\u00e1 pasando con tu startup esta semana? \\u26a1'}];
+  _sid=null; localStorage.removeItem('astroSid'); renderMsgs();
+};
+
+let _mr=null;
+window.toggleRecording=async function(){
+  const btn=document.getElementById('mic-btn');
+  if(_mr?.state==='recording'){_mr.stop();btn.style.background='';btn.style.color='';return;}
+  try {
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const chunks=[];
+    _mr=new MediaRecorder(stream);
+    _mr.ondataavailable=e=>chunks.push(e.data);
+    _mr.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      const blob=new Blob(chunks,{type:'audio/webm'});
+      const form=new FormData(); form.append('file',blob,'voice.webm');
+      try {
+        const r=await fetch('/api/transcribe',{method:'POST',headers:{'Authorization':'Bearer '+(getToken()||'')},body:form});
+        const {text}=await r.json();
+        if (text?.trim()){const i=document.getElementById('chat-input');i.value=text.trim();i.focus();}
+      } catch{}
+    };
+    _mr.start();
+    btn.style.background='#ef4444';btn.style.color='#fff';
+    setTimeout(()=>{if(_mr?.state==='recording'){_mr.stop();btn.style.background='';btn.style.color='';}},60000);
+  } catch{}
+};
+
+// ═══ TRACTION ══════════════════════════════════════════════════════════════
+const MK='sos_metrics';
+let metrics={users:0,revenue:0,growth:0,nps:0,sessions:0,churn:0};
+try{metrics=Object.assign(metrics,JSON.parse(localStorage.getItem(MK)||'{}'));}catch{}
+function saveMet(){localStorage.setItem(MK,JSON.stringify(metrics));}
+function updCards(){
+  document.getElementById('card-users').textContent=(metrics.users||0).toLocaleString();
+  document.getElementById('card-revenue').textContent='$'+(metrics.revenue||0).toLocaleString();
+  document.getElementById('card-growth').textContent=(metrics.growth||0)+'%';
+  document.getElementById('card-nps').textContent=metrics.nps||0;
+  document.getElementById('card-sessions').textContent=(metrics.sessions||0).toLocaleString();
+  document.getElementById('card-churn').textContent=(metrics.churn||0)+'%';
+}
+window.toggleMetricsEdit=function(){
+  const f=document.getElementById('metrics-edit-form'),b=document.getElementById('metrics-edit-btn');
+  const h=f.classList.contains('hidden');
+  f.classList.toggle('hidden');b.textContent=h?'✕ Cancelar':'✏️ Actualizar';
+  if(h){['users','revenue','growth','nps','sessions','churn'].forEach(k=>{const el=document.getElementById('m-'+k);if(el)el.value=metrics[k]||0;});}
+};
+window.saveMetrics=function(){
+  metrics={users:+document.getElementById('m-users').value||0,revenue:+document.getElementById('m-revenue').value||0,growth:+document.getElementById('m-growth').value||0,nps:+document.getElementById('m-nps').value||0,sessions:+document.getElementById('m-sessions').value||0,churn:+document.getElementById('m-churn').value||0};
+  saveMet();updCards();
+  document.getElementById('metrics-edit-form').classList.add('hidden');
+  document.getElementById('metrics-edit-btn').textContent='✏️ Actualizar';
+};
+function renderTractionGoals(){
+  const el=document.getElementById('traction-goals');if(!el)return;
+  if(!tasks.length){el.innerHTML='<p class="text-gray-500 text-sm text-center py-6">Sin objetivos todavía.</p>';return;}
+  const done=tasks.filter(t=>t.status==='done').length,pct=Math.round(done/tasks.length*100);
+  el.innerHTML='<div class="flex justify-between text-xs text-gray-400 mb-2"><span>'+tasks.length+' objetivos</span><span class="text-purple-300">'+pct+'% completados</span></div>'+
+    '<div class="h-2 bg-white/5 rounded-full mb-4"><div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full" style="width:'+pct+'%"></div></div>'+
+    tasks.slice(0,8).map(t=>'<div class="flex items-center gap-3 py-2 border-b border-white/5 last:border-0"><span class="'+(t.status==='done'?'text-green-400':'text-gray-500')+'">'+(t.status==='done'?'✓':'○')+'</span><span class="text-sm '+(t.status==='done'?'line-through text-gray-500':'text-white')+' flex-1 truncate">'+(t.emoji||'🎯')+' '+t.title+'</span>'+(t.area?'<span class="text-xs text-gray-400">'+t.area+'</span>':'')+'</div>').join('');
+}
+
+// ═══ TEAM ══════════════════════════════════════════════════════════════════
+const TEAMK='sos_team';
+let team=[];
+try{team=JSON.parse(localStorage.getItem(TEAMK)||'[]');}catch{}
+window.addMember=function(){
+  const name=document.getElementById('tm-name').value.trim();if(!name)return;
+  team.push({id:uid(),name,role:document.getElementById('tm-role').value.trim(),emoji:document.getElementById('tm-emoji').value});
+  localStorage.setItem(TEAMK,JSON.stringify(team));
+  document.getElementById('tm-name').value='';document.getElementById('tm-role').value='';
+  renderTeam();
+};
+window.removeMember=function(id){
+  team=team.filter(m=>m.id!==id);
+  localStorage.setItem(TEAMK,JSON.stringify(team));renderTeam();
+};
+function renderTeam(){
+  const el=document.getElementById('team-list');if(!el)return;
+  if(!team.length){el.innerHTML='<div class="col-span-full text-center py-12 text-gray-500"><div class="text-5xl mb-3">👥</div><p>Añade miembros de tu equipo arriba</p></div>';return;}
+  el.innerHTML=team.map(m=>
+    '<div class="group bg-white/5 hover:bg-white/8 border border-white/10 rounded-2xl p-5 transition">'+
+      '<div class="flex items-center justify-between mb-3">'+
+        '<div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-2xl">'+m.emoji+'</div>'+
+        '<button onclick="removeMember(\''+m.id+'\')" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition">✕</button>'+
+      '</div>'+
+      '<p class="font-semibold text-white">'+m.name+'</p>'+
+      '<p class="text-sm text-purple-300">'+(m.role||'Team member')+'</p>'+
+    '</div>'
+  ).join('');
+}
+
+// ═══ INVESTORS ══════════════════════════════════════════════════════════════
+const INVK='sos_investors';
+let investors=[];
+try{investors=JSON.parse(localStorage.getItem(INVK)||'[]');}catch{}
+const ISTAGES=['prospect','contacted','meeting','due_diligence','passed','invested'];
+const ISTC={prospect:'text-gray-400',contacted:'text-blue-400',meeting:'text-yellow-400',due_diligence:'text-orange-400',passed:'text-red-400',invested:'text-green-400'};
+window.addInvestor=function(){
+  const name=document.getElementById('inv-name').value.trim();if(!name)return;
+  investors.unshift({id:uid(),name,fund:document.getElementById('inv-fund').value.trim(),notes:document.getElementById('inv-notes').value.trim(),status:'prospect',at:new Date().toLocaleDateString()});
+  localStorage.setItem(INVK,JSON.stringify(investors));
+  document.getElementById('inv-name').value='';document.getElementById('inv-fund').value='';document.getElementById('inv-notes').value='';
+  renderInvestors();
+};
+window.updInvStage=function(id,s){
+  investors=investors.map(i=>i.id===id?{...i,status:s}:i);
+  localStorage.setItem(INVK,JSON.stringify(investors));
+};
+function renderInvestors(){
+  const el=document.getElementById('investors-list');if(!el)return;
+  if(!investors.length){el.innerHTML='<div class="text-center py-12 text-gray-500"><div class="text-5xl mb-3">💰</div><p>Registra tus conversaciones con inversores</p></div>';return;}
+  el.innerHTML=investors.map(inv=>
+    '<div class="flex items-center gap-4 bg-white/5 hover:bg-white/8 border border-white/10 rounded-xl p-4 transition">'+
+      '<div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-lg shrink-0">💼</div>'+
+      '<div class="flex-1 min-w-0"><p class="font-medium text-white text-sm">'+inv.name+'</p><p class="text-xs text-gray-400">'+(inv.fund||'')+'</p>'+(inv.notes?'<p class="text-xs text-gray-500 mt-0.5 truncate">'+inv.notes+'</p>':'')+' </div>'+
+      '<select onchange="updInvStage(\''+inv.id+'\',this.value)" class="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs outline-none capitalize '+(ISTC[inv.status]||'text-gray-400')+'">'+
+        ISTAGES.map(s=>'<option value="'+s+'" '+(s===inv.status?'selected':'')+' class="text-white bg-gray-900">'+s.replace('_',' ')+'</option>').join('')+
+      '</select>'+
+    '</div>'
+  ).join('');
+}
+
+// ═══ LINKEDIN ══════════════════════════════════════════════════════════════
+window.searchLinkedIn=async function(){
+  const query=document.getElementById('li-query').value.trim(),type=document.getElementById('li-type').value;
+  if(!query)return;
+  const res=document.getElementById('li-results');
+  res.innerHTML='<div class="text-center py-8 text-gray-400"><div class="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full inline-block" style="animation:spin 1s linear infinite"></div><p class="mt-3 text-sm">Buscando…</p></div>';
+  try {
+    const r=await axios.post('/api/linkedin-connector/search',{type,query,maxResults:20});
+    if (!r.data.success||!r.data.profiles?.length){res.innerHTML='<p class="text-gray-500 text-sm text-center py-8">Sin resultados para esa búsqueda.</p>';return;}
+    res.innerHTML='<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">'+r.data.profiles.map(p=>
+      '<div class="bg-gray-800 border border-gray-700 rounded-xl p-4">'+
+        '<div class="flex items-start justify-between mb-2"><h3 class="text-white font-semibold text-sm">'+(p.name||'')+'</h3><span class="text-xs px-2 py-0.5 rounded '+(p.compatibilityScore>=90?'bg-green-600':p.compatibilityScore>=75?'bg-blue-600':'bg-yellow-600')+'">'+(p.compatibilityScore||0)+'%</span></div>'+
+        '<p class="text-gray-400 text-xs mb-2">'+(p.headline||'')+'</p>'+
+        '<div class="flex gap-3 text-xs text-gray-500"><span>📍 '+(p.location||'-')+'</span></div>'+
+      '</div>'
+    ).join('')+'</div>';
+  } catch(e) {
+    res.innerHTML='<p class="text-red-400 text-sm text-center py-8">Error al buscar. Intenta de nuevo.</p>';
+  }
+};
+
+// ═══ DOCS ══════════════════════════════════════════════════════════════════
+const DPROMPTS={
+  'one-pager':'Genera un one-pager completo para mi startup. Incluye: propuesta de valor, problema, solución, mercado objetivo, modelo de negocio, tracción y equipo.',
+  'pitch':'Genera el contenido de un pitch deck de 10 slides para inversores: Problema, Solución, Mercado, Producto, Modelo de negocio, Tracción, Equipo, Competencia, Financiación y Visión.',
+  'gtm':'Crea un plan de Go-to-Market detallado. Incluye canales de adquisición, métricas clave, timeline de 3 meses y KPIs.',
+  'okrs':'Genera OKRs para el próximo trimestre. 3 Objectives principales con 3 Key Results cada uno, alineados con el crecimiento.',
+  'term-sheet':'Explica los términos clave de un term sheet: valoración, dilución, liquidation preference, pro-rata, anti-dilución y board seats.',
+  'cap-table':'Explica cómo crear y gestionar una cap table para una startup. Incluye rondas típicas, opciones de empleados y cómo evoluciona la dilución.'
+};
+window.openDocTemplate=function(type){
+  const p=DPROMPTS[type];if(!p)return;
+  switchSection('os');
+  setTimeout(()=>sendMessage(p),100);
+};
+
+// ═══ INIT ══════════════════════════════════════════════════════════════════
+_msgs=[{role:'assistant',content:'\\u00a1Hey! \\u26a1 Soy **Astro**, tu AI Cofounder en ASTAR*. Estoy aqu\\u00ed para ayudarte a mover tu startup m\\u00e1s r\\u00e1pido: estrategia, tareas, inversores, crecimiento.\\n\\n\\u00bfQu\\u00e9 est\\u00e1 pasando esta semana?'}];
+renderMsgs();
+renderTasks();
+updCards();
+renderTeam();
+renderInvestors();
+
+// Load goals from backend
+(async()=>{
+  try{
+    const r=await axios.get('/api/dashboard/goals?userId=${userId}');
+    const goals=r.data.goals||[];
+    if(!goals.length)return;
+    const bt=goals.map(g=>({
+      id:String(g.id||uid()),title:g.description||g.title||'',description:'',
+      status:g.status==='completed'?'done':g.status==='in_progress'?'doing':'todo',
+      priority:g.priority||'medium',emoji:g.emoji||'🎯',area:g.category||'',
+      due:g.deadline?g.deadline.substring(0,10):'',fromAI:false,createdAt:Date.now()
+    })).filter(t=>t.title);
+    const exist=new Set(tasks.map(t=>t.id));
+    const nw=bt.filter(t=>!exist.has(t.id));
+    if(nw.length){tasks=[...tasks,...nw];saveTasks();renderTasks();}
+  }catch(e){/*silent*/}
+})();
+
+// Handle email context
+const _ep=new URLSearchParams(window.location.search);
+const _er=_ep.get('astarResponse');
+if(_er){
+  const dec=decodeURIComponent(_er);
+  _msgs.push({role:'user',content:dec});renderMsgs();
+  setTimeout(()=>sendMessage(dec),500);
+  window.history.replaceState({},document.title,window.location.pathname);
+}
+</script>
+</body>
+</html>`);
 });
 
 export default app;

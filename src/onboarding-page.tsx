@@ -93,6 +93,42 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
       let isTyping = false;
       let sessionId = 'onboarding_${userId}_' + Date.now();
 
+      // ── Auto-fill from Astro session (if founder chatted with Astro before) ──
+      async function prefillFromAstro() {
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          if (!token) return;
+          const res = await fetch('/api/chat-agent/astro-profile', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          if (!res.ok) return;
+          const { session } = await res.json();
+          if (!session) return;
+          // Pre-fill onboarding data fields from Astro session
+          if (session.startup_name) onboardingData.startup_name = session.startup_name;
+          if (session.sector)       onboardingData.sector = session.sector;
+          if (session.team_size)    onboardingData.team_size = String(session.team_size);
+          if (session.fundraising_stage) onboardingData.fundraising_stage = session.fundraising_stage;
+          if (session.geography)    onboardingData.geography = session.geography;
+          if (session.mrr > 0)      onboardingData.mrr = String(session.mrr);
+          if (session.arr > 0)      onboardingData.arr = String(session.arr);
+          if (session.active_users > 0) onboardingData.active_users = String(session.active_users);
+          if (session.problem)      onboardingData.problem = session.problem;
+          if (session.solution)     onboardingData.solution = session.solution;
+          // Show a small banner if we pre-filled anything meaningful
+          if (session.startup_name) {
+            const banner = document.createElement('div');
+            banner.style.cssText = 'background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:12px;padding:10px 16px;font-size:13px;color:#6d28d9;margin-bottom:12px;display:flex;align-items:center;gap:8px;';
+            banner.innerHTML = '⚡ <strong>Astro ya conoce tu startup:</strong> ' + session.startup_name + '. Confirmaremos los datos durante el onboarding.';
+            const chatMsgs = document.getElementById('onboardingChatMessages');
+            if (chatMsgs) chatMsgs.parentElement.insertBefore(banner, chatMsgs.parentElement.firstChild);
+          }
+          console.log('[ONBOARDING] Pre-filled from Astro session:', Object.keys(onboardingData).filter(k => onboardingData[k]));
+        } catch(e) {
+          // Silently fail — onboarding still works without pre-fill
+        }
+      }
+
       // Question flows based on role
       const onboardingFlows = {
         founder: [
@@ -362,8 +398,9 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
       const questions = onboardingFlows[onboardingData.role] || onboardingFlows.other;
       const totalSteps = questions.length;
 
-      // Initialize onboarding
-      window.addEventListener('load', () => {
+      // Initialize onboarding — try pre-filling from Astro first, then start flow
+      window.addEventListener('load', async () => {
+        await prefillFromAstro();
         showNextQuestion();
       });
 
@@ -546,24 +583,30 @@ export function getOnboardingPage(props: OnboardingPageProps): string {
 
           const result = await response.json();
           
+          // Check if there's a redirect parameter in URL (passed from auth)
+          const urlParams = new URLSearchParams(window.location.search);
+          const redirectPath = urlParams.get('redirect');
+          // If redirectPath exists, use it; otherwise default to /dashboard
+          const redirectUrl = redirectPath || '/dashboard';
+          
           if (result.success) {
             setTimeout(() => {
-              addOnboardingMessage('assistant', \`✅ All set! Redirecting you to your dashboard...\`);
+              addOnboardingMessage('assistant', \`✅ All set! Redirecting you to ${userRole === 'founder' ? 'your pitch deck' : 'your dashboard'}...\`);
               setTimeout(() => {
-                window.location.href = '/dashboard';
+                window.location.href = redirectUrl;
               }, 2000);
             }, 1000);
           } else {
-            addOnboardingMessage('error', 'There was an error saving your profile. Redirecting to dashboard...');
+            addOnboardingMessage('error', 'There was an error saving your profile. Redirecting...');
             setTimeout(() => {
-              window.location.href = '/dashboard';
+              window.location.href = redirectUrl;
             }, 2000);
           }
         } catch (error) {
           console.error('Error completing onboarding:', error);
-          addOnboardingMessage('error', 'There was an error. Redirecting to dashboard...');
+          addOnboardingMessage('error', 'There was an error. Redirecting...');
           setTimeout(() => {
-            window.location.href = '/dashboard';
+            window.location.href = redirectUrl;
           }, 2000);
         }
       }

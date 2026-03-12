@@ -690,4 +690,30 @@ projects.delete('/:id/founders/:founderId', requireAuth, async (c) => {
   }
 });
 
+// DELETE /api/projects/:id - Admin only: Delete a startup/project
+projects.delete('/:id', requireAuth, async (c) => {
+  try {
+    const projectId = parseInt(c.req.param('id'));
+    const userRole = c.get('userRole');
+
+    // Only admin can delete
+    if (userRole !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admin only' }, 403);
+    }
+
+    // Delete from beta_products (this is the actual startup)
+    await c.env.DB.prepare(`
+      DELETE FROM beta_products WHERE id = ?
+    `).bind(projectId).run();
+
+    return c.json({
+      success: true,
+      message: 'Startup deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting startup:', error);
+    return c.json({ error: 'Failed to delete startup' }, 500);
+  }
+});
+
 export default projects;

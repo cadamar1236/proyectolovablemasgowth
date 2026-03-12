@@ -166,6 +166,43 @@ async function sendEmailWithResend(
   }
 }
 
+// Batch email sending (up to 100 emails per request - Resend limit)
+async function sendBatchEmailsWithResend(
+  apiKey: string,
+  emails: Array<{ to: string; subject: string; html: string }>,
+  fromEmail: string = 'ASTAR <astar@aihelpstudy.com>'
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const response = await fetch('https://api.resend.com/emails/batch', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(
+        emails.map(email => ({
+          from: fromEmail,
+          to: [email.to],
+          subject: email.subject,
+          html: email.html,
+        }))
+      ),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Resend batch error:', error);
+      return { success: false, error };
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error sending batch emails:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -409,6 +446,9 @@ async function createEmailNotification(
 
 // Este endpoint debe llamarse desde un cron job (Cloudflare Cron Trigger)
 astarMessages.post('/cron/send-daily', async (c) => {
+  // DISABLED — daily emails temporarily turned off
+  return c.json({ disabled: true, sent: 0, message: 'Daily emails are currently disabled' });
+
   try {
     // Verificar cron secret (solo si está configurado y no es el valor por defecto)
     const cronSecret = c.req.header('X-Cron-Secret');
@@ -434,17 +474,106 @@ astarMessages.post('/cron/send-daily', async (c) => {
       return c.json({ message: 'No template for this time', sent: 0 });
     }
 
-    // Obtener usuarios ASTAR activos (que NO hayan cancelado suscripción)
+    // ============================================
+    // IE UNIVERSITY STUDENT EMAIL LIST
+    // ============================================
+    const IE_STUDENT_EMAILS = [
+      'mgazitua.ieu2024@student.ie.edu', 'iamoise.ieu2024@student.ie.edu',
+      'henry.aschke@student.ie.edu', 'tvillegas@student.ie.edu',
+      'sahithi.meda@student.ie.edu', 'daniela.rivas@student.ie.edu',
+      'masakazu.kobayashi@student.ie.edu', 'ivan.yemez@student.ie.edu',
+      'diego.valdez@student.ie.edu', 'denciso.ieu2022@student.ie.edu',
+      'lior.berman@student.ie.edu', 'alicia.leite@student.ie.edu',
+      'mihir.godia@student.ie.edu', 'joellek@student.ie.edu',
+      'abirhamid@student.ie.edu', 'kishan@student.ie.edu',
+      'dogaoflazoglu@student.ie.edu', 'problescalat.ieu2025@student.ie.edu',
+      'sanjana.sreekanthr@student.ie.edu', 'bdelmas.ieu2023@student.ie.edu',
+      'shatrughna.singh@student.ie.edu', 'arefeh.shahali@student.ie.edu',
+      'valerie.demil@student.ie.edu', 'youssef.jemmali@student.ie.edu',
+      'leonardo.lombardi@student.ie.edu', 'mchigumbu.ieu2025@student.ie.edu',
+      'antonruemmele@student.ie.edu', 'ella.garcia@student.ie.edu',
+      'laura.reimer@student.ie.edu', 'autumnmartin@student.ie.edu',
+      'clara.pujadas@student.ie.edu', 'ndimenhle.bungane@student.ie.edu',
+      'anuska.das@student.ie.edu', 'emmajohnston@student.ie.edu',
+      'tenaw.belete@student.ie.edu', 'nour.khalife@student.ie.edu',
+      'phu-tung.ngo@student.ie.edu', 'akhil.garg@student.ie.edu',
+      'felipeiriarte@student.ie.edu', 'kevinleon@student.ie.edu',
+      'siagotska.ieu2024@student.ie.edu', 'ana.sydow@student.ie.edu',
+      'gvargas.ieu2023@student.ie.edu', 'stephan.pentchev@student.ie.edu',
+      'luciano.britti@student.ie.edu', 'rishi.kashyap@student.ie.edu',
+      'raras.handwiyanto@student.ie.edu', 'martin.eala@student.ie.edu',
+      'gabriel.castro@student.ie.edu', 'sidkamat@student.ie.edu',
+      'gasparddefierlant@student.ie.edu', 'erina.kono@student.ie.edu',
+      'pietrosarmiento@student.ie.edu', 'yridasafwan.ieu2022@student.ie.edu',
+      'oespineira.ieu2024@student.ie.edu', 'javier.llorens@student.ie.edu',
+      'isaenz.ieu2024@student.ie.edu', 'giovanni.beolchini@student.ie.edu',
+      'lizziazeev@student.ie.edu', 'abril@student.ie.edu',
+      'asanchez.ieu2024@student.ie.edu', 'haraujo.ieu2024@student.ie.edu',
+      'sdemartino.ieu2022@student.ie.edu', 'daniel.mohebbi@student.ie.edu',
+      'xlacevedo.ieu2024@student.ie.edu', 'ttrujillozur.ieu2024@student.ie.edu',
+      'cesargutierrez@student.ie.edu', 'juanpablo.galindo@student.ie.edu',
+      'pushaanvedi@student.ie.edu', 'miguel.tovar@student.ie.edu',
+      'nicolas.lanari@student.ie.edu', 'sofiabianchi@student.ie.edu',
+      'diego.santisteban@student.ie.edu', 'nicolascastrohelo@student.ie.edu',
+      'jelawady.ieu2024@student.ie.edu', 'gvashakidze.ieu2023@student.ie.edu',
+      'camilo.gomez@student.ie.edu', 'sduran.ieu2024@student.ie.edu',
+      'marioalcedo@student.ie.edu', 'jorge.luis.ganoza@student.ie.edu',
+      'juan.sucunza@student.ie.edu', 'camille.sarie@student.ie.edu',
+      'jonathana@student.ie.edu', 'alfredo.borras@student.ie.edu',
+      'enrique.harten@student.ie.edu', 'dhruv.v@student.ie.edu',
+      'naman.saxena@student.ie.edu', 'abhishek.tatineni@student.ie.edu',
+      'hraibeh.luka@student.ie.edu', 'julian.franco@student.ie.edu',
+      'cande.abdala@student.ie.edu', 'ethan.stackpole@student.ie.edu',
+      'nsanmartin@student.ie.edu', 'abhishek.jha@student.ie.edu',
+      'sparsh@student.ie.edu', 'matejseben@student.ie.edu',
+      'dgrobman.ieu2025@student.ie.edu', 'arendt@student.ie.edu',
+      'adanouj@student.ie.edu', 'varun.rathi@student.ie.edu',
+      'max.vanderlinden@student.ie.edu', 'saikiranah@student.ie.edu',
+      'manuela.villegas@student.ie.edu', 'oalwaleedmoh.ieu2024@student.ie.edu',
+      'charlottevaissiere@student.ie.edu', 'vmunoz.ieu2023@student.ie.edu',
+      'dbueno.ieu2023@student.ie.edu', 'jordan.hays@student.ie.edu',
+      'analuisafuriati@student.ie.edu', 'federica.nulli@student.ie.edu',
+      'natalia.orozco@student.ie.edu', 'laja.ieu2024@student.ie.edu',
+      'kfv.schmid@student.ie.edu', 'cristinajaime@student.ie.edu',
+      'carlosverasc@student.ie.edu', 'agomezlopez@student.ie.edu',
+      'vicenteginer.vgc@student.ie.edu', 'nirmallc@student.ie.edu',
+      'ln.ieu2024@student.ie.edu', 'rosadalima.justina@student.ie.edu',
+      'blakeknutson@student.ie.edu', 'annabeldavidson@student.ie.edu',
+      'joss.arevalo@student.ie.edu', 'manuel.guerrero@student.ie.edu',
+      'teresa.steinbacher@student.ie.edu', 'leaghanem@student.ie.edu',
+      'konstantinosgeo@student.ie.edu', 'jdidiaz03@student.ie.edu'
+    ];
+
+    // Step 1: Auto-create IE student accounts if they don't exist (use INSERT OR IGNORE for speed)
+    const batchStatements = IE_STUDENT_EMAILS.map(studentEmail => {
+      const nameFromEmail = studentEmail.split('@')[0]
+        .replace(/\.ieu\d+/gi, '')
+        .replace(/\./g, ' ')
+        .split(' ')
+        .filter((w: string) => w.length > 0)
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+      return c.env.DB.prepare(
+        `INSERT OR IGNORE INTO users (email, name, role, created_at) VALUES (?, ?, 'founder', datetime('now'))`
+      ).bind(studentEmail, nameFromEmail);
+    });
+    // D1 batch supports up to 500 statements per call
+    await c.env.DB.batch(batchStatements);
+    console.log(`[CRON] Ensured ${IE_STUDENT_EMAILS.length} IE students exist in DB`);
+
+    // Step 2: Get ALL founders + IE students (match by domain, no variable explosion)
     const users = await c.env.DB.prepare(`
       SELECT u.id, u.email, u.name 
       FROM users u
-      WHERE u.email IN ('aihelpstudy@gmail.com', 'giorgio.rodrigano@gmail.com')
+      WHERE (u.role = 'founder' OR u.email LIKE '%@student.ie.edu')
         AND (u.email_unsubscribed IS NULL OR u.email_unsubscribed = 0)
+      GROUP BY u.email
     `).all() as { results: User[] };
 
-    let sentCount = 0;
-    let skippedUnsubscribed = 0;
-    const errors: string[] = [];
+    console.log(`[CRON] Found ${users.results?.length || 0} recipients (founders + IE students)`);
+
+    // Step 3: Prepare all emails for batch sending
+    const emailsToSend: Array<{ user: User; unsubscribeToken: string; templateData: Record<string, any> }> = [];
 
     for (const user of users.results || []) {
       // Verificar si ya se envió este mensaje esta semana
@@ -461,8 +590,6 @@ astarMessages.post('/cron/send-daily', async (c) => {
         INSERT INTO email_unsubscribe_tokens (user_id, token)
         VALUES (?, ?)
       `).bind(user.id, unsubscribeToken).run();
-      
-      const unsubscribeUrl = `https://astarlabshub.com/api/astar-messages/unsubscribe/${unsubscribeToken}`;
 
       // Preparar datos para la plantilla
       const templateData: Record<string, any> = {
@@ -522,36 +649,61 @@ astarMessages.post('/cron/send-daily', async (c) => {
         }
       }
 
-      // Renderizar plantilla
-      const body = renderTemplate(template.body_template, templateData);
-      const htmlBody = convertToHtml(body, template.category);
-      
-      // Add unsubscribe footer
-      const fullHtmlBody = htmlBody + createUnsubscribeFooter(unsubscribeUrl);
+      emailsToSend.push({ user, unsubscribeToken, templateData });
+    }
 
-      // Enviar email con Resend
-      const result = await sendEmailWithResend(
-        c.env.RESEND_API_KEY,
-        user.email,
-        template.subject,
-        fullHtmlBody
-      );
+    console.log(`[CRON] Prepared ${emailsToSend.length} emails to send`);
+
+    // Step 4: Send in batches of 100 (Resend limit)
+    let sentCount = 0;
+    const errors: string[] = [];
+    const BATCH_SIZE = 100;
+
+    for (let i = 0; i < emailsToSend.length; i += BATCH_SIZE) {
+      const batch = emailsToSend.slice(i, i + BATCH_SIZE);
+      const batchEmails = batch.map(({ user, unsubscribeToken, templateData }) => {
+        const unsubscribeUrl = `https://astarlabshub.com/api/astar-messages/unsubscribe/${unsubscribeToken}`;
+        const body = renderTemplate(template.body_template, templateData);
+        const htmlBody = convertToHtml(body, template.category);
+        const fullHtmlBody = htmlBody + createUnsubscribeFooter(unsubscribeUrl);
+
+        return {
+          to: user.email,
+          subject: template.subject,
+          html: fullHtmlBody
+        };
+      });
+
+      // Send batch
+      const result = await sendBatchEmailsWithResend(c.env.RESEND_API_KEY, batchEmails);
 
       if (result.success) {
-        // Guardar mensaje enviado
-        await c.env.DB.prepare(`
-          INSERT INTO astar_sent_messages (user_id, template_id, week_number, year, email_id)
-          VALUES (?, ?, ?, ?, ?)
-        `).bind(user.id, template.id, weekNumber, year, result.emailId || null).run();
+        // Save all sent messages to DB
+        const dbInserts = batch.map(({ user }) => 
+          c.env.DB.prepare(`
+            INSERT INTO astar_sent_messages (user_id, template_id, week_number, year, email_id)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(user.id, template.id, weekNumber, year, null)
+        );
+        await c.env.DB.batch(dbInserts);
 
-        // Crear notificación específica si el template espera respuesta
+        // Create notifications for templates that expect responses
         if (template.expects_response === 1) {
-          await createEmailNotification(c.env.DB, user.id, template);
+          for (const { user } of batch) {
+            await createEmailNotification(c.env.DB, user.id, template);
+          }
         }
-        
-        sentCount++;
+
+        sentCount += batch.length;
+        console.log(`[CRON] Batch ${Math.floor(i / BATCH_SIZE) + 1} sent: ${batch.length} emails`);
       } else {
-        errors.push(`User ${user.id}: ${result.error}`);
+        errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${result.error}`);
+        console.error(`[CRON] Batch failed:`, result.error);
+      }
+
+      // Small delay between batches to avoid overwhelming the API
+      if (i + BATCH_SIZE < emailsToSend.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 
@@ -559,6 +711,8 @@ astarMessages.post('/cron/send-daily', async (c) => {
       success: true,
       template: template.subject,
       sent: sentCount,
+      total: emailsToSend.length,
+      batches: Math.ceil(emailsToSend.length / BATCH_SIZE),
       errors: errors.length > 0 ? errors : undefined
     });
 
@@ -843,7 +997,8 @@ astarMessages.use('/*', async (c, next) => {
                            fullUrl.includes('cron/send-all-week') ||
                            fullUrl.includes('cron/send-by-day') ||
                            fullUrl.includes('debug/') ||
-                           fullUrl.includes('unsubscribe/');
+                           fullUrl.includes('unsubscribe/') ||
+                           fullUrl.includes('/ranking');
   
   // Si es un endpoint público, saltar autenticación
   if (isPublicEndpoint) {
@@ -1256,47 +1411,223 @@ astarMessages.get('/ranking', async (c) => {
     const now = new Date();
     const weekNumber = parseInt(c.req.query('week') || String(getWeekNumber(now)));
     const year = parseInt(c.req.query('year') || String(now.getFullYear()));
-    const userId = c.get('userId');
+    
+    // Try to get userId - may be null for unauthenticated users
+    let userId: any = c.get('userId') || null;
+    if (!userId) {
+      // Try to extract from cookie/header manually
+      try {
+        const authToken = c.req.header('Authorization')?.replace('Bearer ', '') || 
+                          c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+        if (authToken) {
+          const { verify } = await import('hono/jwt');
+          const payload = await verify(authToken, c.env.JWT_SECRET) as any;
+          userId = payload?.userId || null;
+        }
+      } catch(e) { /* ignore auth errors for public endpoint */ }
+    }
 
-    const rankings = await c.env.DB.prepare(`
-      SELECT 
-        m.user_id,
-        u.name,
-        u.email,
-        m.users_contacted,
-        m.hypotheses_tested,
-        m.learnings_count,
-        m.response_rate,
-        m.iteration_score,
-        RANK() OVER (ORDER BY m.iteration_score DESC) as rank
-      FROM astar_weekly_metrics m
-      JOIN users u ON m.user_id = u.id
-      WHERE m.week_number = ? AND m.year = ?
-      ORDER BY m.iteration_score DESC
-      LIMIT 20
-    `).bind(weekNumber, year).all();
+    let rankings;
+    try {
+      rankings = await c.env.DB.prepare(`
+        SELECT 
+          m.user_id,
+          u.name,
+          u.email,
+          COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name,
+          m.users_contacted,
+          m.hypotheses_tested,
+          m.learnings_count,
+          m.response_rate,
+          m.iteration_score,
+          RANK() OVER (ORDER BY m.iteration_score DESC) as rank
+        FROM astar_weekly_metrics m
+        JOIN users u ON m.user_id = u.id
+        WHERE m.week_number = ? AND m.year = ?
+        ORDER BY m.iteration_score DESC
+        LIMIT 20
+      `).bind(weekNumber, year).all();
+    } catch(e) {
+      // Fallback without startup_name if column doesn't exist
+      rankings = await c.env.DB.prepare(`
+        SELECT 
+          m.user_id,
+          u.name,
+          u.email,
+          COALESCE(u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1), '') as startup_name,
+          m.users_contacted,
+          m.hypotheses_tested,
+          m.learnings_count,
+          m.response_rate,
+          m.iteration_score,
+          RANK() OVER (ORDER BY m.iteration_score DESC) as rank
+        FROM astar_weekly_metrics m
+        JOIN users u ON m.user_id = u.id
+        WHERE m.week_number = ? AND m.year = ?
+        ORDER BY m.iteration_score DESC
+        LIMIT 20
+      `).bind(weekNumber, year).all();
+    }
 
-    // Posición del usuario actual
-    const userRank = await c.env.DB.prepare(`
-      SELECT 
-        (SELECT COUNT(*) + 1 FROM astar_weekly_metrics m2 
-         WHERE m2.week_number = ? AND m2.year = ? 
-         AND m2.iteration_score > m.iteration_score) as rank,
-        m.*
-      FROM astar_weekly_metrics m
-      WHERE m.user_id = ? AND m.week_number = ? AND m.year = ?
-    `).bind(weekNumber, year, userId, weekNumber, year).first();
+    // Posición del usuario actual (only if authenticated)
+    let userRank = null;
+    if (userId) {
+      userRank = await c.env.DB.prepare(`
+        SELECT 
+          (SELECT COUNT(*) + 1 FROM astar_weekly_metrics m2 
+           WHERE m2.week_number = ? AND m2.year = ? 
+           AND m2.iteration_score > m.iteration_score) as rank,
+          m.*
+        FROM astar_weekly_metrics m
+        WHERE m.user_id = ? AND m.week_number = ? AND m.year = ?
+      `).bind(weekNumber, year, userId, weekNumber, year).first();
+    }
+
+    // Evolución del usuario: últimas 8 semanas
+    let evolution: any[] = [];
+    if (userId) {
+      const evoResult = await c.env.DB.prepare(`
+        SELECT 
+          m.week_number,
+          m.year,
+          m.iteration_score,
+          m.users_contacted,
+          m.hypotheses_tested,
+          m.learnings_count,
+          (SELECT COUNT(*) + 1 FROM astar_weekly_metrics m2 
+           WHERE m2.week_number = m.week_number AND m2.year = m.year 
+           AND m2.iteration_score > m.iteration_score) as rank
+        FROM astar_weekly_metrics m
+        WHERE m.user_id = ?
+        ORDER BY m.year DESC, m.week_number DESC
+        LIMIT 8
+      `).bind(userId).all();
+      evolution = evoResult.results || [];
+    }
 
     return c.json({
       week_number: weekNumber,
       year: year,
       rankings: rankings.results || [],
-      my_position: userRank
+      my_position: userRank,
+      my_evolution: evolution
     });
 
   } catch (error) {
     console.error('Error getting ranking:', error);
     return c.json({ error: 'Failed to get ranking' }, 500);
+  }
+});
+
+// GET /api/astar-messages/ranking/all-time - Ranking general acumulado de todas las semanas
+astarMessages.get('/ranking/all-time', async (c) => {
+  try {
+    // Try to get userId
+    let userId: any = c.get('userId') || null;
+    if (!userId) {
+      try {
+        const authToken = c.req.header('Authorization')?.replace('Bearer ', '') || 
+                          c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+        if (authToken) {
+          const { verify } = await import('hono/jwt');
+          const payload = await verify(authToken, c.env.JWT_SECRET) as any;
+          userId = payload?.userId || null;
+        }
+      } catch(e) { /* ignore */ }
+    }
+
+    // Aggregate all-time stats per startup
+    const rankings = await c.env.DB.prepare(`
+      SELECT 
+        m.user_id,
+        u.name,
+        u.email,
+        COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name,
+        SUM(m.iteration_score) as total_score,
+        SUM(m.users_contacted) as total_users_contacted,
+        SUM(m.hypotheses_tested) as total_hypotheses_tested,
+        SUM(m.learnings_count) as total_learnings,
+        COUNT(*) as weeks_active,
+        MAX(m.week_number || '-' || m.year) as last_activity,
+        AVG(m.iteration_score) as avg_score_per_week,
+        RANK() OVER (ORDER BY SUM(m.iteration_score) DESC) as rank
+      FROM astar_weekly_metrics m
+      JOIN users u ON m.user_id = u.id
+      GROUP BY m.user_id, u.name, u.email
+      ORDER BY total_score DESC
+      LIMIT 20
+    `).all();
+
+    // Get evolution for each startup (last 8 weeks)
+    const rankingsWithEvolution = await Promise.all(
+      (rankings.results || []).map(async (r: any) => {
+        const evo = await c.env.DB.prepare(`
+          SELECT 
+            week_number,
+            year,
+            iteration_score
+          FROM astar_weekly_metrics
+          WHERE user_id = ?
+          ORDER BY year DESC, week_number DESC
+          LIMIT 8
+        `).bind(r.user_id).all();
+        
+        const evolution = (evo.results || []).reverse(); // oldest first
+        const trend = evolution.length >= 2 
+          ? evolution[evolution.length - 1].iteration_score - evolution[evolution.length - 2].iteration_score
+          : 0;
+
+        return { ...r, evolution, trend };
+      })
+    );
+
+    // User position
+    let myPosition = null;
+    if (userId) {
+      const userStats = await c.env.DB.prepare(`
+        SELECT 
+          m.user_id,
+          SUM(m.iteration_score) as total_score,
+          (SELECT COUNT(DISTINCT user_id) + 1 
+           FROM astar_weekly_metrics m2 
+           WHERE (SELECT SUM(iteration_score) FROM astar_weekly_metrics WHERE user_id = m2.user_id) > 
+                 (SELECT SUM(iteration_score) FROM astar_weekly_metrics WHERE user_id = m.user_id)) as rank
+        FROM astar_weekly_metrics m
+        WHERE m.user_id = ?
+        GROUP BY m.user_id
+      `).bind(userId).first();
+      myPosition = userStats;
+    }
+
+    // User evolution
+    let myEvolution: any[] = [];
+    if (userId) {
+      const evoResult = await c.env.DB.prepare(`
+        SELECT 
+          m.week_number,
+          m.year,
+          m.iteration_score,
+          (SELECT COUNT(DISTINCT user_id) + 1 
+           FROM astar_weekly_metrics m2 
+           WHERE m2.week_number = m.week_number AND m2.year = m.year 
+           AND m2.iteration_score > m.iteration_score) as rank
+        FROM astar_weekly_metrics m
+        WHERE m.user_id = ?
+        ORDER BY m.year DESC, m.week_number DESC
+        LIMIT 8
+      `).bind(userId).all();
+      myEvolution = evoResult.results || [];
+    }
+
+    return c.json({
+      rankings: rankingsWithEvolution,
+      my_position: myPosition,
+      my_evolution: myEvolution
+    });
+
+  } catch (error) {
+    console.error('Error getting all-time ranking:', error);
+    return c.json({ error: 'Failed to get all-time ranking' }, 500);
   }
 });
 
@@ -1565,6 +1896,330 @@ astarMessages.post('/cron/send-by-day/:dayOfWeek', async (c) => {
     console.error('Error sending day emails:', error);
     return c.json({ 
       error: 'Failed to send day emails', 
+      details: error.message || String(error)
+    }, 500);
+  }
+});
+
+// ============================================
+// ADMIN ENDPOINTS - Pitch Deck Monitoring
+// ============================================
+
+// GET /api/astar-messages/admin/all-metrics - Get all pitch deck metrics (admin only)
+astarMessages.get('/admin/all-metrics', async (c) => {
+  try {
+    // Verify admin role
+    const userRole = c.get('userRole');
+    if (userRole !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admin only' }, 403);
+    }
+
+    const filter = c.req.query('filter') || 'current';
+    const now = new Date();
+    const currentWeek = getWeekNumber(now);
+    const currentYear = now.getFullYear();
+
+    let weekCondition = '';
+    if (filter === 'current') {
+      weekCondition = `WHERE m.week_number = ${currentWeek} AND m.year = ${currentYear}`;
+    } else if (filter === 'last') {
+      const lastWeek = currentWeek - 1;
+      weekCondition = `WHERE m.week_number = ${lastWeek} AND m.year = ${currentYear}`;
+    }
+    // 'all' = no filter
+
+    let metrics;
+    try {
+      metrics = await c.env.DB.prepare(`
+        SELECT 
+          m.*,
+          u.name,
+          u.email,
+          COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name,
+          (SELECT COUNT(*) FROM astar_user_responses r 
+           JOIN astar_sent_messages s ON r.sent_message_id = s.id 
+           WHERE s.user_id = m.user_id) as response_count
+        FROM astar_weekly_metrics m
+        JOIN users u ON m.user_id = u.id
+        ${weekCondition}
+        ORDER BY m.iteration_score DESC
+      `).all();
+    } catch(e) {
+      // Fallback without startup_name if column doesn't exist
+      metrics = await c.env.DB.prepare(`
+        SELECT 
+          m.*,
+          u.name,
+          u.email,
+          COALESCE(u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1), '') as startup_name,
+          (SELECT COUNT(*) FROM astar_user_responses r 
+           JOIN astar_sent_messages s ON r.sent_message_id = s.id 
+           WHERE s.user_id = m.user_id) as response_count
+        FROM astar_weekly_metrics m
+        JOIN users u ON m.user_id = u.id
+        ${weekCondition}
+        ORDER BY m.iteration_score DESC
+      `).all();
+    }
+
+    return c.json({
+      success: true,
+      metrics: metrics.results || [],
+      filter,
+      week: currentWeek,
+      year: currentYear
+    });
+
+  } catch (error: any) {
+    console.error('Error getting admin metrics:', error);
+    return c.json({ 
+      error: 'Failed to get metrics', 
+      details: error.message || String(error)
+    }, 500);
+  }
+});
+
+// GET /api/astar-messages/admin/user-responses/:userId - Get all responses for a user (admin only)
+astarMessages.get('/admin/user-responses/:userId', async (c) => {
+  try {
+    // Verify admin role
+    const userRole = c.get('userRole');
+    if (userRole !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admin only' }, 403);
+    }
+
+    const userId = parseInt(c.req.param('userId'));
+
+    const responses = await c.env.DB.prepare(`
+      SELECT 
+        r.*,
+        t.subject as question,
+        t.category,
+        s.week_number,
+        s.year
+      FROM astar_user_responses r
+      JOIN astar_sent_messages s ON r.sent_message_id = s.id
+      JOIN astar_message_templates t ON s.template_id = t.id
+      WHERE r.user_id = ?
+      ORDER BY r.created_at DESC
+    `).bind(userId).all();
+
+    return c.json({
+      success: true,
+      responses: responses.results || [],
+      userId
+    });
+
+  } catch (error: any) {
+    console.error('Error getting user responses:', error);
+    return c.json({ 
+      error: 'Failed to get user responses', 
+      details: error.message || String(error)
+    }, 500);
+  }
+});
+
+// GET /api/astar-messages/admin/email-stats - Get email sending statistics (admin only)
+astarMessages.get('/admin/email-stats', async (c) => {
+  try {
+    // Verify admin role
+    const userRole = c.get('userRole');
+    if (userRole !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admin only' }, 403);
+    }
+
+    const now = new Date();
+    const weekNumber = getWeekNumber(now);
+    const year = now.getFullYear();
+
+    // Count emails sent today
+    const todayStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_sent,
+        COUNT(DISTINCT user_id) as unique_recipients,
+        template_id
+      FROM astar_sent_messages 
+      WHERE DATE(sent_at) = DATE('now')
+      GROUP BY template_id
+    `).all();
+
+    // Count emails sent this week
+    const weekStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_sent,
+        COUNT(DISTINCT user_id) as unique_recipients
+      FROM astar_sent_messages 
+      WHERE week_number = ? AND year = ?
+    `).bind(weekNumber, year).first();
+
+    // Count total active founders and IE students
+    const potentialRecipients = await c.env.DB.prepare(`
+      SELECT COUNT(*) as total
+      FROM users
+      WHERE (role = 'founder' OR email LIKE '%@student.ie.edu')
+        AND (email_unsubscribed IS NULL OR email_unsubscribed = 0)
+    `).first();
+
+    // Get template details for today's sends
+    const templatesUsed = await c.env.DB.prepare(`
+      SELECT DISTINCT
+        t.id,
+        t.subject,
+        t.day_of_week,
+        t.time_of_day,
+        COUNT(s.id) as sent_count
+      FROM astar_sent_messages s
+      JOIN astar_message_templates t ON s.template_id = t.id
+      WHERE DATE(s.sent_at) = DATE('now')
+      GROUP BY t.id
+    `).all();
+
+    return c.json({
+      success: true,
+      today: {
+        total_sent: todayStats.results?.reduce((sum: number, r: any) => sum + (r.total_sent || 0), 0) || 0,
+        unique_recipients: todayStats.results?.reduce((sum: number, r: any) => sum + (r.unique_recipients || 0), 0) || 0,
+        templates: templatesUsed.results || []
+      },
+      this_week: {
+        total_sent: (weekStats as any)?.total_sent || 0,
+        unique_recipients: (weekStats as any)?.unique_recipients || 0
+      },
+      potential_recipients: (potentialRecipients as any)?.total || 0,
+      week_number: weekNumber,
+      year
+    });
+
+  } catch (error: any) {
+    console.error('Error getting email stats:', error);
+    return c.json({ 
+      error: 'Failed to get email stats', 
+      details: error.message || String(error)
+    }, 500);
+  }
+});
+
+// GET /api/astar-messages/admin/debug-recipients - Debug why emails aren't being sent (admin only)
+astarMessages.get('/admin/debug-recipients', async (c) => {
+  try {
+    // Verify admin role
+    const userRole = c.get('userRole');
+    if (userRole !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admin only' }, 403);
+    }
+
+    const now = new Date();
+    const weekNumber = getWeekNumber(now);
+    const year = now.getFullYear();
+    const dayOfWeek = now.getDay();
+    const hour = now.getHours();
+    const timeOfDay = hour < 12 ? 'morning' : 'evening';
+
+    // Get current template
+    const template = await c.env.DB.prepare(`
+      SELECT * FROM astar_message_templates 
+      WHERE day_of_week = ? AND time_of_day = ?
+    `).bind(dayOfWeek, timeOfDay).first() as any;
+
+    // Count total founders
+    const totalFounders = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM users WHERE role = 'founder'
+    `).first() as any;
+
+    // Count founders with unsubscribe
+    const unsubscribedFounders = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM users WHERE role = 'founder' AND email_unsubscribed = 1
+    `).first() as any;
+
+    // Count IE students in DB
+    const ieStudents = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM users WHERE email LIKE '%@student.ie.edu'
+    `).first() as any;
+
+    // Count IE students with unsubscribe
+    const unsubscribedIE = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM users WHERE email LIKE '%@student.ie.edu' AND email_unsubscribed = 1
+    `).first() as any;
+
+    // Count who already received this week's template
+    const alreadyReceived = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count 
+      FROM astar_sent_messages 
+      WHERE template_id = ? AND week_number = ? AND year = ?
+    `).bind(template?.id || 0, weekNumber, year).first() as any;
+
+    // Get eligible recipients (matching cron logic)
+    const eligible = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM users u
+      WHERE (u.role = 'founder' OR u.email LIKE '%@student.ie.edu')
+        AND (u.email_unsubscribed IS NULL OR u.email_unsubscribed = 0)
+    `).first() as any;
+
+    // Sample of users who should receive but didn't
+    const shouldReceive = await c.env.DB.prepare(`
+      SELECT u.id, u.email, u.name, u.role,
+        CASE WHEN s.id IS NOT NULL THEN 1 ELSE 0 END as already_sent
+      FROM users u
+      LEFT JOIN astar_sent_messages s ON u.id = s.user_id 
+        AND s.template_id = ? AND s.week_number = ? AND s.year = ?
+      WHERE (u.role = 'founder' OR u.email LIKE '%@student.ie.edu')
+        AND (u.email_unsubscribed IS NULL OR u.email_unsubscribed = 0)
+      LIMIT 20
+    `).bind(template?.id || 0, weekNumber, year).all();
+
+    // Get list of unsubscribed users
+    const unsubscribedUsers = await c.env.DB.prepare(`
+      SELECT id, email, name, role
+      FROM users
+      WHERE email_unsubscribed = 1
+      ORDER BY email
+    `).all();
+
+    // Get users who didn't receive but should have
+    const notReceived = await c.env.DB.prepare(`
+      SELECT u.id, u.email, u.name, u.role
+      FROM users u
+      WHERE (u.role = 'founder' OR u.email LIKE '%@student.ie.edu')
+        AND (u.email_unsubscribed IS NULL OR u.email_unsubscribed = 0)
+        AND u.id NOT IN (
+          SELECT user_id FROM astar_sent_messages 
+          WHERE template_id = ? AND week_number = ? AND year = ?
+        )
+      LIMIT 50
+    `).bind(template?.id || 0, weekNumber, year).all();
+
+    return c.json({
+      success: true,
+      current_context: {
+        day_of_week: dayOfWeek,
+        time_of_day: timeOfDay,
+        week_number: weekNumber,
+        year,
+        template: template ? {
+          id: template.id,
+          subject: template.subject
+        } : null
+      },
+      stats: {
+        total_founders: totalFounders?.count || 0,
+        unsubscribed_founders: unsubscribedFounders?.count || 0,
+        ie_students_in_db: ieStudents?.count || 0,
+        unsubscribed_ie: unsubscribedIE?.count || 0,
+        eligible_recipients: eligible?.count || 0,
+        already_received_this_template: alreadyReceived?.count || 0,
+        expected_to_send: (eligible?.count || 0) - (alreadyReceived?.count || 0)
+      },
+      ie_student_list_size: 114, // Hardcoded list size
+      sample_users: shouldReceive.results || [],
+      unsubscribed_users: unsubscribedUsers.results || [],
+      users_not_received: notReceived.results || []
+    });
+
+  } catch (error: any) {
+    console.error('Error debugging recipients:', error);
+    return c.json({ 
+      error: 'Failed to debug recipients', 
       details: error.message || String(error)
     }, 500);
   }

@@ -193,6 +193,30 @@ dashboard.post('/goals', requireAuth, async (c) => {
   }
 
   try {
+    // Enforce goal limits ONLY for AppSumo/Dealify LTD buyers
+    // Free users (plan_tier = NULL) have unlimited access
+    const userPlan = await c.env.DB.prepare(
+      `SELECT plan_tier FROM users WHERE id = ?`
+    ).bind(userId).first() as any;
+
+    const planTier = userPlan?.plan_tier || null;
+
+    // Only Solo tier has a cap (3 active goals). Growth/Scale/null = unlimited
+    if (planTier === 'solo') {
+      const activeGoalsCount = await c.env.DB.prepare(
+        `SELECT COUNT(*) as count FROM goals WHERE user_id = ? AND status = 'active'`
+      ).bind(userId).first() as any;
+
+      if ((activeGoalsCount?.count || 0) >= 3) {
+        return c.json({
+          error: 'Tu plan Solo permite máximo 3 objetivos activos. Actualiza al plan Growth para objetivos ilimitados.',
+          limit_reached: true,
+          current_plan: 'solo',
+          upgrade_url: '/pricing'
+        }, 403);
+      }
+    }
+
     // If assigned_to_user_id is provided, validate that this user is in the same team
     if (assigned_to_user_id) {
       const teamMembership = await c.env.DB.prepare(`
@@ -289,6 +313,7 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
     scheduled_dates,
     week_of,
     order_index,
+    priority_order,
     category
   } = body;
 
@@ -432,6 +457,10 @@ dashboard.put('/goals/:id', requireAuth, async (c) => {
     if (order_index !== undefined) {
       updates.push('order_index = ?');
       values.push(order_index);
+    }
+    if (priority_order !== undefined) {
+      updates.push('priority_order = ?');
+      values.push(priority_order);
     }
     if (category !== undefined) {
       updates.push('category = ?');

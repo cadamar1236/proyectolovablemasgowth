@@ -1021,4 +1021,264 @@ admin.get('/stats/engagement-timeline', adminMiddleware, async (c) => {
   }
 });
 
+// ============================================================
+// CONVERSATION PITCH DECK - Admin Endpoints
+// ============================================================
+
+// Get all conversation pitch deck submissions (summary + raw)
+admin.get('/conversation-pitches', adminMiddleware, async (c) => {
+  try {
+    const filter = c.req.query('filter') || 'all';
+    
+    let dateFilter = '';
+    if (filter === 'current') {
+      dateFilter = "AND a.created_at >= datetime('now', 'weekday 0', '-6 days')";
+    } else if (filter === 'last') {
+      dateFilter = "AND a.created_at >= datetime('now', 'weekday 0', '-13 days') AND a.created_at < datetime('now', 'weekday 0', '-6 days')";
+    } else if (filter === 'today') {
+      dateFilter = "AND a.created_at >= datetime('now', 'start of day')";
+    }
+
+    // Get conversation summaries (from activity_log action = 'conversation_pitch_deck')
+    const summaries = await c.env.DB.prepare(`
+      SELECT 
+        a.id,
+        a.user_id,
+        a.details,
+        a.created_at,
+        u.name as user_name,
+        u.email as user_email,
+        COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name
+      FROM activity_log a
+      LEFT JOIN users u ON u.id = a.user_id
+      WHERE a.action = 'conversation_pitch_deck'
+      ${dateFilter}
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `).all();
+
+    // Get raw conversation data 
+    const rawConversations = await c.env.DB.prepare(`
+      SELECT 
+        a.id,
+        a.user_id,
+        a.details,
+        a.created_at,
+        u.name as user_name,
+        u.email as user_email,
+        COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name
+      FROM activity_log a
+      LEFT JOIN users u ON u.id = a.user_id
+      WHERE a.action = 'pitch_deck_conversation_raw'
+      ${dateFilter}
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `).all();
+
+    // Also get legacy voice pitch deck submissions
+    const legacySummaries = await c.env.DB.prepare(`
+      SELECT 
+        a.id,
+        a.user_id,
+        a.details,
+        a.created_at,
+        u.name as user_name,
+        u.email as user_email,
+        COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name
+      FROM activity_log a
+      LEFT JOIN users u ON u.id = a.user_id
+      WHERE a.action IN ('voice_pitch_deck', 'pitch_deck_responses')
+      ${dateFilter}
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `).all();
+
+    // Get auto-generated goals from conversations
+    const recentGoals = await c.env.DB.prepare(`
+      SELECT 
+        g.id,
+        g.user_id,
+        g.category,
+        g.description,
+        g.task,
+        g.priority_label,
+        g.goal_status,
+        g.week_number,
+        g.year_number,
+        g.status,
+        g.created_at,
+        u.name as user_name,
+        u.email as user_email,
+        COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name
+      FROM goals g
+      LEFT JOIN users u ON u.id = g.user_id
+      WHERE g.created_at >= datetime('now', '-7 days')
+      ORDER BY g.created_at DESC
+      LIMIT 50
+    `).all();
+
+    // Get user metrics saved from conversations
+    const recentMetrics = await c.env.DB.prepare(`
+      SELECT 
+        um.id,
+        um.user_id,
+        um.metric_name,
+        um.metric_value,
+        um.recorded_date,
+        um.created_at,
+        u.name as user_name,
+        u.email as user_email,
+        COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name
+      FROM user_metrics um
+      LEFT JOIN users u ON u.id = um.user_id
+      WHERE um.created_at >= datetime('now', '-7 days')
+      ORDER BY um.created_at DESC
+      LIMIT 50
+    `).all();
+
+    // Get weekly scores
+    const weeklyScores = await c.env.DB.prepare(`
+      SELECT 
+        awm.*,
+        u.name as user_name,
+        u.email as user_email,
+        COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name
+      FROM astar_weekly_metrics awm
+      LEFT JOIN users u ON u.id = awm.user_id
+      ORDER BY awm.created_at DESC
+      LIMIT 50
+    `).all();
+
+    // Stats
+    const totalConversations = (summaries.results?.length || 0) + (legacySummaries.results?.filter((l: any) => l.details?.includes('voice_pitch_deck')).length || 0);
+    
+    return c.json({
+      conversations: summaries.results || [],
+      rawConversations: rawConversations.results || [],
+      legacySubmissions: legacySummaries.results || [],
+      recentGoals: recentGoals.results || [],
+      recentMetrics: recentMetrics.results || [],
+      weeklyScores: weeklyScores.results || [],
+      stats: {
+        totalConversations: totalConversations,
+        totalRawSaved: rawConversations.results?.length || 0,
+        totalGoalsGenerated: recentGoals.results?.length || 0,
+        totalMetricsSaved: recentMetrics.results?.length || 0
+      }
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching conversation pitches:', error);
+    return c.json({ error: 'Failed to fetch conversation pitch data' }, 500);
+  }
+});
+
+// Get single conversation detail with full JSON
+admin.get('/conversation-pitches/:id', adminMiddleware, async (c) => {
+  try {
+    const id = c.req.param('id');
+    
+    const entry = await c.env.DB.prepare(`
+      SELECT 
+        a.id,
+        a.user_id,
+        a.action,
+        a.details,
+        a.created_at,
+        u.name as user_name,
+        u.email as user_email,
+        COALESCE(u.startup_name, u.company, (SELECT bp.title FROM beta_products bp WHERE bp.company_user_id = u.id LIMIT 1)) as startup_name
+      FROM activity_log a
+      LEFT JOIN users u ON u.id = a.user_id
+      WHERE a.id = ?
+    `).bind(id).first();
+
+    if (!entry) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+
+    // Parse JSON details if possible
+    let parsedDetails = null;
+    try {
+      parsedDetails = JSON.parse(entry.details as string);
+    } catch (e) {
+      parsedDetails = entry.details;
+    }
+
+    return c.json({
+      entry: {
+        ...entry,
+        parsed_details: parsedDetails
+      }
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching conversation detail:', error);
+    return c.json({ error: 'Failed to fetch conversation detail' }, 500);
+  }
+});
+
+// ─── Astro AI Sessions ───────────────────────────────────────────────────────
+admin.get('/astro-sessions', adminMiddleware, async (c) => {
+  try {
+    const sessions = await c.env.DB.prepare(`
+      SELECT 
+        a.id,
+        a.user_id,
+        a.startup_name,
+        a.problem,
+        a.solution,
+        a.sector,
+        a.geography,
+        a.mrr,
+        a.arr,
+        a.active_users,
+        a.growth_rate_percent,
+        a.team_size,
+        a.fundraising_goal,
+        a.fundraising_stage,
+        a.vc_recommendations,
+        a.conversation_turns,
+        a.data_completeness,
+        a.created_at,
+        a.updated_at,
+        u.name as founder_name,
+        u.email as founder_email,
+        u.avatar_url as founder_avatar
+      FROM astro_sessions a
+      JOIN users u ON a.user_id = u.id
+      ORDER BY a.updated_at DESC
+      LIMIT 200
+    `).all();
+
+    return c.json({ sessions: sessions.results || [] });
+  } catch (error) {
+    console.error('[ADMIN] astro-sessions error:', error);
+    return c.json({ error: 'Failed to load astro sessions' }, 500);
+  }
+});
+
+// GET /admin/astro-messages/:userId — full conversation history for one user
+admin.get('/astro-messages/:userId', adminMiddleware, async (c) => {
+  try {
+    const userId = c.req.param('userId');
+    // Create table if it doesn't exist yet (first deploy guard)
+    await c.env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS astro_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        session_date TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+    const msgs = await c.env.DB.prepare(
+      'SELECT id, role, content, session_date, created_at FROM astro_messages WHERE user_id = ? ORDER BY created_at ASC LIMIT 300'
+    ).bind(userId).all();
+    return c.json({ messages: msgs.results || [] });
+  } catch (error) {
+    console.error('[ADMIN] astro-messages error:', error);
+    return c.json({ error: 'Failed to load conversation' }, 500);
+  }
+});
+
 export default admin;

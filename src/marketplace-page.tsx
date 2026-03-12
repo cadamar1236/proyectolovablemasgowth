@@ -48,18 +48,21 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <i class="fas fa-chart-line mr-1 md:mr-2"></i><span class="hidden sm:inline">Traction</span>
           </button>
           ` : ''}
-          <button onclick="switchTab('inbox')" id="tab-inbox" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold ${userRole === 'founder' ? 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent' : 'text-primary border-b-2 border-primary'}">
+          <button onclick="switchTab('inbox')" id="tab-inbox" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold ${userRole === 'founder' ? 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent' : 'text-primary border-b-2 border-primary'}" style="display:none">
             <i class="fas fa-inbox mr-1 md:mr-2"></i><span class="hidden sm:inline">Inbox</span>
             <span id="unread-badge" class="hidden ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">0</span>
           </button>
-          <button onclick="switchTab('directory')" id="tab-directory" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent">
+          <button onclick="switchTab('directory')" id="tab-directory" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent" style="display:none">
             <i class="fas fa-store mr-1 md:mr-2"></i><span class="hidden sm:inline">Directory</span>
           </button>
-          <button onclick="switchTab('connector')" id="tab-connector" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-purple-50 to-indigo-50">
+          <button onclick="switchTab('connector')" id="tab-connector" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-purple-50 to-indigo-50" style="display:none">
             <i class="fas fa-network-wired mr-1 md:mr-2"></i><span class="hidden sm:inline">AI Connector</span>
           </button>
-          <button onclick="switchTab('crm')" id="tab-crm" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-emerald-50 to-teal-50">
+          <button onclick="switchTab('crm')" id="tab-crm" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-emerald-50 to-teal-50" style="display:none">
             <i class="fas fa-users-cog mr-1 md:mr-2"></i><span class="hidden sm:inline">AI CRM</span>
+          </button>
+          <button onclick="openVoiceCheckin()" id="tab-voice" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-purple-50 to-pink-50" style="display:none">
+            <i class="fas fa-microphone mr-1 md:mr-2"></i><span class="hidden sm:inline">🎯 Pitch Deck</span>
           </button>
           ${userRole === 'admin' ? `
           <button onclick="window.location.href='/admin'" class="tab-btn flex-shrink-0 px-4 md:px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-gradient-to-r from-purple-50 to-blue-50">
@@ -72,8 +75,113 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
       <!-- Tab Contents -->
       
       ${userRole === 'founder' ? `
-      <!-- HOME TAB -->
+      <!-- HOME TAB - ASTRO AI COFOUNDER CHAT -->
       <div id="content-home" class="tab-content">
+
+        <!-- Astro Chat Interface -->
+        <div id="astro-chat-container" style="height: calc(100vh - 180px); min-height: 500px; background: #0d0d0d; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(139,92,246,0.2); box-shadow: 0 0 40px rgba(139,92,246,0.08);">
+          
+          <!-- Astro Header -->
+          <div style="padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 12px; background: rgba(139,92,246,0.06);">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">⚡</div>
+            <div>
+              <div style="font-weight: 700; color: #f0f0f0; font-size: 15px;">Astro</div>
+              <div style="font-size: 12px; color: #a78bfa;">AI Cofounder · Sales, Marketing & Fundraising</div>
+            </div>
+            <div style="margin-left: auto; display: flex; align-items: center; gap-6px;">
+              <span id="astro-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
+              <span style="font-size: 12px; color: #6b7280; margin-left: 6px;">Online</span>
+            </div>
+          </div>
+
+          <!-- Messages Area -->
+          <div id="astro-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth;">
+            <!-- Messages injected by JS -->
+            <div id="astro-loading" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; max-width: 80%; background: rgba(255,255,255,0.05); border-radius: 16px; border-bottom-left-radius: 4px;">
+              <span style="color: #a78bfa; font-size: 14px;">Astro está escribiendo</span>
+              <span class="astro-typing-dots">
+                <span style="display: inline-block; width: 5px; height: 5px; background: #a78bfa; border-radius: 50%; animation: astroTyping 1.2s infinite;"></span>
+                <span style="display: inline-block; width: 5px; height: 5px; background: #a78bfa; border-radius: 50%; animation: astroTyping 1.2s infinite 0.4s; margin: 0 3px;"></span>
+                <span style="display: inline-block; width: 5px; height: 5px; background: #a78bfa; border-radius: 50%; animation: astroTyping 1.2s infinite 0.8s;"></span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Voice Recording Overlay (hidden by default) -->
+          <div id="astro-voice-overlay" style="display:none; padding: 20px; border-top: 1px solid rgba(139,92,246,0.3); background: rgba(17,0,34,0.95); flex-direction: column; align-items: center; gap: 12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div id="astro-voice-pulse" style="width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#a855f7); display:flex; align-items:center; justify-content:center; font-size:22px; animation: voicePulse 1.2s ease-in-out infinite;">🎙️</div>
+              <div>
+                <div style="font-weight:700; color:#f0f0f0; font-size:14px;">Astro is listening...</div>
+                <div style="font-size:12px; color:#a78bfa;">Tell me about your week — I'll transcribe and analyse it</div>
+              </div>
+              <div id="astro-voice-countdown" style="margin-left:auto; font-size:28px; font-weight:800; color:#a78bfa; min-width:40px; text-align:right;">60</div>
+            </div>
+            <!-- Waveform bars (animated) -->
+            <div style="display:flex; align-items:center; gap:3px; height:32px;" id="astro-waveform">
+              ${Array.from({length:24}).map((_,i) => `<div style="width:3px; border-radius:2px; background:rgba(139,92,246,0.6); height:${8+Math.floor(Math.random()*20)}px; animation:waveBar 0.8s ease-in-out infinite; animation-delay:${(i*0.05).toFixed(2)}s;"></div>`).join('')}
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button onclick="stopAstroVoiceRecording(true)" style="padding:10px 24px; border-radius:24px; background:linear-gradient(135deg,#7c3aed,#a855f7); border:none; color:white; font-weight:700; font-size:13px; cursor:pointer;">⚡ Send to Astro</button>
+              <button onclick="stopAstroVoiceRecording(false)" style="padding:10px 18px; border-radius:24px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#9ca3af; font-size:13px; cursor:pointer;">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Input Area -->
+          <div style="padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.07); background: rgba(0,0,0,0.3);">
+            <div style="display: flex; gap: 10px; align-items: flex-end;">
+              <!-- Voice button -->
+              <button id="astro-voice-btn" onclick="startAstroVoiceRecording()"
+                title="Tell Astro about your week by voice (60s)"
+                style="width:44px; height:44px; border-radius:50%; background:rgba(139,92,246,0.12); border:1px solid rgba(139,92,246,0.3); cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.2s; font-size:18px;"
+                onmouseover="this.style.background='rgba(139,92,246,0.25)'"
+                onmouseout="this.style.background='rgba(139,92,246,0.12)'">🎙️</button>
+              <textarea id="astro-input" placeholder="Type a message or use 🎙️ to tell Astro about your week..." rows="1"
+                style="flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 16px; color: #f0f0f0; font-size: 14px; resize: none; outline: none; font-family: inherit; line-height: 1.5; max-height: 120px; overflow-y: auto;"
+                onkeydown="astroHandleKeydown(event)"
+                oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+              <button onclick="sendAstroMessage()" 
+                style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.15s, box-shadow 0.15s;"
+                onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 15px rgba(124,58,237,0.5)'"
+                onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+            </div>
+            <p style="font-size: 11px; color: #4b5563; margin-top: 8px; text-align: center;">Astro collects your metrics to connect you with the right VCs · <a href="/pitch" style="color: #7c3aed; text-decoration: none;">See full pitch deck →</a></p>
+          </div>
+        </div>
+
+        <style>
+          @keyframes astroTyping { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+          @keyframes voicePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(139,92,246,0.5); } 50% { box-shadow: 0 0 0 14px rgba(139,92,246,0); } }
+          @keyframes waveBar { 0%,100% { transform: scaleY(0.4); opacity:0.5; } 50% { transform: scaleY(1.3); opacity:1; } }
+          #astro-messages::-webkit-scrollbar { width: 6px; }
+          #astro-messages::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 4px; }
+          #astro-messages::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.45); border-radius: 4px; }
+          #astro-messages::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.7); }
+          #astro-messages { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) rgba(255,255,255,0.04); }
+          #astro-input::placeholder { color: #4b5563; }
+          #astro-input:focus { border-color: rgba(139,92,246,0.5) !important; }
+          .astro-msg-astro { display: flex; align-items: flex-start; gap: 10px; animation: astroBubbleIn 0.3s ease; }
+          .astro-msg-user { display: flex; justify-content: flex-end; animation: astroBubbleIn 0.3s ease; }
+          @keyframes astroBubbleIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+          .astro-bubble-astro { background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.2); color: #e5e7eb; padding: 12px 16px; border-radius: 16px; border-bottom-left-radius: 4px; max-width: 85%; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+          .astro-bubble-user { background: rgba(255,255,255,0.08); color: #e5e7eb; padding: 12px 16px; border-radius: 16px; border-bottom-right-radius: 4px; max-width: 85%; font-size: 14px; line-height: 1.7; word-break: break-word; }
+          .astro-avatar-sm { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg,#7c3aed,#a855f7); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; margin-top: 2px; }
+          .astro-vc-card { background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.25); border-radius: 10px; padding: 10px 14px; margin: 6px 0; }
+        </style>
+
+      </div><!-- end content-home -->
+
+      <!-- TRACTION TAB -->
+      <div id="content-traction" class="tab-content hidden">
+
+        <!-- Goals Hub -->
+        <div class="flex items-center gap-3 mb-4">
+          <div class="h-px flex-1 bg-gray-200"></div>
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-widest">⚡ Goals Hub</span>
+          <div class="h-px flex-1 bg-gray-200"></div>
+        </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
           <div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-gray-200">
             <div class="flex items-center justify-between">
@@ -124,7 +232,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <p class="text-xs text-gray-500 mt-2" id="stat-revenue-growth">-</p>
           </div>
         </div>
-        
+
         <!-- Goals Table Section -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
           <div class="p-4 md:p-6 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
@@ -140,8 +248,6 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
               <i class="fas fa-plus mr-2"></i>New Goal
             </button>
           </div>
-          
-          <!-- Monthly Timeline Overview (Weeks) -->
           <!-- Monthly Calendar Overview -->
           <div id="monthly-calendar-overview" class="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-purple-100">
             <div class="flex items-center justify-between mb-3">
@@ -159,7 +265,6 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
                 <span id="timeline-total-tasks" class="text-sm text-gray-500 ml-2">Loading...</span>
               </div>
             </div>
-            <!-- Calendar Grid -->
             <div class="grid grid-cols-7 gap-1 mb-2">
               <div class="text-center text-xs font-semibold text-gray-500 py-1">Mon</div>
               <div class="text-center text-xs font-semibold text-gray-500 py-1">Tue</div>
@@ -169,10 +274,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
               <div class="text-center text-xs font-semibold text-gray-400 py-1">Sat</div>
               <div class="text-center text-xs font-semibold text-gray-400 py-1">Sun</div>
             </div>
-            <div id="calendar-grid" class="grid grid-cols-7 gap-1">
-              <!-- Calendar days will be generated dynamically -->
-            </div>
-            <!-- Legend -->
+            <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
             <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
               <div class="flex items-center gap-4">
                 <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-400 rounded"></span> Light (1-2)</span>
@@ -182,7 +284,6 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
               <span id="busiest-day" class="font-medium"></span>
             </div>
           </div>
-          
           <!-- Goals Filters -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
             <div class="flex flex-wrap gap-3 items-center">
@@ -219,7 +320,6 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
               </button>
             </div>
           </div>
-          
           <!-- Goals Table -->
           <div class="overflow-x-auto">
             <table class="w-full">
@@ -250,7 +350,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-bold text-gray-900">Quick Stats</h3>
@@ -280,10 +380,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- TRACTION TAB -->
-      <div id="content-traction" class="tab-content hidden">
         <!-- Team To-Do List Overview -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
           <div class="p-6 border-b border-gray-200">
@@ -1078,7 +1175,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
     </div>
 
     <!-- Goal Detail Modal -->
-    <div id="goal-detail-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center">
+    <div id="goal-detail-modal" class="fixed inset-0 bg-black/50 z-[60] hidden items-center justify-center">
       <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 rounded-t-2xl">
           <div class="flex justify-between items-start">
@@ -1469,6 +1566,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         const contentEl = document.getElementById('content-' + tab);
         if (contentEl) contentEl.classList.remove('hidden');
         
+        if (tab === 'home') initAstroChat();
         if (tab === 'traction') {
           setTimeout(initCharts, 100);
           renderTeamTodoList();
@@ -1479,6 +1577,752 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         if (tab === 'connector') initConnector();
         if (tab === 'crm') initCRM();
       }
+
+      // ============================================================
+      // ASTRO CHAT - AI Cofounder
+      // ============================================================
+      let astroHistory = [];
+      let astroCollectedData = {};
+      let astroInitialized = false;
+      let astroThinking = false;
+      let astroIsWeeklyCheckin = false;  // persists across all turns of a weekly check-in session
+
+      function getAuthToken() {
+        return document.cookie.match(/authToken=([^;]+)/)?.[1] || '';
+      }
+
+      async function initAstroChat() {
+        if (astroInitialized) return;
+        astroInitialized = true;
+
+        // Try to load prior session from DB before showing greeting
+        let priorSession = null;
+        let daysSinceLastSeen = 0;
+        const token = getAuthToken();
+
+        if (token) {
+          try {
+            const profileRes = await fetch('/api/chat-agent/astro-profile', {
+              headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              if (profileData.session) {
+                priorSession = profileData.session;
+                // Store pending goals in global scope for greeting context
+                if (profileData.pendingGoals && profileData.pendingGoals.length > 0) {
+                  priorSession._pendingGoals = profileData.pendingGoals;
+                }
+                // Pre-fill collected data from prior session
+                const s = priorSession;
+                if (s.startup_name) astroCollectedData.startup_name = s.startup_name;
+                if (s.problem) astroCollectedData.problem = s.problem;
+                if (s.solution) astroCollectedData.solution = s.solution;
+                if (s.sector) astroCollectedData.sector = s.sector;
+                if (s.geography) astroCollectedData.geography = s.geography;
+                if (s.mrr > 0) astroCollectedData.mrr = s.mrr;
+                if (s.arr > 0) astroCollectedData.arr = s.arr;
+                if (s.active_users > 0) astroCollectedData.active_users = s.active_users;
+                if (s.team_size > 1) astroCollectedData.team_size = s.team_size;
+                if (s.fundraising_stage) astroCollectedData.fundraising_stage = s.fundraising_stage;
+                if (s.fundraising_goal) astroCollectedData.fundraising_goal = s.fundraising_goal;
+
+                // Calculate days since last seen
+                if (s.last_seen_at) {
+                  daysSinceLastSeen = Math.floor((Date.now() - new Date(s.last_seen_at).getTime()) / 86400000);
+                  astroIsWeeklyCheckin = daysSinceLastSeen >= 6;
+                }
+
+                // Days since last seen already calculated above
+
+              }
+            }
+          } catch {}
+        }
+
+        await requestAstroGreeting(priorSession, daysSinceLastSeen);
+      }
+
+      async function requestAstroGreeting(priorSession = null, daysSinceLastSeen = 0) {
+        try {
+          const token = getAuthToken();
+          const isReturning = priorSession !== null;
+          const priorActionItems = priorSession?.action_items
+            ? (() => { try { return JSON.parse(priorSession.action_items); } catch { return []; } })()
+            : [];
+          const pendingGoals = priorSession?._pendingGoals || [];
+
+          const res = await fetch('/api/chat-agent/astro-chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+            },
+            body: JSON.stringify({
+              message: null,
+              conversationHistory: [],
+              collectedData: astroCollectedData,
+              isReturning,
+              daysSinceLastSeen,
+              priorActionItems,
+              pendingGoals
+            })
+          });
+          const data = await res.json();
+          // Remove loading indicator
+          const loadingEl = document.getElementById('astro-loading');
+          if (loadingEl) loadingEl.remove();
+          // Add Astro greeting
+          addAstroMessage(data.response, 'astro');
+          astroHistory.push({ role: 'astro', content: data.response });
+        } catch (e) {
+          const loadingEl = document.getElementById('astro-loading');
+          if (loadingEl) loadingEl.remove();
+          const greeting = astroCollectedData.startup_name
+            ? "Hey, welcome back! ⚡ Take a minute — tell me how the week went for " + astroCollectedData.startup_name + ": what moved, what didn't, and what's the one thing you need help with right now."
+            : "Hey! I'm Astro ⚡, your AI Cofounder at ASTAR*. Before we dive in — take a minute and tell me how your week went. What did you build or ship? How are your key metrics moving? And what's the one thing blocking you right now?";
+          addAstroMessage(greeting, 'astro');
+          astroHistory.push({ role: 'astro', content: greeting });
+        }
+      }
+
+      function addAstroMessage(content, role) {
+        const messagesEl = document.getElementById('astro-messages');
+        if (!messagesEl) return;
+        const div = document.createElement('div');
+        div.className = role === 'astro' ? 'astro-msg-astro' : 'astro-msg-user';
+        if (role === 'astro') {
+          div.innerHTML = '<div class="astro-avatar-sm">⚡</div><div class="astro-bubble-astro">' + escapeAstroHtml(content) + '</div>';
+        } else {
+          div.innerHTML = '<div class="astro-bubble-user">' + escapeAstroHtml(content) + '</div>';
+        }
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function showAstroTyping() {
+        const messagesEl = document.getElementById('astro-messages');
+        if (!messagesEl) return;
+        const div = document.createElement('div');
+        div.id = 'astro-typing-indicator';
+        div.className = 'astro-msg-astro';
+        div.innerHTML = '<div class="astro-avatar-sm">⚡</div><div class="astro-bubble-astro" style="padding: 10px 16px;"><span style="display:inline-block;width:5px;height:5px;background:#a78bfa;border-radius:50%;animation:astroTyping 1.2s infinite;"></span><span style="display:inline-block;width:5px;height:5px;background:#a78bfa;border-radius:50%;animation:astroTyping 1.2s infinite 0.4s;margin:0 3px;"></span><span style="display:inline-block;width:5px;height:5px;background:#a78bfa;border-radius:50%;animation:astroTyping 1.2s infinite 0.8s;"></span></div>';
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function hideAstroTyping() {
+        const el = document.getElementById('astro-typing-indicator');
+        if (el) el.remove();
+      }
+
+      function escapeAstroHtml(text) {
+        // Strip markdown tables (lines that start with | ... |)
+        text = text.replace(/^\\|.*\\|\\s*$/gm, '');
+        // Remove separator lines like |---|---|
+        text = text.replace(/^\\|[-:\\s|]+\\|\\s*$/gm, '');
+        // Remove excess blank lines left by table removal
+        text = text.replace(/\\n{3,}/g, '\\n\\n');
+        // Escape HTML entities first
+        text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Bold: **text** or __text__
+        text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+        text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        // Italic: *text* or _text_
+        text = text.replace(/\\*([^*]+?)\\*/g, '<em>$1</em>');
+        // Convert markdown headers (## ...) to bold lines
+        text = text.replace(/^#{1,3}\\s+(.+)$/gm, '<strong>$1</strong>');
+        // Convert markdown bullet lines to •
+        text = text.replace(/^[\\-\\*]\\s+/gm, '• ');
+        // Numbered lists — keep as-is
+        // Newlines to <br>
+        text = text.replace(/\\n/g, '<br>');
+        return text;
+      }
+
+      function astroHandleKeydown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          sendAstroMessage();
+        }
+      }
+
+      // ── Voice Recording ──────────────────────────────────────────────
+      let astroMediaRecorder = null;
+      let astroAudioChunks = [];
+      let astroVoiceCountdownInterval = null;
+      let astroVoiceSecondsLeft = 60;
+
+      async function startAstroVoiceRecording() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert('Your browser does not support microphone access. Try Chrome or Edge.');
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          astroAudioChunks = [];
+          astroVoiceSecondsLeft = 60;
+
+          // Pick the best supported MIME type
+          const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
+            : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+
+          astroMediaRecorder = new MediaRecorder(stream, { mimeType });
+          astroMediaRecorder.ondataavailable = e => { if (e.data.size > 0) astroAudioChunks.push(e.data); };
+          astroMediaRecorder.onstop = async () => {
+            stream.getTracks().forEach(t => t.stop());
+            // Only send if user clicked Send (not Cancel)
+            if (astroMediaRecorder._shouldSend) {
+              await transcribeAndSendToAstro(new Blob(astroAudioChunks, { type: mimeType }), mimeType);
+            }
+          };
+
+          astroMediaRecorder.start(250); // collect in 250ms chunks
+
+          // Show overlay
+          const overlay = document.getElementById('astro-voice-overlay');
+          overlay.style.display = 'flex';
+
+          // Countdown
+          document.getElementById('astro-voice-countdown').textContent = '60';
+          astroVoiceCountdownInterval = setInterval(() => {
+            astroVoiceSecondsLeft--;
+            document.getElementById('astro-voice-countdown').textContent = astroVoiceSecondsLeft;
+            if (astroVoiceSecondsLeft <= 0) stopAstroVoiceRecording(true);
+          }, 1000);
+
+        } catch (err) {
+          console.error('Mic error:', err);
+          alert('Could not access microphone. Please allow microphone permission and try again.');
+        }
+      }
+
+      function stopAstroVoiceRecording(send) {
+        clearInterval(astroVoiceCountdownInterval);
+        document.getElementById('astro-voice-overlay').style.display = 'none';
+        if (astroMediaRecorder && astroMediaRecorder.state !== 'inactive') {
+          astroMediaRecorder._shouldSend = send;
+          astroMediaRecorder.stop();
+        }
+      }
+
+      async function transcribeAndSendToAstro(audioBlob, mimeType) {
+        // Show transcribing state in chat
+        const transcribingId = 'astro-transcribing-' + Date.now();
+        const messagesEl = document.getElementById('astro-messages');
+        const transcribingEl = document.createElement('div');
+        transcribingEl.id = transcribingId;
+        transcribingEl.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:80%;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:16px;border-bottom-left-radius:4px;';
+        transcribingEl.innerHTML = '<span style="font-size:18px;">🎙️</span><span style="color:#a78bfa;font-size:14px;">Transcribing your voice note...</span>';
+        messagesEl.appendChild(transcribingEl);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        try {
+          const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'recording.' + ext);
+
+          const token = getAuthToken();
+          const res = await fetch('/api/chat-agent/transcribe', {
+            method: 'POST',
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+            body: formData
+          });
+
+          const data = await res.json();
+          transcribingEl.remove();
+
+          if (!res.ok || !data.transcription) {
+            addAstroMessage('⚠️ Could not transcribe the audio. Please try typing your message.', 'astro');
+            return;
+          }
+
+          const transcription = data.transcription.trim();
+
+          // Show user bubble with the transcription
+          addAstroMessage('🎙️ ' + transcription, 'user');
+          astroHistory.push({ role: 'user', content: '🎙️ ' + transcription });
+
+          // Send to Astro with [VOICE_TRANSCRIPT] prefix for special handling
+          astroThinking = true;
+          showAstroTyping();
+
+          const chatToken = getAuthToken();
+          const chatRes = await fetch('/api/chat-agent/astro-chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(chatToken ? { 'Authorization': 'Bearer ' + chatToken } : {})
+            },
+            body: JSON.stringify({
+              message: '[VOICE_TRANSCRIPT] ' + transcription,
+              conversationHistory: astroHistory.slice(-20),
+              collectedData: astroCollectedData,
+              isWeeklyCheckin: true
+            })
+          });
+
+          const chatData = await chatRes.json();
+          hideAstroTyping();
+          astroThinking = false;
+
+          if (chatData.extractedData) {
+            Object.entries(chatData.extractedData).forEach(([k,v]) => { if (v != null) astroCollectedData[k] = v; });
+          }
+          if (chatData.isVCRecommendation) {
+            showAstroVCCards(chatData.recommendedVCCards || []);
+            if (chatData.response) setTimeout(() => { addAstroMessage(chatData.response, 'astro'); astroHistory.push({ role: 'astro', content: chatData.response }); }, 400);
+          } else {
+            addAstroMessage(chatData.response, 'astro');
+            astroHistory.push({ role: 'astro', content: chatData.response });
+          }
+          if (chatData.dataSaved) showAstroProfileCard(astroCollectedData);
+          if (chatData.actionItems && chatData.actionItems.length > 0) showAstroActionItems(chatData.actionItems, false);
+          if (chatData.createdGoals && chatData.createdGoals.length > 0) showAstroCreatedGoals(chatData.createdGoals, 'en');
+
+        } catch (err) {
+          console.error('Voice transcription error:', err);
+          transcribingEl.remove();
+          astroThinking = false;
+          hideAstroTyping();
+          addAstroMessage('⚠️ Something went wrong with the voice note. Try typing instead.', 'astro');
+        }
+      }
+
+      async function sendAstroMessage() {
+        if (astroThinking) return;
+        const input = document.getElementById('astro-input');
+        const message = input ? input.value.trim() : '';
+        if (!message) return;
+
+        // Clear input
+        input.value = '';
+        input.style.height = 'auto';
+
+        // Add user message to UI
+        addAstroMessage(message, 'user');
+        astroHistory.push({ role: 'user', content: message });
+
+        // Show typing indicator
+        astroThinking = true;
+        showAstroTyping();
+
+        try {
+          const token = getAuthToken();
+          const res = await fetch('/api/chat-agent/astro-chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+            },
+            body: JSON.stringify({
+              message,
+              conversationHistory: astroHistory.slice(-20), // Last 20 messages for context
+              collectedData: astroCollectedData,
+              isWeeklyCheckin: astroIsWeeklyCheckin
+            })
+          });
+
+          const data = await res.json();
+          hideAstroTyping();
+
+          // Merge extracted data into our local store first
+          if (data.extractedData && typeof data.extractedData === 'object') {
+            Object.entries(data.extractedData).forEach(([k, v]) => {
+              if (v !== null && v !== undefined) astroCollectedData[k] = v;
+            });
+          }
+
+          // If VC recommendations received, show cards first, then the conversational follow-up
+          if (data.isVCRecommendation) {
+            showAstroVCCards(data.recommendedVCCards || []);
+            if (data.response) {
+              // Small delay so cards render first, then follow-up bubble appears
+              setTimeout(function() {
+                addAstroMessage(data.response, 'astro');
+                astroHistory.push({ role: 'astro', content: data.response });
+              }, 400);
+            }
+          } else {
+            addAstroMessage(data.response, 'astro');
+            astroHistory.push({ role: 'astro', content: data.response });
+          }
+
+          // Show saved profile card if data was persisted
+          if (data.dataSaved) {
+            showAstroProfileCard(astroCollectedData);
+          }
+
+          // Show action items card if received
+          if (data.actionItems && data.actionItems.length > 0) {
+            showAstroActionItems(data.actionItems, false);
+          }
+
+          // Show auto-created goals confirmation if backend created goals
+          if (data.createdGoals && data.createdGoals.length > 0) {
+            var lang = (astroCollectedData.lang || navigator.language || 'es').startsWith('en') ? 'en' : 'es';
+            showAstroCreatedGoals(data.createdGoals, lang);
+          }
+
+          // Show metric update card if metrics were updated during weekly check-in
+          if (data.updatedMetrics && Object.keys(data.updatedMetrics).length > 0) {
+            showAstroMetricsUpdated(data.updatedMetrics);
+          }
+        } catch (e) {
+          hideAstroTyping();
+          addAstroMessage('Ups, hubo un problema de conexión. ¿Puedes intentarlo de nuevo?', 'astro');
+        }
+
+        astroThinking = false;
+      }
+
+      var astroGoalIcons = ['🎯','📈','🚀','💡','🤝','💰','📣','🛠️'];
+      var astroGoalColors = [
+        { bg:'rgba(139,92,246,0.12)', border:'rgba(139,92,246,0.3)', badge:'rgba(139,92,246,0.2)', badgeText:'#c4b5fd' },
+        { bg:'rgba(16,185,129,0.1)',  border:'rgba(16,185,129,0.3)',  badge:'rgba(16,185,129,0.2)',  badgeText:'#6ee7b7' },
+        { bg:'rgba(236,72,153,0.1)', border:'rgba(236,72,153,0.3)',  badge:'rgba(236,72,153,0.2)',  badgeText:'#f9a8d4' },
+        { bg:'rgba(251,191,36,0.08)',border:'rgba(251,191,36,0.25)', badge:'rgba(251,191,36,0.15)', badgeText:'#fcd34d' },
+        { bg:'rgba(59,130,246,0.1)', border:'rgba(59,130,246,0.3)',  badge:'rgba(59,130,246,0.2)',  badgeText:'#93c5fd' },
+      ];
+
+      function showAstroActionItems(items, isPrior) {
+        var messagesEl = document.getElementById('astro-messages');
+        if (!messagesEl || !items || items.length === 0) return;
+
+        // Remove any previous action items block
+        var prev = document.getElementById('astro-action-items');
+        if (prev) prev.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.id = 'astro-action-items';
+        wrapper.style.cssText = 'margin: 8px 0 16px 0; animation: astroBubbleIn 0.4s ease;';
+
+        // Header
+        var header = document.createElement('div');
+        header.style.cssText = 'font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;padding:0 2px;margin-bottom:10px;display:flex;align-items:center;gap:8px;';
+        header.innerHTML = '🎯 <span>Goals creados automáticamente en tu Hub</span>';
+        wrapper.appendChild(header);
+
+        // Cards grid
+        var grid = document.createElement('div');
+        grid.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+
+        items.forEach(function(item, i) {
+          var col = astroGoalColors[i % astroGoalColors.length];
+          var icon = astroGoalIcons[i % astroGoalIcons.length];
+
+          var card = document.createElement('div');
+          card.style.cssText = 'background:' + col.bg + ';border:1px solid ' + col.border + ';border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:border-color 0.2s;';
+          card.onmouseover = function(){ this.style.borderColor = col.badgeText; };
+          card.onmouseout  = function(){ this.style.borderColor = col.border; };
+
+          // Icon circle
+          var num = document.createElement('div');
+          num.style.cssText = 'min-width:28px;height:28px;background:' + col.badge + ';border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;';
+          num.textContent = icon;
+          card.appendChild(num);
+
+          // Text
+          var text = document.createElement('div');
+          text.style.cssText = 'flex:1;font-size:13px;color:#e2e8f0;line-height:1.5;';
+          text.textContent = item;
+          card.appendChild(text);
+
+          // Auto-created badge
+          var badge = document.createElement('span');
+          badge.style.cssText = 'flex-shrink:0;background:' + col.badge + ';border:1px solid ' + col.border + ';color:' + col.badgeText + ';padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;white-space:nowrap;';
+          badge.textContent = '✓ Goal';
+          card.appendChild(badge);
+
+          grid.appendChild(card);
+        });
+
+        wrapper.appendChild(grid);
+
+        // Link to hub
+        var hubLink = document.createElement('div');
+        hubLink.style.cssText = 'font-size:11px;color:#6b7280;margin-top:8px;padding-left:4px;cursor:pointer;';
+        hubLink.innerHTML = '📌 Ver todos los goals en <span style="color:#a78bfa;text-decoration:underline;">tu Hub</span>';
+        hubLink.onclick = function() { switchTab('home'); };
+        wrapper.appendChild(hubLink);
+
+        messagesEl.appendChild(wrapper);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function showAstroCreatedGoals(goals, lang) {
+        var messagesEl = document.getElementById('astro-messages');
+        if (!messagesEl || !goals || goals.length === 0) return;
+
+        var prev = document.getElementById('astro-goals-created');
+        if (prev) prev.remove();
+
+        var card = document.createElement('div');
+        card.id = 'astro-goals-created';
+        card.style.cssText = 'margin: 8px 0 16px 0; animation: astroBubbleIn 0.4s ease;';
+
+        var isEs = lang !== 'en';
+        var headerText = isEs
+          ? '\u2705 ' + goals.length + ' goal' + (goals.length > 1 ? 's' : '') + ' creado' + (goals.length > 1 ? 's' : '') + ' autom\u00e1ticamente en tu Hub'
+          : '\u2705 ' + goals.length + ' goal' + (goals.length > 1 ? 's' : '') + ' auto-created in your Hub';
+        var subText = isEs
+          ? 'Los puedes ver y actualizar en la pesta\u00f1a <strong>\u2302 Hub</strong> \u2192 Goals.'
+          : 'You can track and update them in the <strong>\u2302 Hub</strong> tab \u2192 Goals.';
+        var btnLabel = isEs ? '\ud83c\udfaf Ver mis Goals' : '\ud83c\udfaf View my Goals';
+
+        var inner = document.createElement('div');
+        inner.style.cssText = 'background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(5,150,105,0.06));border:1px solid rgba(16,185,129,0.35);border-radius:14px;padding:14px 16px;';
+
+        var hdr = document.createElement('div');
+        hdr.style.cssText = 'font-size:13px;font-weight:700;color:#4ade80;margin-bottom:6px;';
+        hdr.textContent = headerText;
+        inner.appendChild(hdr);
+
+        var sub = document.createElement('div');
+        sub.style.cssText = 'font-size:12px;color:#9ca3af;margin-bottom:10px;';
+        sub.innerHTML = subText;
+        inner.appendChild(sub);
+
+        var list = document.createElement('div');
+        list.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-bottom:12px;';
+        goals.forEach(function(g) {
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;color:#d1d5db;';
+          row.innerHTML = '<span style="color:#4ade80;font-weight:700;">\u2022</span> ' + (g.description || '');
+          list.appendChild(row);
+        });
+        inner.appendChild(list);
+
+        var hubBtn = document.createElement('button');
+        hubBtn.style.cssText = 'background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#4ade80;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity 0.15s;';
+        hubBtn.textContent = btnLabel;
+        hubBtn.onclick = function() { switchTab('home'); };
+        inner.appendChild(hubBtn);
+
+        card.appendChild(inner);
+        messagesEl.appendChild(card);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function showAstroMetricsUpdated(updatedMetrics) {
+        var messagesEl = document.getElementById('astro-messages');
+        if (!messagesEl || !updatedMetrics || Object.keys(updatedMetrics).length === 0) return;
+
+        var prev = document.getElementById('astro-metrics-updated');
+        if (prev) prev.remove();
+
+        var card = document.createElement('div');
+        card.id = 'astro-metrics-updated';
+        card.style.cssText = 'margin: 8px 0 16px 0; animation: astroBubbleIn 0.4s ease;';
+
+        var inner = document.createElement('div');
+        inner.style.cssText = 'background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(37,99,235,0.06));border:1px solid rgba(59,130,246,0.35);border-radius:14px;padding:14px 16px;';
+
+        var hdr = document.createElement('div');
+        hdr.style.cssText = 'font-size:13px;font-weight:700;color:#60a5fa;margin-bottom:8px;';
+        hdr.textContent = '📊 Métricas actualizadas en tu perfil';
+        inner.appendChild(hdr);
+
+        var list = document.createElement('div');
+        list.style.cssText = 'display:flex;flex-direction:column;gap:5px;';
+        var labelMap = { mrr:'MRR', arr:'ARR', active_users:'Usuarios activos', growth_rate_percent:'Crecimiento mensual', team_size:'Equipo' };
+        Object.entries(updatedMetrics).forEach(function(entry) {
+          var key = entry[0]; var val = entry[1];
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;';
+          var label = labelMap[key] || key;
+          var prevHtml = val.prev ? '<span style="color:#6b7280;text-decoration:line-through;">' + val.prev + '</span> → ' : '';
+          row.innerHTML = '<span style="color:#93c5fd;font-weight:600;min-width:120px;">' + label + '</span>' + prevHtml + '<span style="color:#bfdbfe;font-weight:700;">' + val.next + '</span>';
+          list.appendChild(row);
+        });
+        inner.appendChild(list);
+
+        var sub = document.createElement('div');
+        sub.style.cssText = 'font-size:11px;color:#6b7280;margin-top:8px;';
+        sub.textContent = 'Guardado en tu sesión de Astro y sincronizado con tu Hub.';
+        inner.appendChild(sub);
+
+        card.appendChild(inner);
+        messagesEl.appendChild(card);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      async function astroCreateGoalFromItem(description, btn) {
+        var token = getAuthToken();
+        if (!token) { alert('Inicia sesión para guardar goals.'); return; }
+        var original = btn.textContent;
+        btn.textContent = '...';
+        btn.disabled = true;
+        try {
+          var res = await fetch('/api/dashboard/goals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            credentials: 'include',
+            body: JSON.stringify({
+              category: 'Traction',
+              description: description,
+              task: description,
+              priority: 'P1',
+              cadence: 'One time',
+              goal_status: 'To start',
+              week_of: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+            })
+          });
+          var data = await res.json();
+          if (data.goal || data.success) {
+            btn.textContent = '✓ Añadido';
+            btn.style.opacity = '0.6';
+          } else {
+            btn.textContent = original;
+            btn.disabled = false;
+            alert('Error al crear el goal: ' + (data.error || 'Inténtalo de nuevo'));
+          }
+        } catch(e) {
+          btn.textContent = original;
+          btn.disabled = false;
+          alert('Error de conexión. Inténtalo de nuevo.');
+        }
+      }
+
+      function showAstroVCCards(vcCards) {
+        const messagesEl = document.getElementById('astro-messages');
+        if (!messagesEl) return;
+
+        // Remove previous VC cards block if any
+        const prev = document.getElementById('astro-vc-cards');
+        if (prev) prev.remove();
+
+        const wrapper = document.createElement('div');
+        wrapper.id = 'astro-vc-cards';
+        wrapper.style.cssText = 'display:flex; flex-direction:column; gap:10px; padding: 6px 0 12px 0; animation: astroBubbleIn 0.4s ease;';
+
+        if (vcCards && vcCards.length > 0) {
+
+          vcCards.forEach(vc => {
+            const ticketStr = vc.min_ticket_usd > 0
+              ? '$' + (vc.min_ticket_usd/1000) + 'K – $' + (vc.max_ticket_usd/1000000).toFixed(1) + 'M'
+              : 'Variable';
+            const card = document.createElement('div');
+            card.style.cssText = 'background:linear-gradient(135deg,rgba(109,40,217,0.12) 0%,rgba(30,27,75,0.25) 100%);border:1px solid rgba(139,92,246,0.25);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;transition:border-color 0.2s;';
+            card.onmouseover = function(){ this.style.borderColor='rgba(139,92,246,0.55)'; };
+            card.onmouseout  = function(){ this.style.borderColor='rgba(139,92,246,0.25)'; };
+            card.innerHTML = [
+              '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">',
+                '<div style="display:flex;align-items:center;gap:8px;">',
+                  '<div style="width:36px;height:36px;background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">💼</div>',
+                  '<div>',
+                    '<div style="color:#e9d5ff;font-weight:700;font-size:14px;">' + escapeAstroHtml(vc.name) + '</div>',
+                    '<div style="color:#9ca3af;font-size:11px;">' + escapeAstroHtml(vc.country || '') + (vc.geography ? ' · ' + escapeAstroHtml(vc.geography) : '') + '</div>',
+                  '</div>',
+                '</div>',
+                vc.website ? '<a href="' + escapeAstroHtml(vc.website) + '" target="_blank" rel="noopener" style="font-size:11px;color:#a78bfa;text-decoration:none;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.3);padding:4px 10px;border-radius:6px;white-space:nowrap;flex-shrink:0;">Visitar →</a>' : '',
+              '</div>',
+              '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;">',
+                '<span style="font-size:11px;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.25);color:#c4b5fd;padding:2px 8px;border-radius:20px;">🎯 ' + escapeAstroHtml(vc.stage || '') + '</span>',
+                '<span style="font-size:11px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);color:#6ee7b7;padding:2px 8px;border-radius:20px;">💰 ' + ticketStr + '</span>',
+                vc.typical_equity_pct > 0 ? '<span style="font-size:11px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);color:#fcd34d;padding:2px 8px;border-radius:20px;">% ' + vc.typical_equity_pct + '% equity</span>' : '',
+              '</div>',
+              vc.description ? '<div style="font-size:12px;color:#d1d5db;line-height:1.5;margin-top:2px;">' + escapeAstroHtml(vc.description) + '</div>' : '',
+              vc.portfolio_examples ? '<div style="font-size:11px;color:#6b7280;margin-top:1px;">📦 Portfolio: ' + escapeAstroHtml(vc.portfolio_examples) + '</div>' : '',
+            ].join('');
+            wrapper.appendChild(card);
+          });
+        }
+
+        // Action buttons below VC cards
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;padding:4px 0;';
+        const pitchBtn = document.createElement('button');
+        pitchBtn.textContent = '📝 Preparar pitch deck';
+        pitchBtn.style.cssText = 'background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);color:#a78bfa;padding:9px 18px;border-radius:9px;font-size:13px;cursor:pointer;font-family:inherit;transition:background 0.2s;';
+        pitchBtn.onmouseover = function(){ this.style.background='rgba(139,92,246,0.28)'; };
+        pitchBtn.onmouseout  = function(){ this.style.background='rgba(139,92,246,0.15)'; };
+        pitchBtn.onclick = function(){ switchTab('pitch'); };
+        const leaderboardLink = document.createElement('a');
+        leaderboardLink.href = '/leaderboard';
+        leaderboardLink.textContent = '🏆 Ver leaderboard';
+        leaderboardLink.style.cssText = 'background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#4ade80;padding:9px 18px;border-radius:9px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;transition:background 0.2s;';
+        leaderboardLink.onmouseover = function(){ this.style.background='rgba(34,197,94,0.2)'; };
+        leaderboardLink.onmouseout  = function(){ this.style.background='rgba(34,197,94,0.1)'; };
+        actions.appendChild(pitchBtn);
+        actions.appendChild(leaderboardLink);
+        wrapper.appendChild(actions);
+
+        messagesEl.appendChild(wrapper);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function showAstroProfileCard(data) {
+        const messagesEl = document.getElementById('astro-messages');
+        if (!messagesEl) return;
+
+        // Need at least one meaningful piece of data
+        const hasData = data.startup_name || data.active_users || data.mrr || data.fundraising_stage || data.sector;
+        if (!hasData) return;
+
+        // Remove previous saved profile card (update in-place)
+        const prev = document.getElementById('astro-profile-card');
+        if (prev) prev.remove();
+
+        // Calculate rough completeness from collected data
+        const fields = ['startup_name','problem','solution','sector','mrr','active_users','team_size','fundraising_stage'];
+        const filled = fields.filter(f => data[f] && data[f] !== '0').length;
+        const pct = Math.round((filled / fields.length) * 100);
+        const barColor = pct < 40 ? '#f59e0b' : pct < 70 ? '#8b5cf6' : '#10b981';
+
+        const parts = [];
+        if (data.active_users) parts.push({ icon: '👥', val: data.active_users + ' usuarios' });
+        if (data.mrr) parts.push({ icon: '💰', val: '$' + data.mrr + '/mes MRR' });
+        if (data.arr) parts.push({ icon: '📊', val: '$' + data.arr + ' ARR' });
+        if (data.team_size) parts.push({ icon: '🧑‍💻', val: 'Equipo de ' + data.team_size });
+        if (data.fundraising_stage) parts.push({ icon: '🚀', val: data.fundraising_stage });
+        if (data.sector) parts.push({ icon: '🏭', val: data.sector });
+        if (data.geography) parts.push({ icon: '🌍', val: data.geography });
+
+        const pillsHtml = parts.map(p =>
+          '<span style="font-size:11px;background:rgba(109,40,217,0.15);border:1px solid rgba(139,92,246,0.25);color:#c4b5fd;padding:3px 9px;border-radius:20px;white-space:nowrap;">' + p.icon + ' ' + escapeAstroHtml(String(p.val)) + '</span>'
+        ).join('');
+
+        const card = document.createElement('div');
+        card.id = 'astro-profile-card';
+        card.style.cssText = 'background:linear-gradient(135deg,rgba(30,27,75,0.6) 0%,rgba(17,24,39,0.8) 100%);border:1px solid rgba(139,92,246,0.3);border-radius:16px;padding:14px 16px;margin:4px 0;animation:astroBubbleIn 0.35s ease;';
+        card.innerHTML = [
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">',
+            '<div style="display:flex;align-items:center;gap:8px;">',
+              '<div style="width:32px;height:32px;background:linear-gradient(135deg,#6d28d9,#a855f7);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;">⚡</div>',
+              '<div>',
+                '<div style="color:#e9d5ff;font-weight:700;font-size:14px;">' + escapeAstroHtml(data.startup_name || 'Tu startup') + '</div>',
+                '<div style="color:#9ca3af;font-size:11px;">Perfil guardado en ASTAR*</div>',
+              '</div>',
+            '</div>',
+            '<div style="text-align:right;">',
+              '<div style="font-size:18px;font-weight:700;color:' + barColor + ';">' + pct + '%</div>',
+              '<div style="font-size:10px;color:#6b7280;">completo</div>',
+            '</div>',
+          '</div>',
+          '<div style="width:100%;height:5px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;margin-bottom:10px;">',
+            '<div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,' + barColor + ',#a855f7);border-radius:99px;transition:width 0.8s ease;"></div>',
+          '</div>',
+          parts.length > 0 ? '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">' + pillsHtml + '</div>' : '',
+          '<div style="display:flex;justify-content:space-between;align-items:center;">',
+            '<span style="font-size:11px;color:#4ade80;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;background:#4ade80;border-radius:50%;display:inline-block;"></span>Datos guardados</span>',
+            '<a href="/leaderboard" style="font-size:11px;color:#a78bfa;text-decoration:none;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);padding:4px 10px;border-radius:6px;">Ver leaderboard →</a>',
+          '</div>',
+        ].join('');
+
+        messagesEl.appendChild(card);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      // Legacy alias
+      function showAstroSavedIndicator(data) { showAstroProfileCard(data); }
+
+      // Auto-init Astro when page loads (home tab is default)
+      document.addEventListener('DOMContentLoaded', function() {
+        initAstroChat();
+      });
+
       
       // ============== AI CONNECTOR FUNCTIONS ==============
       let connectorSessionId = null;
@@ -2392,7 +3236,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         // Group goals by assigned user
         const byDRI = {};
         allGoals.forEach(goal => {
-          const dri = goal.assigned_user_name || goal.dri || 'Unassigned';
+          const dri = goal.assigned_user_name || goal.dri || goal.creator_name || goal.user_name || 'Yo';
           if (!byDRI[dri]) byDRI[dri] = [];
           byDRI[dri].push(goal);
         });
@@ -3136,7 +3980,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
       
       window.showDayTasks = function(dateStr) {
         // Find tasks scheduled for this day
-        const tasksForDay = allGoals.filter(goal => {
+        let tasksForDay = allGoals.filter(goal => {
           let dates = parseScheduledDates(goal.scheduled_dates);
           return dates.includes(dateStr);
         });
@@ -3146,26 +3990,70 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           return;
         }
         
-        // Create modal content with checkboxes
+        // Sort by priority_order number (1, 2, 3...)
+        tasksForDay.sort((a, b) => {
+          const orderA = a.priority_order ?? 999;
+          const orderB = b.priority_order ?? 999;
+          return orderA - orderB;
+        });
+        
+        // Create modal content
         const formatDate = new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        const taskListHTML = tasksForDay.map(g => {
+        const taskListHTML = tasksForDay.map((g, index) => {
           const isDone = g.goal_status === 'Done';
           const isWIP = g.goal_status === 'WIP';
+          const currentOrder = g.priority_order ?? (index + 1);
+          
+          // Calculate day progress for multi-day tasks
+          let scheduledDates = parseScheduledDates(g.scheduled_dates);
+          const totalDays = scheduledDates.length;
+          const currentDayIndex = scheduledDates.indexOf(dateStr) + 1;
+          const dayProgress = totalDays > 1 ? \`\${currentDayIndex}/\${totalDays}\` : '';
+          
           return \`
-            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all">
-              <input type="checkbox" 
-                     id="task-check-\${g.id}" 
-                     \${isDone ? 'checked' : ''} 
-                     onchange="toggleTaskStatus(\${g.id}, this.checked)" 
-                     class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500">
-              <label for="task-check-\${g.id}" class="flex-1 cursor-pointer">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium \${isDone ? 'text-gray-400 line-through' : 'text-gray-900'}">\${g.task || g.description}</span>
-                  \${isDone ? '<span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">Done</span>' : ''}
-                  \${isWIP ? '<span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">WIP</span>' : ''}
+            <div class="p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all">
+              <div class="flex items-start gap-3">
+                <!-- Priority number input with label -->
+                <div class="flex flex-col items-center">
+                  <label class="text-[10px] text-purple-600 font-semibold mb-1">Priority</label>
+                  <input type="number" 
+                         value="\${currentOrder}"
+                         onchange="updateGoalPriorityOrder(\${g.id}, this.value, '\${dateStr}')"
+                         onclick="event.stopPropagation()"
+                         class="w-14 h-10 text-center border-2 border-purple-300 rounded-lg font-bold text-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                         min="1"
+                         title="Priority order (lower = higher priority)">
                 </div>
-                \${g.dri ? '<p class="text-xs text-gray-500 mt-1">DRI: ' + g.dri + '</p>' : ''}
-              </label>
+                
+                <input type="checkbox" 
+                       id="task-check-\${g.id}" 
+                       \${isDone ? 'checked' : ''} 
+                       onclick="event.stopPropagation()"
+                       onchange="toggleTaskStatus(\${g.id}, this.checked)" 
+                       class="mt-2 w-5 h-5 text-purple-600 rounded focus:ring-purple-500">
+                
+                <div class="flex-1 cursor-pointer" onclick="showGoalDetail(\${g.id})">
+                  <!-- Full description FIRST -->
+                  \${g.description && g.task !== g.description ? \`
+                    <p class="text-sm text-gray-600 mb-2 font-medium">\${g.description}</p>
+                  \` : ''}
+                  
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-sm font-semibold \${isDone ? 'text-gray-400 line-through' : 'text-gray-900'}">\${g.task || g.description}</span>
+                    \${isDone ? '<span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">✓ Done</span>' : ''}
+                    \${isWIP ? '<span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">⚡ WIP</span>' : ''}
+                    \${dayProgress && isDone ? '<span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">📅 Day ' + dayProgress + '</span>' : ''}
+                    <i class="fas fa-arrow-right text-xs text-purple-400 ml-auto"></i>
+                  </div>
+                  
+                  <!-- Meta info -->
+                  <div class="flex items-center gap-3 text-xs text-gray-500">
+                    \${g.priority ? '<span class="px-2 py-0.5 rounded-full bg-gray-100">' + g.priority + '</span>' : ''}
+                    \${g.dri ? '<span><i class="fas fa-user-circle"></i> ' + g.dri + '</span>' : ''}
+                    \${g.deadline ? '<span><i class="fas fa-calendar"></i> ' + new Date(g.deadline).toLocaleDateString() + '</span>' : ''}
+                  </div>
+                </div>
+              </div>
             </div>
           \`;
         }).join('');
@@ -3178,7 +4066,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
             <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 flex justify-between items-center">
               <div>
                 <h3 class="font-bold text-lg">Tasks for \${formatDate}</h3>
-                <p class="text-sm text-purple-100">\${tasksForDay.length} task\${tasksForDay.length !== 1 ? 's' : ''} scheduled</p>
+                <p class="text-sm text-purple-100">\${tasksForDay.length} task\${tasksForDay.length !== 1 ? 's' : ''} scheduled • Sorted by priority</p>
               </div>
               <button onclick="this.closest('.fixed').remove()" class="text-white/70 hover:text-white transition-colors">
                 <i class="fas fa-times text-xl"></i>
@@ -3202,6 +4090,45 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         modal.addEventListener('click', (e) => {
           if (e.target === modal) modal.remove();
         });
+      };
+      
+      window.updateGoalPriorityOrder = async function(goalId, orderValue, dateStr) {
+        try {
+          const order = parseInt(orderValue);
+          if (isNaN(order) || order < 1) {
+            alert('Please enter a valid priority number (1 or higher)');
+            return;
+          }
+          
+          // Check if this priority number is already used by another task on this day
+          const tasksForDay = allGoals.filter(goal => {
+            let dates = parseScheduledDates(goal.scheduled_dates);
+            return dates.includes(dateStr) && goal.id !== goalId;
+          });
+          
+          const isDuplicate = tasksForDay.some(task => task.priority_order === order);
+          if (isDuplicate) {
+            alert('Priority number ' + order + ' is already used by another task on this day. Please choose a different number.');
+            return;
+          }
+          
+          await axios.put('/api/dashboard/goals/' + goalId, { priority_order: order });
+          
+          // Update in local array
+          const goal = allGoals.find(g => g.id === goalId);
+          if (goal) {
+            goal.priority_order = order;
+          }
+          
+          // Update UI
+          renderGoalsTable();
+          updateCalendarOverview();
+          
+          console.log('[GOAL] Priority order updated:', { goalId, order });
+        } catch (e) {
+          console.error('Error updating priority order:', e);
+          alert('Failed to update priority order');
+        }
       };
       
       window.toggleTaskStatus = async function(goalId, isChecked) {
@@ -3363,7 +4290,7 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
         document.getElementById('detail-priority').textContent = goal.priority || 'P0';
         document.getElementById('detail-status').textContent = goal.goal_status || 'To start';
         document.getElementById('detail-cadence').textContent = goal.cadence || 'One time';
-        document.getElementById('detail-dri').textContent = goal.assigned_user_name || goal.dri || 'Not assigned';
+        document.getElementById('detail-dri').textContent = goal.assigned_user_name || goal.dri || goal.creator_name || goal.user_name || 'Yo';
         
         // Populate scheduled dates
         let scheduledDates = parseScheduledDates(goal.scheduled_dates);
@@ -5170,6 +6097,941 @@ export function getDirectoryPage(props: DirectoryPageProps): string {
           }
         };
       });
+    </script>
+
+    <!-- Voice Weekly Check-in Modal -->
+    <div id="voice-checkin-modal" class="hidden fixed inset-0 bg-black/50 z-[70] flex items-center justify-center">
+      <div class="bg-white rounded-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 rounded-t-2xl">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h3 class="text-2xl font-bold text-white mb-1">� AI Pitch Deck Check-in</h3>
+              <p class="text-purple-100 text-sm">18 questions · 5 sections · 6 AI agents analyzing your week</p>
+            </div>
+            <button onclick="closeVoiceCheckin()" class="text-white/70 hover:text-white transition-colors">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+          
+          <!-- Language Selector -->
+          <div class="flex items-center gap-3">
+            <label class="text-white text-sm font-medium">Language:</label>
+            <div class="flex gap-2">
+              <button 
+                onclick="setVoiceLanguage('en-US')" 
+                id="lang-en"
+                class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-all text-sm font-medium"
+              >
+                🇺🇸 English
+              </button>
+              <button 
+                onclick="setVoiceLanguage('es-ES')" 
+                id="lang-es"
+                class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-all text-sm font-medium"
+              >
+                🇪🇸 Español
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+          <div class="text-center mb-6">
+            <div class="w-20 h-20 bg-purple-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+              <i class="fas fa-robot text-purple-600 text-4xl"></i>
+            </div>
+            <h4 class="text-xl font-bold text-gray-900 mb-2">Ready for your Pitch Deck?</h4>
+            <p class="text-gray-600 mb-2">18 questions across 5 startup categories, analyzed by 6 specialized AI agents.</p>
+            <div class="flex flex-wrap justify-center gap-2 mb-4">
+              <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">🟡 Hypotheses</span>
+              <span class="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">🟠 Build</span>
+              <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">🔵 Users</span>
+              <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">🟣 Metrics</span>
+              <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">🟢 Traction</span>
+            </div>
+            <p class="text-gray-500 text-sm">Answer by voice or typing. AI auto-creates goals & extracts metrics.</p>
+            
+            <!-- Browser compatibility check -->
+            <div id="voice-support-check" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p class="text-sm text-blue-800">
+                <i class="fas fa-info-circle mr-2"></i>
+                Checking browser compatibility...
+              </p>
+            </div>
+
+            <button 
+              onclick="startVoiceCheckin()"
+              id="start-voice-btn"
+              class="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold text-lg hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <i class="fas fa-play mr-2"></i>
+              Start Check-in
+            </button>
+          </div>
+
+          <!-- Voice Agent Container (populated dynamically) -->
+          <div id="voice-agent-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Voice Weekly Check-in Functions
+      let currentQuestionIndex = 0;
+      let responses = {};
+      let isListening = false;
+      let isSpeaking = false;
+      let recognition = null;
+      let currentLanguage = 'en-US'; // Default language
+
+      const WEEKLY_QUESTIONS_EN = [
+        // === SECTION 1: HYPOTHESES (Monday) ===
+        {
+          id: 'hypotheses',
+          question: "Welcome to your weekly Pitch Deck! Let's start with hypotheses. What are the 1 to 3 hypotheses you're testing this week?",
+          category: '🟡 Hypotheses',
+          section: 'hypothesis',
+          sectionColor: 'yellow'
+        },
+        {
+          id: 'expected_behavior',
+          question: "What user behavior do you expect to see if your hypothesis is correct?",
+          category: '🟡 Hypotheses',
+          section: 'hypothesis',
+          sectionColor: 'yellow'
+        },
+        {
+          id: 'validation_signal',
+          question: "How will you know a hypothesis is validated? What's the concrete signal?",
+          category: '🟡 Hypotheses',
+          section: 'hypothesis',
+          sectionColor: 'yellow'
+        },
+        // === SECTION 2: BUILD (Tuesday) ===
+        {
+          id: 'build_progress',
+          question: "Now about building. What part of the product did you build this week?",
+          category: '🟠 Build',
+          section: 'build',
+          sectionColor: 'orange'
+        },
+        {
+          id: 'tech_stack',
+          question: "What tech stack or tools did you use?",
+          category: '🟠 Build',
+          section: 'build',
+          sectionColor: 'orange'
+        },
+        {
+          id: 'build_hours',
+          question: "How many hours did you spend building this week?",
+          category: '🟠 Build',
+          section: 'build',
+          sectionColor: 'orange'
+        },
+        // === SECTION 3: USERS (Wednesday) ===
+        {
+          id: 'users_talked',
+          question: "Let's talk about users. How many users did you talk to this week?",
+          category: '🔵 Users',
+          section: 'users',
+          sectionColor: 'blue'
+        },
+        {
+          id: 'users_used_product',
+          question: "How many actually used your product?",
+          category: '🔵 Users',
+          section: 'users',
+          sectionColor: 'blue'
+        },
+        {
+          id: 'key_learning',
+          question: "What was the most important learning from users? One sentence.",
+          category: '🔵 Users',
+          section: 'users',
+          sectionColor: 'blue'
+        },
+        // === SECTION 4: METRICS (Thursday) ===
+        {
+          id: 'daily_active_users',
+          question: "Now metrics. How many users interacted with your product this week?",
+          category: '🟣 Metrics',
+          section: 'metrics',
+          sectionColor: 'purple'
+        },
+        {
+          id: 'repeated_actions',
+          question: "What actions did users repeat most often?",
+          category: '🟣 Metrics',
+          section: 'metrics',
+          sectionColor: 'purple'
+        },
+        {
+          id: 'drop_off_points',
+          question: "Where did users get stuck or drop off?",
+          category: '🟣 Metrics',
+          section: 'metrics',
+          sectionColor: 'purple'
+        },
+        {
+          id: 'product_insight',
+          question: "What insight does this reveal about your product?",
+          category: '🟣 Metrics',
+          section: 'metrics',
+          sectionColor: 'purple'
+        },
+        // === SECTION 5: TRACTION (Friday) ===
+        {
+          id: 'revenue',
+          question: "Last section, traction! How much revenue did you generate this week?",
+          category: '🟢 Traction',
+          section: 'traction',
+          sectionColor: 'green'
+        },
+        {
+          id: 'new_users',
+          question: "How many new users did you acquire?",
+          category: '🟢 Traction',
+          section: 'traction',
+          sectionColor: 'green'
+        },
+        {
+          id: 'active_users',
+          question: "How many users were active this week?",
+          category: '🟢 Traction',
+          section: 'traction',
+          sectionColor: 'green'
+        },
+        {
+          id: 'churned_users',
+          question: "How many users churned?",
+          category: '🟢 Traction',
+          section: 'traction',
+          sectionColor: 'green'
+        },
+        {
+          id: 'traction_signal',
+          question: "What was the strongest traction signal this week?",
+          category: '🟢 Traction',
+          section: 'traction',
+          sectionColor: 'green'
+        }
+      ];
+
+      const WEEKLY_QUESTIONS_ES = [
+        // === SECCIÓN 1: HIPÓTESIS (Lunes) ===
+        {
+          id: 'hypotheses',
+          question: "¡Bienvenido a tu Pitch Deck semanal! Empecemos con hipótesis. ¿Cuáles son las 1 a 3 hipótesis que estás probando esta semana?",
+          category: '🟡 Hipótesis',
+          section: 'hypothesis',
+          sectionColor: 'yellow'
+        },
+        {
+          id: 'expected_behavior',
+          question: "¿Qué comportamiento de usuario esperas ver si tu hipótesis es correcta?",
+          category: '🟡 Hipótesis',
+          section: 'hypothesis',
+          sectionColor: 'yellow'
+        },
+        {
+          id: 'validation_signal',
+          question: "¿Cómo sabrás que una hipótesis está validada? ¿Cuál es la señal concreta?",
+          category: '🟡 Hipótesis',
+          section: 'hypothesis',
+          sectionColor: 'yellow'
+        },
+        // === SECCIÓN 2: CONSTRUCCIÓN (Martes) ===
+        {
+          id: 'build_progress',
+          question: "Ahora sobre construcción. ¿Qué parte del producto construiste esta semana?",
+          category: '🟠 Construcción',
+          section: 'build',
+          sectionColor: 'orange'
+        },
+        {
+          id: 'tech_stack',
+          question: "¿Qué tecnologías o herramientas usaste?",
+          category: '🟠 Construcción',
+          section: 'build',
+          sectionColor: 'orange'
+        },
+        {
+          id: 'build_hours',
+          question: "¿Cuántas horas dedicaste a construir esta semana?",
+          category: '🟠 Construcción',
+          section: 'build',
+          sectionColor: 'orange'
+        },
+        // === SECCIÓN 3: USUARIOS (Miércoles) ===
+        {
+          id: 'users_talked',
+          question: "Hablemos de usuarios. ¿Con cuántos usuarios hablaste esta semana?",
+          category: '🔵 Usuarios',
+          section: 'users',
+          sectionColor: 'blue'
+        },
+        {
+          id: 'users_used_product',
+          question: "¿Cuántos usaron tu producto?",
+          category: '🔵 Usuarios',
+          section: 'users',
+          sectionColor: 'blue'
+        },
+        {
+          id: 'key_learning',
+          question: "¿Cuál fue el aprendizaje más importante de los usuarios? En una frase.",
+          category: '🔵 Usuarios',
+          section: 'users',
+          sectionColor: 'blue'
+        },
+        // === SECCIÓN 4: MÉTRICAS (Jueves) ===
+        {
+          id: 'daily_active_users',
+          question: "Ahora métricas. ¿Cuántos usuarios interactuaron con tu producto esta semana?",
+          category: '🟣 Métricas',
+          section: 'metrics',
+          sectionColor: 'purple'
+        },
+        {
+          id: 'repeated_actions',
+          question: "¿Qué acciones repitieron más los usuarios?",
+          category: '🟣 Métricas',
+          section: 'metrics',
+          sectionColor: 'purple'
+        },
+        {
+          id: 'drop_off_points',
+          question: "¿Dónde se quedaron atascados o abandonaron los usuarios?",
+          category: '🟣 Métricas',
+          section: 'metrics',
+          sectionColor: 'purple'
+        },
+        {
+          id: 'product_insight',
+          question: "¿Qué insight revela esto sobre tu producto?",
+          category: '🟣 Métricas',
+          section: 'metrics',
+          sectionColor: 'purple'
+        },
+        // === SECCIÓN 5: TRACCIÓN (Viernes) ===
+        {
+          id: 'revenue',
+          question: "¡Última sección, tracción! ¿Cuánto revenue generaste esta semana?",
+          category: '🟢 Tracción',
+          section: 'traction',
+          sectionColor: 'green'
+        },
+        {
+          id: 'new_users',
+          question: "¿Cuántos usuarios nuevos adquiriste?",
+          category: '🟢 Tracción',
+          section: 'traction',
+          sectionColor: 'green'
+        },
+        {
+          id: 'active_users',
+          question: "¿Cuántos usuarios estuvieron activos esta semana?",
+          category: '🟢 Tracción',
+          section: 'traction',
+          sectionColor: 'green'
+        },
+        {
+          id: 'churned_users',
+          question: "¿Cuántos usuarios se fueron (churned)?",
+          category: '🟢 Tracción',
+          section: 'traction',
+          sectionColor: 'green'
+        },
+        {
+          id: 'traction_signal',
+          question: "¿Cuál fue la señal de tracción más fuerte esta semana?",
+          category: '🟢 Tracción',
+          section: 'traction',
+          sectionColor: 'green'
+        }
+      ];
+
+      let WEEKLY_QUESTIONS = WEEKLY_QUESTIONS_EN; // Default to English
+
+      function setVoiceLanguage(lang) {
+        currentLanguage = lang;
+        WEEKLY_QUESTIONS = lang === 'es-ES' ? WEEKLY_QUESTIONS_ES : WEEKLY_QUESTIONS_EN;
+        
+        // Update UI
+        document.getElementById('lang-en').className = lang === 'en-US' 
+          ? 'px-4 py-2 bg-white text-purple-600 rounded-lg font-medium text-sm shadow-lg'
+          : 'px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-all text-sm font-medium';
+        
+        document.getElementById('lang-es').className = lang === 'es-ES'
+          ? 'px-4 py-2 bg-white text-purple-600 rounded-lg font-medium text-sm shadow-lg'
+          : 'px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-all text-sm font-medium';
+        
+        console.log('[VOICE] Language set to:', lang);
+      }
+
+      function openVoiceCheckin() {
+        document.getElementById('voice-checkin-modal').classList.remove('hidden');
+        checkVoiceSupport();
+      }
+
+      function closeVoiceCheckin() {
+        document.getElementById('voice-checkin-modal').classList.add('hidden');
+        stopVoiceCheckin();
+      }
+
+      function checkVoiceSupport() {
+        const supportCheck = document.getElementById('voice-support-check');
+        const startBtn = document.getElementById('start-voice-btn');
+
+        const hasSpeedSynthesis = 'speechSynthesis' in window;
+        const hasRecognition = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+
+        if (hasSpeedSynthesis && hasRecognition) {
+          supportCheck.innerHTML = '<p class="text-sm text-green-800"><i class="fas fa-check-circle mr-2"></i>✅ Your browser supports voice features!</p>';
+          supportCheck.className = 'bg-green-50 border border-green-200 rounded-lg p-4 mb-4';
+          startBtn.disabled = false;
+        } else {
+          supportCheck.innerHTML = '<p class="text-sm text-red-800"><i class="fas fa-exclamation-triangle mr-2"></i>⚠️ Voice features not supported. Please use Chrome, Edge, or Safari. You can still type your answers.</p>';
+          supportCheck.className = 'bg-red-50 border border-red-200 rounded-lg p-4 mb-4';
+          startBtn.disabled = false; // Allow typing even without voice
+        }
+      }
+
+      async function startVoiceCheckin() {
+        currentQuestionIndex = 0;
+        responses = {};
+        
+        const container = document.getElementById('voice-agent-container');
+        container.innerHTML = \`
+          <div class="border-t border-gray-200 pt-6">
+            <div class="mb-6">
+              <!-- Section indicators -->
+              <div class="flex justify-center gap-2 mb-3">
+                <span class="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">🟡 Hypotheses</span>
+                <span class="px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">🟠 Build</span>
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">🔵 Users</span>
+                <span class="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">🟣 Metrics</span>
+                <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium">🟢 Traction</span>
+              </div>
+              <!-- Progress bar -->
+              <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                <div id="voice-progress-bar" class="bg-purple-600 rounded-full h-2 transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <p class="text-sm text-gray-600 text-center">Question <span id="question-number">1</span> of \${WEEKLY_QUESTIONS.length} · Pitch Deck Mode 🎯</p>
+            </div>
+
+            <!-- Question Display -->
+            <div id="voice-question-display" class="mb-6"></div>
+
+            <!-- Voice Status -->
+            <div id="voice-status" class="flex items-center justify-center gap-4 mb-6"></div>
+
+            <!-- Manual Input -->
+            <form onsubmit="submitVoiceAnswer(event)" class="space-y-4">
+              <textarea 
+                id="voice-answer-input"
+                placeholder="Type your answer or click the microphone to speak..."
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                rows="3"
+              ></textarea>
+              <div class="flex gap-2">
+                <button type="submit" class="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">
+                  Next Question →
+                </button>
+                <button type="button" onclick="skipVoiceQuestion()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                  Skip
+                </button>
+              </div>
+            </form>
+          </div>
+        \`;
+
+        askQuestion(0);
+      }
+
+      async function askQuestion(index) {
+        console.log('[VOICE-ASK] Asking question index:', index);
+        console.log('[VOICE-ASK] Current responses:', JSON.stringify(responses));
+        
+        if (index >= WEEKLY_QUESTIONS.length) {
+          console.log('[VOICE-ASK] All questions done, calling completeVoiceCheckin');
+          console.log('[VOICE-ASK] Final responses before complete:', JSON.stringify(responses));
+          await completeVoiceCheckin();
+          return;
+        }
+
+        currentQuestionIndex = index;
+        const question = WEEKLY_QUESTIONS[index];
+        
+        // Update progress
+        const progress = ((index / WEEKLY_QUESTIONS.length) * 100);
+        document.getElementById('voice-progress-bar').style.width = progress + '%';
+        document.getElementById('question-number').textContent = (index + 1);
+
+        // Check if we're entering a new section
+        const prevQuestion = index > 0 ? WEEKLY_QUESTIONS[index - 1] : null;
+        const isNewSection = !prevQuestion || prevQuestion.section !== question.section;
+
+        // Section color mapping
+        const sectionColors = {
+          yellow: 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30',
+          orange: 'from-orange-500/20 to-orange-600/10 border-orange-500/30',
+          blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
+          purple: 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
+          green: 'from-green-500/20 to-green-600/10 border-green-500/30'
+        };
+        const sectionStyle = sectionColors[question.sectionColor] || sectionColors.purple;
+
+        // Section badge for progress
+        const sections = ['hypothesis', 'build', 'users', 'metrics', 'traction'];
+        const sectionIndex = sections.indexOf(question.section);
+        const sectionProgress = ((sectionIndex / sections.length) * 100);
+
+        // Display question with optional section header
+        const display = document.getElementById('voice-question-display');
+        display.innerHTML = \`
+          \${isNewSection ? \`
+            <div class="mb-4 bg-gradient-to-r \${sectionStyle} border rounded-xl p-3 text-center animate-fade-in">
+              <span class="text-lg font-bold">\${question.category}</span>
+              <span class="text-xs ml-2 opacity-70">Section \${sectionIndex + 1}/5</span>
+            </div>
+          \` : ''}
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-robot text-purple-600 text-xl"></i>
+            </div>
+            <div class="flex-1">
+              <div class="bg-gray-50 rounded-2xl rounded-tl-none p-4">
+                <span class="text-xs font-semibold text-purple-500 uppercase tracking-wide">\${question.category}</span>
+                <p class="text-gray-800 font-medium mt-1">\${question.question}</p>
+              </div>
+            </div>
+          </div>
+        \`;
+
+        // Speak question if supported
+        if ('speechSynthesis' in window) {
+          await speakText(question.question);
+          
+          // Auto-start listening after speaking (the speakText already has 3-second delay)
+          if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+            startListening();
+          }
+        } else {
+          // If speech synthesis not supported, still allow voice input
+          if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+            setTimeout(() => startListening(), 500);
+          }
+        }
+      }
+
+      function speakText(text) {
+        return new Promise((resolve) => {
+          if (!('speechSynthesis' in window)) {
+            resolve();
+            return;
+          }
+
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = currentLanguage; // Use selected language
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+
+          isSpeaking = true;
+          updateVoiceStatus();
+
+          utterance.onend = () => {
+            isSpeaking = false;
+            updateVoiceStatus();
+            
+            // Wait 3 seconds before resolving
+            setTimeout(() => {
+              resolve();
+            }, 3000);
+          };
+
+          utterance.onerror = () => {
+            isSpeaking = false;
+            updateVoiceStatus();
+            resolve();
+          };
+
+          window.speechSynthesis.speak(utterance);
+        });
+      }
+
+      function startListening() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) return;
+
+        recognition = new SpeechRecognition();
+        recognition.lang = currentLanguage; // Use selected language
+        recognition.continuous = true; // Keep listening continuously
+        recognition.interimResults = true; // Show interim results
+        recognition.maxAlternatives = 1;
+
+        isListening = true;
+        updateVoiceStatus();
+
+        let finalTranscript = '';
+        let silenceTimer = null;
+
+        recognition.onresult = (event) => {
+          let interimTranscript = '';
+          
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + ' ';
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Update input with current transcript
+          document.getElementById('voice-answer-input').value = (finalTranscript + interimTranscript).trim();
+
+          // Clear previous silence timer
+          if (silenceTimer) clearTimeout(silenceTimer);
+
+          // Set new silence timer (2 seconds of silence = done talking)
+          silenceTimer = setTimeout(() => {
+            if (finalTranscript.trim() || interimTranscript.trim()) {
+              stopListening();
+            }
+          }, 2000);
+        };
+
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+          isListening = false;
+          updateVoiceStatus();
+        };
+
+        recognition.onend = () => {
+          isListening = false;
+          updateVoiceStatus();
+        };
+
+        recognition.start();
+      }
+
+      function updateVoiceStatus() {
+        const status = document.getElementById('voice-status');
+        
+        if (isSpeaking) {
+          status.innerHTML = '<div class="flex items-center gap-2 text-purple-600"><div class="animate-pulse">🔊</div><span class="text-sm font-medium">Agent speaking...</span></div>';
+        } else if (isListening) {
+          status.innerHTML = \`
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2 text-green-600">
+                <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span class="text-sm font-semibold">🎤 Listening... (speak now, pause when done)</span>
+              </div>
+              <button onclick="stopListening()" class="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600">Done Speaking</button>
+            </div>
+          \`;
+        } else {
+          status.innerHTML = '<div class="flex items-center gap-2 text-gray-500"><i class="fas fa-clock"></i><span class="text-sm">Waiting...</span></div>';
+        }
+      }
+
+      function stopListening() {
+        if (recognition) {
+          recognition.stop();
+        }
+        isListening = false;
+        updateVoiceStatus();
+      }
+
+      function submitVoiceAnswer(e) {
+        e.preventDefault();
+        const answer = document.getElementById('voice-answer-input').value.trim();
+        
+        if (!answer) {
+          alert('Please provide an answer');
+          return;
+        }
+
+        const question = WEEKLY_QUESTIONS[currentQuestionIndex];
+        console.log('[VOICE-SUBMIT] Saving answer for question:', question.id);
+        console.log('[VOICE-SUBMIT] Answer:', answer);
+        responses[question.id] = answer;
+        console.log('[VOICE-SUBMIT] Responses after save:', JSON.stringify(responses));
+        console.log('[VOICE-SUBMIT] Responses keys:', Object.keys(responses));
+
+        // Clear input
+        document.getElementById('voice-answer-input').value = '';
+
+        // Next question
+        askQuestion(currentQuestionIndex + 1);
+      }
+
+      function skipVoiceQuestion() {
+        const question = WEEKLY_QUESTIONS[currentQuestionIndex];
+        console.log('[VOICE-SKIP] Skipping question:', question.id);
+        responses[question.id] = '(skipped)';
+        console.log('[VOICE-SKIP] Responses after skip:', JSON.stringify(responses));
+        askQuestion(currentQuestionIndex + 1);
+      }
+
+      let pitchDeckAnalysis = null; // Store AI analysis results
+
+      async function completeVoiceCheckin() {
+        // Show analyzing state
+        const container = document.getElementById('voice-agent-container');
+        container.innerHTML = \`
+          <div class="text-center py-8">
+            <div class="text-5xl mb-4 animate-pulse">🤖</div>
+            <h3 class="text-xl font-bold mb-2">Analyzing with AI Agents...</h3>
+            <p class="text-gray-600 mb-4">6 specialized agents are reviewing your answers</p>
+            <div class="flex justify-center gap-3 mb-6">
+              <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium animate-pulse">🟡 Hypothesis Agent</span>
+              <span class="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium animate-pulse" style="animation-delay: 0.2s">🟠 Build Agent</span>
+              <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium animate-pulse" style="animation-delay: 0.4s">🔵 User Learning Agent</span>
+            </div>
+            <div class="flex justify-center gap-3">
+              <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium animate-pulse" style="animation-delay: 0.6s">🟣 Metrics Agent</span>
+              <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium animate-pulse" style="animation-delay: 0.8s">🟢 Traction Agent</span>
+              <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-medium animate-pulse" style="animation-delay: 1s">🧠 Orchestrator</span>
+            </div>
+          </div>
+        \`;
+
+        // Speak completion message
+        const completionMessage = currentLanguage === 'es-ES'
+          ? "Perfecto. Ahora nuestros 6 agentes de inteligencia artificial están analizando tus respuestas. Dame un momento."
+          : "Perfect. Now our 6 AI agents are analyzing your responses. Give me a moment.";
+        
+        speakText(completionMessage); // Don't await, let it speak while we fetch
+
+        // Save responses via multiagent endpoint
+        try {
+          const token = document.cookie.match(/authToken=([^;]+)/)?.[1];
+          
+          if (!token) {
+            throw new Error('No authentication token found');
+          }
+
+          console.log('[PITCH-DECK] Preparing to send to multiagent system');
+          console.log('[PITCH-DECK] Responses object:', responses);
+          console.log('[PITCH-DECK] Response keys:', Object.keys(responses));
+
+          const response = await fetch('/api/chat-agent/voice-pitch-deck', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({
+              responses,
+              language: currentLanguage,
+              week: new Date().toISOString().split('T')[0]
+            })
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('[PITCH-DECK] Analysis complete:', result);
+            pitchDeckAnalysis = result;
+            
+            // Refresh goals list to show auto-created goals
+            if (typeof loadDashboardData === 'function') {
+              console.log('[PITCH-DECK] Refreshing dashboard data...');
+              await loadDashboardData();
+            }
+            
+            // Speak the weekly summary
+            const summaryMsg = currentLanguage === 'es-ES'
+              ? \`Análisis completo. Tu puntuación semanal es \${result.analysis?.overall_score || 'pendiente'} de 100. Calificación: \${result.analysis?.week_rating || 'pendiente'}. \${result.analysis?.weekly_summary || 'Buen trabajo esta semana.'}\`
+              : \`Analysis complete. Your weekly score is \${result.analysis?.overall_score || 'pending'} out of 100. Rating: \${result.analysis?.week_rating || 'pending'}. \${result.analysis?.weekly_summary || 'Great work this week.'}\`;
+            
+            await speakText(summaryMsg);
+            
+            // Show rich summary
+            showVoiceSummary();
+          } else {
+            const errorData = await response.json();
+            console.error('[PITCH-DECK] Server error:', errorData);
+            throw new Error('Analysis failed: ' + (errorData.error || response.statusText));
+          }
+        } catch (error) {
+          console.error('[PITCH-DECK] Error:', error);
+          // Fallback: show basic summary even if AI fails
+          pitchDeckAnalysis = null;
+          showVoiceSummary();
+        }
+      }
+
+      function showVoiceSummary() {
+        const container = document.getElementById('voice-agent-container');
+        const analysis = pitchDeckAnalysis?.analysis;
+        const agents = analysis?.agents || {};
+        const goalsCreated = pitchDeckAnalysis?.goalsCreated || 0;
+        const metricsExtracted = pitchDeckAnalysis?.metricsSaved || 0;
+        const weeklyScore = analysis?.overall_score || '—';
+        const weekRating = analysis?.week_rating || 'N/A';
+        const weeklySummary = analysis?.weekly_summary || '';
+        const topStrength = analysis?.top_strength || '';
+        const topRisk = analysis?.top_risk || '';
+
+        // Color for score
+        const scoreNum = parseFloat(weeklyScore) || 0;
+        const scoreColor = scoreNum >= 70 ? 'text-green-400' : scoreNum >= 40 ? 'text-yellow-400' : 'text-red-400';
+        const scoreGlow = scoreNum >= 70 ? 'shadow-green-500/50' : scoreNum >= 40 ? 'shadow-yellow-500/50' : 'shadow-red-500/50';
+
+        // Agent analysis sections
+        const agentSections = [
+          { key: 'hypothesis', icon: '🟡', label: 'Hypothesis Agent', color: 'yellow' },
+          { key: 'build', icon: '🟠', label: 'Build Agent', color: 'orange' },
+          { key: 'users', icon: '🔵', label: 'User Learning Agent', color: 'blue' },
+          { key: 'metrics', icon: '🟣', label: 'Metrics Agent', color: 'purple' },
+          { key: 'traction', icon: '🟢', label: 'Traction Agent', color: 'green' }
+        ];
+
+        container.innerHTML = \`
+          <div class="py-4">
+            <!-- Header with Score -->
+            <div class="text-center mb-6">
+              <div class="inline-block bg-gradient-to-br from-purple-600/30 to-indigo-600/30 border border-purple-500/30 rounded-2xl p-6 shadow-lg \${scoreGlow}">
+                <div class="text-6xl font-black \${scoreColor} mb-1">\${weeklyScore}<span class="text-2xl opacity-60">/10</span></div>
+                <div class="text-sm font-semibold text-purple-300 uppercase tracking-wider">\${weekRating}</div>
+              </div>
+              <h3 class="text-xl font-bold mt-4 mb-1">🎯 Pitch Deck Analysis Complete</h3>
+              \${weeklySummary ? \`<p class="text-gray-600 text-sm max-w-lg mx-auto">\${weeklySummary}</p>\` : ''}
+            </div>
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-3 gap-3 mb-6">
+              <div class="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-xl p-3 text-center">
+                <div class="text-2xl font-bold text-green-400">\${goalsCreated}</div>
+                <div class="text-xs text-green-300/80">Goals Created</div>
+              </div>
+              <div class="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl p-3 text-center">
+                <div class="text-2xl font-bold text-blue-400">\${metricsExtracted}</div>
+                <div class="text-xs text-blue-300/80">Metrics Saved</div>
+              </div>
+              <div class="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-xl p-3 text-center">
+                <div class="text-2xl font-bold text-purple-400">5</div>
+                <div class="text-xs text-purple-300/80">AI Agents Used</div>
+              </div>
+            </div>
+
+            <!-- Top Strength / Risk -->
+            \${topStrength || topRisk ? \`
+              <div class="grid grid-cols-2 gap-3 mb-6">
+                \${topStrength ? \`
+                  <div class="bg-green-50 rounded-xl p-3 border border-green-200">
+                    <div class="text-xs font-semibold text-green-700 mb-1">💪 Top Strength</div>
+                    <div class="text-xs text-green-600">\${topStrength}</div>
+                  </div>
+                \` : ''}
+                \${topRisk ? \`
+                  <div class="bg-red-50 rounded-xl p-3 border border-red-200">
+                    <div class="text-xs font-semibold text-red-700 mb-1">⚠️ Top Risk</div>
+                    <div class="text-xs text-red-600">\${topRisk}</div>
+                  </div>
+                \` : ''}
+              </div>
+            \` : ''}
+
+            <!-- ASTAR Scores -->
+            \${pitchDeckAnalysis?.weekly_scores ? \`
+              <div class="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
+                <h4 class="font-semibold text-sm text-gray-700 mb-3">📊 ASTAR Weekly Scores</h4>
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-500">Velocity of Learning</span>
+                    <span class="font-bold text-sm text-purple-600">\${pitchDeckAnalysis.weekly_scores.velocity_of_learning || 0}</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-500">Depth of Usage</span>
+                    <span class="font-bold text-sm text-purple-600">\${pitchDeckAnalysis.weekly_scores.depth_of_usage || 0}</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-500">Organic Pull</span>
+                    <span class="font-bold text-sm text-purple-600">\${pitchDeckAnalysis.weekly_scores.organic_pull || 0}</span>
+                  </div>
+                  <div class="flex justify-between items-center bg-purple-50 rounded-lg px-2 py-1">
+                    <span class="text-xs font-semibold text-purple-700">Overall Score</span>
+                    <span class="font-black text-sm text-purple-700">\${pitchDeckAnalysis.weekly_scores.total_score || 0}/100</span>
+                  </div>
+                </div>
+              </div>
+            \` : ''}
+
+            <!-- Agent Analysis Accordion -->
+            <div class="space-y-2 mb-6">
+              <h4 class="font-semibold text-sm text-gray-700 mb-2">🤖 Agent Reports</h4>
+              \${agentSections.map(agent => {
+                const agentData = agents[agent.key];
+                if (!agentData) return '';
+                const feedback = typeof agentData === 'string' ? agentData : (agentData.feedback || agentData.analysis || agentData.summary || JSON.stringify(agentData));
+                const score = agentData.quality_score || agentData.productivity_score || agentData.engagement_score || agentData.depth_score || agentData.traction_score || '';
+                return \`
+                  <details class="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                    <summary class="px-4 py-2 cursor-pointer hover:bg-gray-100 flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <span>\${agent.icon}</span> \${agent.label} \${score ? \`<span class="ml-auto text-xs font-bold text-purple-600">\${score}/10</span>\` : ''}
+                    </summary>
+                    <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-600 leading-relaxed">
+                      \${feedback}
+                    </div>
+                  </details>
+                \`;
+              }).join('')}
+            </div>
+
+            <!-- Auto-Created Goals -->
+            \${pitchDeckAnalysis?.auto_goals?.length ? \`
+              <div class="bg-green-50 rounded-xl p-4 mb-6 border border-green-200">
+                <h4 class="font-semibold text-sm text-green-800 mb-2">✅ Auto-Created Goals (\${pitchDeckAnalysis.auto_goals.length})</h4>
+                <ul class="space-y-1">
+                  \${pitchDeckAnalysis.auto_goals.map(g => \`
+                    <li class="text-xs text-green-700 flex items-start gap-2">
+                      <span class="text-green-500 mt-0.5">•</span>
+                      <span><strong>\${g.description || g.task || g}</strong> \${g.priority_label ? '— ' + g.priority_label : ''}</span>
+                    </li>
+                  \`).join('')}
+                </ul>
+              </div>
+            \` : ''}
+
+            <!-- Your Responses (collapsed by default) -->
+            <details class="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
+              <summary class="font-semibold text-sm text-gray-700 cursor-pointer hover:text-purple-600">📝 Your Responses (click to expand)</summary>
+              <div class="space-y-2 mt-3">
+                \${WEEKLY_QUESTIONS.map((q, i) => \`
+                  <div class="text-sm">
+                    <span class="text-purple-600 font-medium text-xs">\${q.category} — \${q.id}:</span>
+                    <p class="text-gray-700 ml-3 text-xs">\${responses[q.id] || '(no response)'}</p>
+                  </div>
+                \`).join('')}
+              </div>
+            </details>
+
+            <button onclick="closeVoiceCheckin()" class="w-full px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold shadow-lg shadow-purple-500/30">
+              Done — Back to Dashboard
+            </button>
+          </div>
+        \`;
+      }
+
+      function stopVoiceCheckin() {
+        if (recognition) {
+          recognition.stop();
+        }
+        window.speechSynthesis.cancel();
+        currentQuestionIndex = 0;
+        responses = {};
+        isListening = false;
+        isSpeaking = false;
+      }
     </script>
   `;
 

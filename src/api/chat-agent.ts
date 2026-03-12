@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+﻿import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { verify } from 'hono/jwt';
 import type { Bindings, AuthContext } from '../types';
@@ -52,2554 +52,885 @@ app.get('/status', jwtMiddleware, async (c) => {
   });
 });
 
-// Helper: Get user's startup context (goals + metrics)
-async function getStartupContext(db: any, userId: number) {
-  console.log('[GET-CONTEXT] Fetching context for user:', userId);
-  
-  // Get goals
+// ============================================================
+// ASTRO CHAT - AI Cofounder conversational interface
+// ============================================================
+// Powers the main dashboard chat where Astro (AI Cofounder)
+// greets founders, collects startup metrics through natural
+// conversation, and recommends the best VCs for their stage.
+// Saves data to astro_sessions, user_metrics, goal_weekly_traction
+// and users.startup_name for leaderboard positioning.
+// ============================================================
+
+// Helper: extract structured startup data from conversation using AI
+async function extractAstroMetrics(groqKey: string, history: any[], userMessage: string | null): Promise<Record<string, any>> {
+  if (!userMessage && history.length === 0) return {};
   try {
-    console.log('[GET-CONTEXT] Querying goals table...');
-    const goalsResult = await db.prepare(`
-      SELECT id, description, status, target_value, current_value, deadline, category, created_at
-      FROM goals 
-      WHERE user_id = ? 
-      ORDER BY created_at DESC
-    `).bind(userId).all();
-    
-    console.log('[GET-CONTEXT] Goals query result:', goalsResult);
-    const goals = goalsResult.results || [];
-    console.log('[GET-CONTEXT] Goals count:', goals.length);
+    const conversationText = [
+      ...history.map((m: any) => `${m.role === 'astro' ? 'Astro' : 'Founder'}: ${m.content}`),
+      ...(userMessage ? [`Founder: ${userMessage}`] : [])
+    ].join('\n');
 
-    // Get metrics history (last 30 days)
-    console.log('[GET-CONTEXT] Querying metrics...');
-    const metricsResult = await db.prepare(`
-      SELECT metric_name, metric_value, recorded_date
-      FROM user_metrics 
-      WHERE user_id = ? 
-      ORDER BY recorded_date DESC
-      LIMIT 60
-    `).bind(userId).all();
+    const extractionPrompt = `Extrae datos estructurados del startup de esta conversación. Devuelve SOLO JSON válido, sin explicaciones.
 
-    const metrics = metricsResult.results || [];
-    console.log('[GET-CONTEXT] Metrics count:', metrics.length);
+Campos (usa null si no se menciona):
+{
+  "startup_name": "nombre del startup o null",
+  "problem": "problema que resuelven (max 100 chars) o null",
+  "solution": "cómo lo resuelven (max 100 chars) o null",
+  "sector": "uno de: AI/SaaS/Marketplace/Fintech/Health/EdTech/B2B/B2C/Other o null",
+  "geography": "uno de: Spain/LatAm/USA/Europe/Global o null",
+  "mrr": número o null,
+  "arr": número o null,
+  "active_users": número o null,
+  "growth_rate_percent": número o null,
+  "team_size": número o null,
+  "fundraising_goal": "e.g. '500K' o '1M' o null",
+  "fundraising_stage": "uno de: pre-seed/seed/series-a/series-b o null"
+}
 
-    // Get primary metrics config
-    console.log('[GET-CONTEXT] Querying primary metrics...');
-    const primaryMetrics = await db.prepare(`
-      SELECT metric1_name, metric2_name 
-      FROM primary_metrics 
-      WHERE user_id = ?
-    `).bind(userId).first();
+Conversación:
+${conversationText.substring(0, 3000)}`;
 
-    // Calculate summary stats
-    const activeGoals = goals.filter((g: any) => g.status === 'active' || g.status === 'in_progress');
-    const completedGoals = goals.filter((g: any) => g.status === 'completed');
-    console.log('[GET-CONTEXT] Active goals:', activeGoals.length, 'Completed:', completedGoals.length);
-    
-    // Get latest metrics values
-    const latestUsers = metrics.find((m: any) => m.metric_name === 'users')?.metric_value || 0;
-    const latestRevenue = metrics.find((m: any) => m.metric_name === 'revenue')?.metric_value || 0;
-
-    // Calculate growth (compare last two entries)
-    const userMetrics = metrics.filter((m: any) => m.metric_name === 'users');
-    const revenueMetrics = metrics.filter((m: any) => m.metric_name === 'revenue');
-    
-    const userGrowth = userMetrics.length >= 2 
-      ? ((userMetrics[0].metric_value - userMetrics[1].metric_value) / (userMetrics[1].metric_value || 1) * 100).toFixed(1)
-      : 0;
-    
-    const revenueGrowth = revenueMetrics.length >= 2
-      ? ((revenueMetrics[0].metric_value - revenueMetrics[1].metric_value) / (revenueMetrics[1].metric_value || 1) * 100).toFixed(1)
-      : 0;
-
-    console.log('[GET-CONTEXT] Context built successfully');
-    return {
-      goals: {
-        all: goals,
-        active: activeGoals,
-        completed: completedGoals,
-        totalCount: goals.length,
-        completedCount: completedGoals.length,
-        completionRate: goals.length > 0 ? Math.round((completedGoals.length / goals.length) * 100) : 0
-      },
-      metrics: {
-        current: {
-          users: latestUsers,
-          revenue: latestRevenue
-        },
-        growth: {
-          users: userGrowth,
-          revenue: revenueGrowth
-        },
-        history: metrics,
-        primaryConfig: primaryMetrics || { metric1_name: 'users', metric2_name: 'revenue' }
-      },
-      summary: `
-        Startup has ${goals.length} goals (${completedGoals.length} completed, ${activeGoals.length} active).
-        Current metrics: ${latestUsers} users, $${latestRevenue} revenue.
-        Growth: ${userGrowth}% users, ${revenueGrowth}% revenue.
-      `
-    };
-  } catch (error) {
-    console.error('[GET-CONTEXT] ERROR:', error);
-    console.error('[GET-CONTEXT] Error details:', error instanceof Error ? error.message : String(error));
-    throw error;
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-120b',
+        messages: [{ role: 'user', content: extractionPrompt }],
+        temperature: 0.1,
+        max_tokens: 300
+      })
+    });
+    if (!res.ok) return {};
+    const d = await res.json() as any;
+    const raw = d.choices[0]?.message?.content || '{}';
+    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return {};
   }
 }
 
-// Helper: Generate AI response using Groq or Cloudflare AI
-async function generateAIResponse(apiKey: string, systemPrompt: string, userMessage: string, context: any, cloudflareAI?: any, chatHistory: any[] = []) {
-  const MAX_RETRIES = 2;
-  const TIMEOUT_MS = 25000; // 25 seconds timeout for mobile
-  
-  // Simplify context for mobile/slow connections
-  const simplifiedContext = {
-    goals: {
-      totalCount: context.goals.totalCount,
-      completedCount: context.goals.completedCount,
-      active: context.goals.active.slice(0, 5) // Only first 5 active goals
-    },
-    metrics: {
-      current: context.metrics.current,
-      growth: context.metrics.growth
-    }
-  };
-
-  // Build conversation history for context (last 10 messages)
-  const recentHistory = chatHistory.slice(-10);
-  console.log('[AI] Using conversation history:', recentHistory.length, 'messages');
-  
-  // Try Groq FIRST (primary AI)
-  if (apiKey) {
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        console.log(`[AI] Using Groq API (attempt ${attempt}/${MAX_RETRIES})`);
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-        
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              ...recentHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
-              { role: 'user', content: `Contexto: ${JSON.stringify(simplifiedContext)}\n\nPregunta: ${userMessage}` }
-            ],
-            max_tokens: 1500,
-            temperature: 0.7
-          }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[AI] Groq API error:', response.status, errorText);
-          
-          if (attempt < MAX_RETRIES && (response.status === 429 || response.status >= 500)) {
-            // Retry on rate limit or server errors
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            continue;
-          }
-          
-          throw new Error(`Groq API error: ${response.status}`);
-        }
-
-        const data = await response.json() as any;
-        console.log('[AI] Groq response received successfully');
-        return data.choices[0]?.message?.content || 'No pude generar una respuesta.';
-        
-      } catch (error: any) {
-        console.error(`[AI] Groq attempt ${attempt} error:`, error);
-        
-        if (error.name === 'AbortError') {
-          console.log('[AI] Request timed out');
-          if (attempt < MAX_RETRIES) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            continue;
-          }
-        }
-        
-        if (attempt >= MAX_RETRIES) {
-          throw error;
-        }
-        
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-      }
-    }
-  }
-  
-  // Fallback to Cloudflare AI if Groq failed
-  if (cloudflareAI) {
-    try {
-      console.log('[AI] Groq failed, using Cloudflare Workers AI as fallback');
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...recentHistory.map((msg: any) => ({ role: msg.role, content: msg.content })),
-        { role: 'user', content: `Contexto: ${JSON.stringify(simplifiedContext)}\n\nPregunta: ${userMessage}` }
-      ];
-      
-      const response = await cloudflareAI.run('@cf/meta/llama-3.2-3b-instruct', {
-        messages,
-        max_tokens: 1500,
-        temperature: 0.7
-      });
-      
-      return response.response || 'No pude generar una respuesta.';
-    } catch (error) {
-      console.error('[AI] Cloudflare AI error:', error);
-    }
-  }
-  
-  console.error('[AI] All AI providers failed, using fallback');
-  throw new Error('No AI provider available');
-}
-
-// Get chat history
-app.get('/history', jwtMiddleware, async (c) => {
-  const user = c.get('user') as AuthContext;
-  
+// Helper: save extracted metrics to DB (astro_sessions + user_metrics + goal_weekly_traction)
+async function saveAstroData(db: any, userId: number, extracted: Record<string, any>, vcRecommendations?: string, actionItems?: string[], detectedLang?: string): Promise<void> {
   try {
-    const messages = await c.env.DB.prepare(`
-      SELECT id, role, content, created_at FROM agent_chat_messages
-      WHERE user_id = ?
-      ORDER BY created_at ASC
-      LIMIT 50
-    `).bind(user.userId).all();
+    const existing = await db.prepare('SELECT * FROM astro_sessions WHERE user_id = ?').bind(userId).first() as any;
 
-    return c.json({
-      messages: messages.results.map((msg: any) => ({
-        id: msg.id,
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.created_at
-      }))
-    });
-  } catch (error) {
-    console.error('Error fetching chat history:', error);
-    return c.json({ messages: [] });
-  }
-});
+    const merged = { ...(existing || {}), ...Object.fromEntries(Object.entries(extracted).filter(([, v]) => v !== null && v !== undefined)) };
 
-// Send message and get AI response
-app.post('/message', jwtMiddleware, async (c) => {
-  console.log('[CHAT] === NEW MESSAGE REQUEST ===');
-  const user = c.get('user') as AuthContext;
-  console.log('[CHAT] User ID:', user.userId);
-  
-  let requestBody;
-  try {
-    requestBody = await c.req.json();
-    console.log('[CHAT] Request body:', JSON.stringify(requestBody));
-  } catch (jsonError) {
-    console.error('[CHAT] Failed to parse JSON:', jsonError);
-    return c.json({ error: 'Invalid JSON' }, 400);
-  }
-  
-  let { message, useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, goalData, emailContext, flowState } = requestBody;
-  console.log('[CHAT] Flags:', { useMetricsAgent, useBrandAgent, websiteUrl, industry, stage, hasGoalData: !!goalData, emailContext, flowState });
+    const fields = ['startup_name', 'problem', 'solution', 'sector', 'mrr', 'active_users', 'team_size', 'fundraising_stage'];
+    const filled = fields.filter(f => merged[f] !== null && merged[f] !== undefined && merged[f] !== '').length;
+    const completeness = Math.round((filled / fields.length) * 100);
 
-  // ============ EMAIL CONTEXT HANDLING ============
-  // Si viene desde un email con contexto, interceptar ANTES de validar el mensaje
-  if (emailContext && !message?.trim()) {
-    console.log('[CHAT] ========== EMAIL CONTEXT DETECTED ==========');
-    console.log('[CHAT] Context:', emailContext);
-    
-    let contextMessage = '';
-    let category = 'ASTAR';
-    
-    switch(emailContext) {
-      case 'hipotesis':
-        contextMessage = '💡 **Monday Update — Ideas Day**\n\n' +
-          'Let me capture your hypothesis for this week!\n\n' +
-          '**Question 1 of 3:**\n' +
-          'What is your **#1 hypothesis** you will test this week?\n\n' +
-          '_Example: "If new users can complete onboarding in under 2 minutes, more of them will reach the first aha moment."_';
-        category = 'hypothesis';
-        break;
-        
-      case 'construccion':
-        contextMessage = '🛠️ **Tuesday Update — Build Day**\n\n' +
-          'Let me capture your build progress!\n\n' +
-          '**Question 1 of 4:**\n' +
-          'What did you **build today**?\n_(Feature, flow, or experiment — be specific)_\n\n' +
-          '_Example: "Built a basic onboarding flow that lets users create their first project."_';
-        category = 'build';
-        break;
-        
-      case 'usuarios':
-        contextMessage = '💬 **Wednesday Update — User Learning Day**\n\n' +
-          'Let me capture your user conversations!\n\n' +
-          '**Question 1 of 3:**\n' +
-          'How many users did you **speak with today**?\n_(Conversations, interviews, or live feedback sessions)_\n\n' +
-          '_Example: "6 users (4 live calls, 2 async chats)"_';
-        category = 'user_learning';
-        break;
-        
-      case 'metricas':
-        contextMessage = '📊 **Thursday Update — Measurement & Insights**\n\n' +
-          'Let me capture your user behavior insights!\n\n' +
-          '**Question 1 of 4:**\n' +
-          'How many users **interacted with your product today**?\n_(Any meaningful usage)_\n\n' +
-          '_Example: "9 users total"_';
-        category = 'insight';
-        break;
-        
-      case 'traction':
-        contextMessage = '📈 **Friday Update — Traction Metrics**\n\n' +
-          'Let me capture your weekly traction!\n\n' +
-          '**Question 1 of 5:**\n' +
-          'How much **revenue** did you generate this week? (€)\n_(Cash collected or committed)_\n\n' +
-          '_Example: "€420 (7 users × €60)"_';
-        category = 'traction';
-        break;
-        
-      case 'reflexion':
-        contextMessage = '🧘 **Weekend Reflection**\n\n' +
-          'Share any final thoughts from the week:\n\n' +
-          '• What feedback did you close?\n' +
-          '• What signal leaves you most confident (or worried)?\n\n' +
-          '_This is optional — feel free to skip!_';
-        category = 'reflect';
-        break;
-        
-      default:
-        contextMessage = '👋 Hi! How can I help you today?';
-    }
-    
-    // Guardar mensaje del sistema con contexto y estado del flujo
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'assistant', ?, datetime('now'))
-    `).bind(user.userId, contextMessage).run();
-    
-    return c.json({ 
-      message: contextMessage,
-      emailContext: emailContext,
-      category: category,
-      flowState: 'question_1', // Track where we are in the flow
-      waitingForUserResponse: true
-    });
-  }
-  // ============ END EMAIL CONTEXT HANDLING ============
+    const turns = (existing?.conversation_turns || 0) + 1;
+    const vcJson = vcRecommendations || existing?.vc_recommendations || null;
+    const actionItemsJson = actionItems && actionItems.length > 0
+      ? JSON.stringify(actionItems)
+      : (existing?.action_items || null);
+    const lang = detectedLang || existing?.language || 'es';
 
-  if (!message?.trim()) {
-    console.error('[CHAT] No message provided');
-    return c.json({ error: 'Message is required' }, 400);
-  }
-
-  // ============ DETECT ASTAR TRIGGER ============
-  // Si el mensaje contiene el marcador oculto __TRIGGER_GOAL_FLOW__, activar el flujo
-  if (message.includes('__TRIGGER_GOAL_FLOW__')) {
-    console.log('[CHAT] ========== ASTAR TRIGGER DETECTED ==========');
-    // Limpiar el mensaje del marcador
-    message = message.replace('__TRIGGER_GOAL_FLOW__', '').trim();
-    console.log('[CHAT] Cleaned message:', message);
-    
-    // Retornar con flag para activar el flujo en el frontend
-    return c.json({
-      message: message, // El mensaje original limpio
-      triggerGoalFlow: true, // Flag para que el frontend inicie el flujo
-      category: 'ASTAR'
-    });
-  }
-  // ============ END ASTAR TRIGGER ============
-
-  // ============ PROCESS EMAIL CONTEXT RESPONSE ============
-  // Si el usuario está respondiendo a una pregunta de contexto de email
-  if (emailContext && message?.trim()) {
-    console.log('[CHAT] ========== PROCESSING EMAIL CONTEXT RESPONSE ==========');
-    console.log('[CHAT] Context:', emailContext, 'Message:', message, 'FlowState:', flowState);
-    
-    const db = c.env.DB;
-    
-    // Guardar el mensaje del usuario
     await db.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'user', ?, datetime('now'))
-    `).bind(user.userId, message).run();
-    
-    try {
-      let responseMessage = '';
-      let nextFlowState = '';
-      let goalCreated = false;
-      
-      switch(emailContext) {
-        case 'hipotesis': {
-          // Monday - Ideas Day: 3 questions flow
-          if (!flowState || flowState === 'question_1') {
-            // User answered Q1: What is your #1 hypothesis?
-            // Store temporarily and ask Q2
-            await db.prepare(`
-              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
-              VALUES (?, 'system', ?, ?, datetime('now'))
-            `).bind(user.userId, 'temp_hypothesis', JSON.stringify({ hypothesis: message })).run();
-            
-            responseMessage = '✅ Got it!\n\n' +
-              '💡 **Hypothesis:** "' + message + '"\n\n' +
-              '---\n\n' +
-              '**Question 2 of 3:**\n' +
-              'What **user behavior** do you expect to see if this hypothesis is correct?\n\n' +
-              '_Example: "At least 50% of new users complete onboarding and interact with the core feature within their first session."_';
-            nextFlowState = 'question_2';
-          } else if (flowState === 'question_2') {
-            // User answered Q2: Expected behavior
-            // Get stored hypothesis, add behavior, ask Q3
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_hypothesis'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const hypothesisData = storedData ? JSON.parse(storedData.metadata) : {};
-            hypothesisData.expected_behavior = message;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages 
-              SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_hypothesis'
-            `).bind(JSON.stringify(hypothesisData), user.userId).run();
-            
-            responseMessage = '✅ Perfect!\n\n' +
-              '📊 **Expected behavior:** "' + message + '"\n\n' +
-              '---\n\n' +
-              '**Question 3 of 3:**\n' +
-              'How will you know the hypothesis is **validated**? (specific signal)\n\n' +
-              '_Example: "6 out of 10 new users complete onboarding and trigger the core action within 24 hours."_';
-            nextFlowState = 'question_3';
-          } else if (flowState === 'question_3') {
-            // User answered Q3: Validation signal
-            // Get all stored data and create the hypothesis goal
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_hypothesis'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const hypothesisData = storedData ? JSON.parse(storedData.metadata) : {};
-            
-            // Get current week number
-            const now = new Date();
-            const startOfYear = new Date(now.getFullYear(), 0, 1);
-            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
-            
-            // Create the hypothesis goal with all new fields
-            const result = await db.prepare(`
-              INSERT INTO goals (
-                user_id, category, description, task, 
-                hypothesis_expected_behavior, hypothesis_validation_signal, hypothesis_status,
-                priority, priority_label, cadence, goal_status, 
-                week_number, year_number, status, created_at
-              )
-              VALUES (?, 'hypothesis', ?, 'Validate hypothesis', ?, ?, 'testing', 'P1', 'Urgent & important', 'Recurrent', 'To start', ?, ?, 'active', CURRENT_TIMESTAMP)
-            `).bind(
-              user.userId,
-              hypothesisData.hypothesis || message,
-              hypothesisData.expected_behavior || '',
-              message, // validation signal
-              weekNumber,
-              now.getFullYear()
-            ).run();
-            
-            // Clean up temp data
-            await db.prepare(`
-              DELETE FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_hypothesis'
-            `).bind(user.userId).run();
-            
-            goalCreated = true;
-            responseMessage = '🎉 **Monday Update Complete!**\n\n' +
-              '---\n\n' +
-              '💡 **Hypothesis:**\n"' + hypothesisData.hypothesis + '"\n\n' +
-              '📊 **Expected behavior:**\n"' + hypothesisData.expected_behavior + '"\n\n' +
-              '✅ **Validation signal:**\n"' + message + '"\n\n' +
-              '---\n\n' +
-              '📋 Saved to your Goals with category **hypothesis**\n' +
-              '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
-              'Good luck validating this week! 🚀';
-            nextFlowState = 'complete';
-          }
-          break;
-        }
-        
-        case 'construccion': {
-          // Tuesday - Build Day: 4 questions flow
-          if (!flowState || flowState === 'question_1') {
-            await db.prepare(`
-              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
-              VALUES (?, 'system', ?, ?, datetime('now'))
-            `).bind(user.userId, 'temp_build', JSON.stringify({ build_description: message })).run();
-            
-            responseMessage = '✅ Great!\n\n' +
-              '🛠️ **Build:** "' + message + '"\n\n' +
-              '---\n\n' +
-              '**Question 2 of 4:**\n' +
-              'What **tech stack or tools** did you use?\n_(Frameworks, no-code tools, APIs, AI models, etc.)_\n\n' +
-              '_Example: "Frontend: Next.js + Tailwind | Backend: Firebase | AI: OpenAI API"_';
-            nextFlowState = 'question_2';
-          } else if (flowState === 'question_2') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const buildData = storedData ? JSON.parse(storedData.metadata) : {};
-            buildData.tech_stack = message;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
-            `).bind(JSON.stringify(buildData), user.userId).run();
-            
-            responseMessage = '✅ Nice stack!\n\n' +
-              '⚙️ **Tech:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 3 of 4:**\n' +
-              'How **long** did it take you to build this?\n_(Approximate hours)_\n\n' +
-              '_Example: "~3.5 hours"_';
-            nextFlowState = 'question_3';
-          } else if (flowState === 'question_3') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const buildData = storedData ? JSON.parse(storedData.metadata) : {};
-            // Extract number from hours
-            const hoursMatch = message.match(/(\d+(?:\.\d+)?)/);
-            buildData.hours_spent = hoursMatch ? parseFloat(hoursMatch[1]) : 0;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
-            `).bind(JSON.stringify(buildData), user.userId).run();
-            
-            responseMessage = '✅ Tracked!\n\n' +
-              '⏱️ **Time:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 4 of 4:**\n' +
-              'Which **hypothesis** is this build testing?\n_(Link it to your Monday hypothesis)_\n\n' +
-              '_Example: "Testing if users can generate a useful output in their first session to increase activation."_';
-            nextFlowState = 'question_4';
-          } else if (flowState === 'question_4') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const buildData = storedData ? JSON.parse(storedData.metadata) : {};
-            
-            const now = new Date();
-            const startOfYear = new Date(now.getFullYear(), 0, 1);
-            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
-            
-            const result = await db.prepare(`
-              INSERT INTO goals (
-                user_id, category, description, task,
-                build_tech_stack, build_hours_spent,
-                priority, priority_label, cadence, goal_status,
-                week_number, year_number, status, created_at
-              )
-              VALUES (?, 'build', ?, ?, ?, ?, 'P1', 'Urgent & important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
-            `).bind(
-              user.userId,
-              buildData.build_description || '',
-              'Build: ' + message, // hypothesis it tests
-              buildData.tech_stack || '',
-              buildData.hours_spent || 0,
-              weekNumber,
-              now.getFullYear()
-            ).run();
-            
-            await db.prepare(`
-              DELETE FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_build'
-            `).bind(user.userId).run();
-            
-            goalCreated = true;
-            responseMessage = '🎉 **Tuesday Update Complete!**\n\n' +
-              '---\n\n' +
-              '🛠️ **Built:** "' + buildData.build_description + '"\n\n' +
-              '⚙️ **Tech stack:** ' + buildData.tech_stack + '\n\n' +
-              '⏱️ **Time spent:** ' + buildData.hours_spent + ' hours\n\n' +
-              '💡 **Testing hypothesis:** "' + message + '"\n\n' +
-              '---\n\n' +
-              '📋 Saved to your Goals with category **build**\n' +
-              '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
-              'Great progress! Keep building! 🚀';
-            nextFlowState = 'complete';
-          }
-          break;
-        }
-        
-        case 'usuarios': {
-          // Wednesday - User Learning: 3 questions
-          if (!flowState || flowState === 'question_1') {
-            const usersMatch = message.match(/(\d+)/);
-            await db.prepare(`
-              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
-              VALUES (?, 'system', ?, ?, datetime('now'))
-            `).bind(user.userId, 'temp_users', JSON.stringify({ users_spoken: usersMatch ? parseInt(usersMatch[1]) : 0 })).run();
-            
-            responseMessage = '✅ Great!\n\n' +
-              '💬 **Users spoken:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 2 of 3:**\n' +
-              'How many of them **actually used the product**?\n_(Touched the product, not just gave opinions)_\n\n' +
-              '_Example: "4 users completed the core flow, 2 dropped off during onboarding"_';
-            nextFlowState = 'question_2';
-          } else if (flowState === 'question_2') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_users'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const userData = storedData ? JSON.parse(storedData.metadata) : {};
-            const usersMatch = message.match(/(\d+)/);
-            userData.users_used_product = usersMatch ? parseInt(usersMatch[1]) : 0;
-            userData.users_detail = message;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_users'
-            `).bind(JSON.stringify(userData), user.userId).run();
-            
-            responseMessage = '✅ Noted!\n\n' +
-              '📱 **Used product:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 3 of 3:**\n' +
-              'What was the **single most important thing** you learned today?\n_(One sentence only)_\n\n' +
-              '_Example: "Users understand the value only after seeing a real example, not from the landing page."_';
-            nextFlowState = 'question_3';
-          } else if (flowState === 'question_3') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_users'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const userData = storedData ? JSON.parse(storedData.metadata) : {};
-            
-            const now = new Date();
-            const startOfYear = new Date(now.getFullYear(), 0, 1);
-            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
-            
-            // Build comprehensive description
-            const description = `User Learning Week ${weekNumber}: Spoke with ${userData.users_spoken || 0} users, ${userData.users_used_product || 0} used the product. ${userData.users_detail || 'Details in task field.'}`;
-            
-            const result = await db.prepare(`
-              INSERT INTO goals (
-                user_id, category, description, task,
-                users_spoken, users_used_product, key_learning,
-                priority, priority_label, cadence, goal_status,
-                week_number, year_number, status, created_at
-              )
-              VALUES (?, 'user_learning', ?, ?, ?, ?, ?, 'P1', 'Urgent & important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
-            `).bind(
-              user.userId,
-              description,
-              userData.users_detail || 'User conversations and product usage details',
-              userData.users_spoken || 0,
-              userData.users_used_product || 0,
-              message, // key learning
-              weekNumber,
-              now.getFullYear()
-            ).run();
-            
-            await db.prepare(`
-              DELETE FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_users'
-            `).bind(user.userId).run();
-            
-            goalCreated = true;
-            responseMessage = '🎉 **Wednesday Update Complete!**\n\n' +
-              '---\n\n' +
-              '💬 **Users spoken:** ' + userData.users_spoken + '\n\n' +
-              '📱 **Used product:** ' + (userData.users_detail || userData.users_used_product) + '\n\n' +
-              '💡 **Key learning:**\n"' + message + '"\n\n' +
-              '---\n\n' +
-              '📋 Saved to your Goals with category **user_learning**\n' +
-              '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
-              'Great insights! Keep talking to users! 🚀';
-            nextFlowState = 'complete';
-          }
-          break;
-        }
-        
-        case 'metricas': {
-          // Thursday - Measurement & Insights: 4 questions
-          if (!flowState || flowState === 'question_1') {
-            const usersMatch = message.match(/(\d+)/);
-            await db.prepare(`
-              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
-              VALUES (?, 'system', ?, ?, datetime('now'))
-            `).bind(user.userId, 'temp_insights', JSON.stringify({ users_interacted: usersMatch ? parseInt(usersMatch[1]) : 0 })).run();
-            
-            responseMessage = '✅ Got it!\n\n' +
-              '📊 **Users interacted:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 2 of 4:**\n' +
-              'What actions did users **repeat most often**?\n_(Core behaviors, not edge cases)_\n\n' +
-              '_Example: "6 users generated a second output within the same session, 3 users returned later the same day"_';
-            nextFlowState = 'question_2';
-          } else if (flowState === 'question_2') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const insightData = storedData ? JSON.parse(storedData.metadata) : {};
-            insightData.repeated_actions = message;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
-            `).bind(JSON.stringify(insightData), user.userId).run();
-            
-            responseMessage = '✅ Interesting patterns!\n\n' +
-              '🔄 **Repeated actions:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 3 of 4:**\n' +
-              'Where did users **get stuck, drop off, or ask for help**?\n\n' +
-              '_Example: "Most users hesitated on the pricing screen, 2 users didn\'t understand what to do after the first result"_';
-            nextFlowState = 'question_3';
-          } else if (flowState === 'question_3') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const insightData = storedData ? JSON.parse(storedData.metadata) : {};
-            insightData.drop_off_points = message;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
-            `).bind(JSON.stringify(insightData), user.userId).run();
-            
-            responseMessage = '✅ Important friction points!\n\n' +
-              '⚠️ **Drop-off points:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 4 of 4:**\n' +
-              'What **insight** does this reveal about your product?\n_(One sentence only)_\n\n' +
-              '_Example: "The core feature is valuable, but the next step is unclear after first success."_';
-            nextFlowState = 'question_4';
-          } else if (flowState === 'question_4') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const insightData = storedData ? JSON.parse(storedData.metadata) : {};
-            
-            const now = new Date();
-            const startOfYear = new Date(now.getFullYear(), 0, 1);
-            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
-            
-            const result = await db.prepare(`
-              INSERT INTO goals (
-                user_id, category, description, task,
-                users_interacted, repeated_actions, drop_off_points, key_insight,
-                priority, priority_label, cadence, goal_status,
-                week_number, year_number, status, created_at
-              )
-              VALUES (?, 'insight', ?, 'User behavior insights', ?, ?, ?, ?, 'P1', 'Urgent & important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
-            `).bind(
-              user.userId,
-              message, // key insight as description
-              insightData.users_interacted || 0,
-              insightData.repeated_actions || '',
-              insightData.drop_off_points || '',
-              message,
-              weekNumber,
-              now.getFullYear()
-            ).run();
-            
-            await db.prepare(`
-              DELETE FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_insights'
-            `).bind(user.userId).run();
-            
-            goalCreated = true;
-            responseMessage = '🎉 **Thursday Update Complete!**\n\n' +
-              '---\n\n' +
-              '📊 **Users interacted:** ' + insightData.users_interacted + '\n\n' +
-              '🔄 **Repeated actions:** ' + insightData.repeated_actions + '\n\n' +
-              '⚠️ **Drop-off points:** ' + insightData.drop_off_points + '\n\n' +
-              '💡 **Key insight:**\n"' + message + '"\n\n' +
-              '---\n\n' +
-              '📋 Saved to your Goals with category **insight**\n' +
-              '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
-              'Great analysis! Use these insights tomorrow! 🚀';
-            nextFlowState = 'complete';
-          }
-          break;
-        }
-        
-        case 'traction': {
-          // Friday - Traction Metrics: 5 questions
-          if (!flowState || flowState === 'question_1') {
-            const revenueMatch = message.match(/[€$]?(\d+(?:[.,]\d+)?)/);
-            await db.prepare(`
-              INSERT OR REPLACE INTO agent_chat_messages (user_id, role, content, metadata, created_at)
-              VALUES (?, 'system', ?, ?, datetime('now'))
-            `).bind(user.userId, 'temp_traction', JSON.stringify({ revenue: revenueMatch ? parseFloat(revenueMatch[1].replace(',', '.')) : 0 })).run();
-            
-            responseMessage = '✅ Tracked!\n\n' +
-              '💰 **Revenue:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 2 of 5:**\n' +
-              'How many **new users** did you acquire this week?\n\n' +
-              '_Example: "18 new users"_';
-            nextFlowState = 'question_2';
-          } else if (flowState === 'question_2') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const tractionData = storedData ? JSON.parse(storedData.metadata) : {};
-            const usersMatch = message.match(/(\d+)/);
-            tractionData.new_users = usersMatch ? parseInt(usersMatch[1]) : 0;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
-            `).bind(JSON.stringify(tractionData), user.userId).run();
-            
-            responseMessage = '✅ Great!\n\n' +
-              '👥 **New users:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 3 of 5:**\n' +
-              'How many users were **active** this week?\n_(Used the product at least once)_\n\n' +
-              '_Example: "12 users used the product at least once"_';
-            nextFlowState = 'question_3';
-          } else if (flowState === 'question_3') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const tractionData = storedData ? JSON.parse(storedData.metadata) : {};
-            const usersMatch = message.match(/(\d+)/);
-            tractionData.active_users = usersMatch ? parseInt(usersMatch[1]) : 0;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
-            `).bind(JSON.stringify(tractionData), user.userId).run();
-            
-            responseMessage = '✅ Noted!\n\n' +
-              '📱 **Active users:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 4 of 5:**\n' +
-              'How many users **churned** this week?\n_(Stopped using the product or explicitly dropped off)_\n\n' +
-              '_Example: "3 users stopped using the product"_';
-            nextFlowState = 'question_4';
-          } else if (flowState === 'question_4') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const tractionData = storedData ? JSON.parse(storedData.metadata) : {};
-            const usersMatch = message.match(/(\d+)/);
-            tractionData.churned_users = usersMatch ? parseInt(usersMatch[1]) : 0;
-            
-            await db.prepare(`
-              UPDATE agent_chat_messages SET metadata = ?
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
-            `).bind(JSON.stringify(tractionData), user.userId).run();
-            
-            responseMessage = '✅ Important metric!\n\n' +
-              '📉 **Churned:** ' + message + '\n\n' +
-              '---\n\n' +
-              '**Question 5 of 5:**\n' +
-              'What was the **strongest traction signal** this week?\n_(One sentence only)_\n\n' +
-              '_Example: "Two users upgraded without being prompted after their first successful use"_';
-            nextFlowState = 'question_5';
-          } else if (flowState === 'question_5') {
-            const storedData = await db.prepare(`
-              SELECT metadata FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(user.userId).first() as { metadata: string } | null;
-            
-            const tractionData = storedData ? JSON.parse(storedData.metadata) : {};
-            
-            const now = new Date();
-            const startOfYear = new Date(now.getFullYear(), 0, 1);
-            const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
-            
-            // Save to goal_weekly_traction table
-            const result = await db.prepare(`
-              INSERT OR REPLACE INTO goal_weekly_traction (
-                user_id, revenue_amount, new_users, active_users, churned_users, strongest_signal,
-                week_number, year, created_at
-              )
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            `).bind(
-              user.userId,
-              tractionData.revenue || 0,
-              tractionData.new_users || 0,
-              tractionData.active_users || 0,
-              tractionData.churned_users || 0,
-              message,
-              weekNumber,
-              now.getFullYear()
-            ).run();
-            
-            // Sync with global user_metrics for leaderboard consistency
-            const today = now.toISOString().split('T')[0];
-            
-            // Update active users in user_metrics
-            await db.prepare(`
-              DELETE FROM user_metrics WHERE user_id = ? AND metric_name = 'users' AND recorded_date = ?
-            `).bind(user.userId, today).run();
-            await db.prepare(`
-              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-              VALUES (?, 'users', ?, ?)
-            `).bind(user.userId, tractionData.active_users || 0, today).run();
-            
-            // Update revenue in user_metrics
-            await db.prepare(`
-              DELETE FROM user_metrics WHERE user_id = ? AND metric_name = 'revenue' AND recorded_date = ?
-            `).bind(user.userId, today).run();
-            await db.prepare(`
-              INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-              VALUES (?, 'revenue', ?, ?)
-            `).bind(user.userId, tractionData.revenue || 0, today).run();
-            
-            // Also create a goal for tracking
-            await db.prepare(`
-              INSERT INTO goals (
-                user_id, category, description, task,
-                priority, priority_label, cadence, goal_status,
-                week_number, year_number, status, created_at
-              )
-              VALUES (?, 'traction', ?, 'Weekly traction metrics', 'P1', 'Urgent & important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
-            `).bind(
-              user.userId,
-              message, // strongest signal as description
-              weekNumber,
-              now.getFullYear()
-            ).run();
-            
-            await db.prepare(`
-              DELETE FROM agent_chat_messages 
-              WHERE user_id = ? AND role = 'system' AND content = 'temp_traction'
-            `).bind(user.userId).run();
-            
-            goalCreated = true;
-            responseMessage = '🎉 **Friday Update Complete!**\n\n' +
-              '---\n\n' +
-              '💰 **Revenue:** €' + tractionData.revenue + '\n\n' +
-              '👥 **New users:** ' + tractionData.new_users + '\n\n' +
-              '📱 **Active users:** ' + tractionData.active_users + '\n\n' +
-              '📉 **Churned:** ' + tractionData.churned_users + '\n\n' +
-              '🚀 **Strongest signal:**\n"' + message + '"\n\n' +
-              '---\n\n' +
-              '📋 Saved to **weekly traction** metrics\n' +
-              '📊 This data will be used for the Weekly Leaderboard!\n\n' +
-              'Great week! See you on the leaderboard! 🏆';
-            nextFlowState = 'complete';
-          }
-          break;
-        }
-        
-        case 'reflexion': {
-          // Saturday - Weekly reflection: simple save
-          const now = new Date();
-          const startOfYear = new Date(now.getFullYear(), 0, 1);
-          const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
-          
-          const result = await db.prepare(`
-            INSERT INTO goals (
-              user_id, category, description, task,
-              priority, priority_label, cadence, goal_status,
-              week_number, year_number, status, created_at
-            )
-            VALUES (?, 'reflect', ?, 'Weekly reflection', 'P2', 'Urgent or important', 'Recurrent', 'Done', ?, ?, 'active', CURRENT_TIMESTAMP)
-          `).bind(
-            user.userId,
-            message,
-            weekNumber,
-            now.getFullYear()
-          ).run();
-          
-          goalCreated = true;
-          responseMessage = '🎉 **Reflection Saved!**\n\n' +
-            '---\n\n' +
-            '🤔 **Your insight:**\n"' + message + '"\n\n' +
-            '---\n\n' +
-            '📋 Saved with category **reflect**\n' +
-            '🎯 Goal ID: #' + result.meta?.last_row_id + '\n\n' +
-            '📊 Week ' + weekNumber + ' reflection complete!\n\n' +
-            'Have a restful weekend and come back strong on Monday! 💪';
-          nextFlowState = 'complete';
-          break;
-        }
-      }
-      
-      // Guardar respuesta del asistente
-      await db.prepare(`
-        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-        VALUES (?, 'assistant', ?, datetime('now'))
-      `).bind(user.userId, responseMessage).run();
-      
-      return c.json({ 
-        message: responseMessage,
-        goalCreated: goalCreated,
-        emailContextProcessed: true,
-        flowState: nextFlowState,
-        emailContext: emailContext
-      });
-      
-    } catch (error) {
-      console.error('[CHAT] Error processing email context response:', error);
-      const errorMessage = '❌ Hubo un error al procesar tu respuesta. Por favor, intenta de nuevo.';
-      
-      await db.prepare(`
-        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-        VALUES (?, 'assistant', ?, datetime('now'))
-      `).bind(user.userId, errorMessage).run();
-      
-      return c.json({ message: errorMessage });
-    }
-  }
-  // ============ END PROCESS EMAIL CONTEXT RESPONSE ============
+      INSERT INTO astro_sessions (
+        user_id, startup_name, problem, solution, sector, geography,
+        mrr, arr, active_users, growth_rate_percent, team_size,
+        fundraising_goal, fundraising_stage, vc_recommendations, action_items,
+        conversation_turns, data_completeness, language, last_seen_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id) DO UPDATE SET
+        startup_name = COALESCE(excluded.startup_name, startup_name),
+        problem = COALESCE(excluded.problem, problem),
+        solution = COALESCE(excluded.solution, solution),
+        sector = COALESCE(excluded.sector, sector),
+        geography = COALESCE(excluded.geography, geography),
+        mrr = CASE WHEN excluded.mrr > 0 THEN excluded.mrr ELSE mrr END,
+        arr = CASE WHEN excluded.arr > 0 THEN excluded.arr ELSE arr END,
+        active_users = CASE WHEN excluded.active_users > 0 THEN excluded.active_users ELSE active_users END,
+        growth_rate_percent = CASE WHEN excluded.growth_rate_percent > 0 THEN excluded.growth_rate_percent ELSE growth_rate_percent END,
+        team_size = CASE WHEN excluded.team_size > 0 THEN excluded.team_size ELSE team_size END,
+        fundraising_goal = COALESCE(excluded.fundraising_goal, fundraising_goal),
+        fundraising_stage = COALESCE(excluded.fundraising_stage, fundraising_stage),
+        vc_recommendations = COALESCE(excluded.vc_recommendations, vc_recommendations),
+        action_items = COALESCE(excluded.action_items, action_items),
+        conversation_turns = excluded.conversation_turns,
+        data_completeness = excluded.data_completeness,
+        language = COALESCE(excluded.language, language),
+        last_seen_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(
+      userId,
+      merged.startup_name || null, merged.problem || null, merged.solution || null,
+      merged.sector || null, merged.geography || null,
+      merged.mrr || 0, merged.arr || 0,
+      merged.active_users || 0, merged.growth_rate_percent || 0,
+      merged.team_size || 1,
+      merged.fundraising_goal || null, merged.fundraising_stage || null,
+      vcJson, actionItemsJson, turns, completeness, lang
+    ).run();
 
-  // ============ GOAL CREATION FROM FLOW ============
-  // Si viene goalData del flujo de creación de goals, crear directamente
-  if (goalData) {
-    console.log('[CHAT] ========== GOAL CREATION FROM FLOW ==========');
-    console.log('[CHAT] Goal data received:', JSON.stringify(goalData));
-    
-    try {
-      const db = c.env.DB;
-      const result = await db.prepare(`
-        INSERT INTO goals (
-          user_id, category, description, task, priority, priority_label, 
-          cadence, dri, goal_status, week_of, status, created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+    if (merged.startup_name) {
+      await db.prepare('UPDATE users SET startup_name = ? WHERE id = ?').bind(merged.startup_name, userId).run();
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    if (merged.active_users > 0) {
+      await db.prepare('DELETE FROM user_metrics WHERE user_id = ? AND metric_name = ? AND recorded_date = ?').bind(userId, 'users', today).run();
+      await db.prepare('INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date) VALUES (?, ?, ?, ?)').bind(userId, 'users', merged.active_users, today).run();
+    }
+
+    const effectiveRevenue = merged.mrr > 0 ? merged.mrr : (merged.arr > 0 ? Math.round(merged.arr / 12) : 0);
+    if (effectiveRevenue > 0) {
+      await db.prepare('DELETE FROM user_metrics WHERE user_id = ? AND metric_name = ? AND recorded_date = ?').bind(userId, 'revenue', today).run();
+      await db.prepare('INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date) VALUES (?, ?, ?, ?)').bind(userId, 'revenue', effectiveRevenue, today).run();
+    }
+
+    if (merged.active_users > 0 || effectiveRevenue > 0) {
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+
+      await db.prepare(`
+        INSERT OR REPLACE INTO goal_weekly_traction (
+          user_id, revenue_amount, new_users, active_users, churned_users, strongest_signal,
+          week_number, year, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `).bind(
-        user.userId,
-        goalData.category || 'ASTAR',
-        goalData.description,
-        goalData.task || null,
-        goalData.priority || 'P0',
-        goalData.priority_label || 'Urgent & important',
-        goalData.cadence || 'One time',
-        goalData.dri || null,
-        goalData.goal_status || 'To start',
-        goalData.week_of || null
+        userId,
+        effectiveRevenue,
+        0,
+        merged.active_users || 0,
+        0,
+        `Astro session: ${merged.startup_name || 'Startup'} — ${merged.fundraising_stage || 'early stage'}`,
+        weekNumber,
+        now.getFullYear()
       ).run();
-      
-      console.log('[CHAT] Goal created successfully! ID:', result.meta?.last_row_id);
-      
-      const successMessage = '✅ Goal created successfully!\n\n' +
-        '📋 **' + goalData.description + '**\n' +
-        '🎯 Task: ' + (goalData.task || 'N/A') + '\n' +
-        '🏷️ Category: ' + goalData.category + '\n' +
-        '⚡ Priority: ' + goalData.priority + ' - ' + goalData.priority_label + '\n' +
-        '🔄 Cadence: ' + goalData.cadence + '\n' +
-        '👤 Owner: ' + (goalData.dri || 'Not assigned') + '\n' +
-        '📊 Status: ' + goalData.goal_status + '\n' +
-        '📅 Week: ' + (goalData.week_of || 'Not specified') + '\n\n' +
-        '🆔 Goal ID: ' + result.meta?.last_row_id + '\n\n' +
-        'Now available in your dashboard!';
-      
-      // Guardar en historial de chat
-      await db.prepare(`
-        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-        VALUES (?, 'user', ?, datetime('now'))
-      `).bind(user.userId, message).run();
-      
-      await db.prepare(`
-        INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-        VALUES (?, 'assistant', ?, datetime('now'))
-      `).bind(user.userId, successMessage).run();
-      
-      return c.json({ message: successMessage });
-      
-    } catch (error) {
-      console.error('[CHAT] Error creating goal from flow:', error);
-      const errorMessage = '❌ There was an error creating the goal. Please try again.';
-      
-      // Guardar error en historial
-      try {
-        await c.env.DB.prepare(`
-          INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-          VALUES (?, 'assistant', ?, datetime('now'))
-        `).bind(user.userId, errorMessage).run();
-      } catch (dbError) {
-        console.error('[CHAT] DB error:', dbError);
-      }
-      
-      return c.json({ message: errorMessage });
     }
-  }
 
-  // ============ INTENT DETECTION ============
-  // Detectar automáticamente qué quiere el usuario basándose en su mensaje
-  const messageLower = message.toLowerCase();
-  
-  // ============ GOAL DETECTION - PRIORITY #1 ============
-  // Detectar si quiere crear un goal - ESTO VA PRIMERO antes de cualquier otro procesamiento
-  const goalKeywords = [
-    'crear goal', 'create goal', 'nuevo goal', 'new goal',
-    'crear objetivo', 'nuevo objetivo', 'añadir objetivo', 'agregar objetivo',
-    'quiero crear', 'necesito crear', 'me gustaria crear', 'me gustaría crear',
-    'registrar goal', 'definir objetivo', 'establecer goal', 'poner un objetivo',
-    'añadir goal', 'agregar goal', 'add goal', 'añadir meta', 'nueva meta',
-    'crear una meta', 'quiero un objetivo', 'quiero un goal',
-    'crea un goal', 'crea un objetivo', 'hazme un goal', 'hazme un objetivo',
-    'agrega un goal', 'agrega un objetivo', 'pon un objetivo',
-    'i want to create', 'set a goal', 'add a goal', 'make a goal'
-  ];
-  
-  const wantsToCreateGoal = goalKeywords.some(keyword => messageLower.includes(keyword));
-  
-  if (wantsToCreateGoal) {
-    console.log('[CHAT] ========== GOAL CREATION DETECTED ==========');
-    console.log('[CHAT] User wants to create a goal. Triggering flow directly');
-    
-    // Guardar mensaje del usuario
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'user', ?, datetime('now'))
-    `).bind(user.userId, message).run();
-    
-    // Responder con un flag especial que el frontend detectará
-    // IMPORTANTE: El message es un texto amigable por si el frontend NO detecta el flag
-    // Esto evita que se muestre texto técnico como __START_GOAL_FLOW__
-    console.log('[CHAT] Returning goal flow trigger');
-    
-    return c.json({ 
-      message: '✨ Perfect! Let\'s create your goal. I\'ll ask you a few quick questions to complete all the information.',
-      triggerGoalFlow: true,
-      startFlow: true
-    });
-  }
-  // ============ END GOAL DETECTION ============
-  
-  // Detectar si el usuario quiere generar imágenes
-  const wantsImage = (
-    messageLower.includes('genera') && (messageLower.includes('imagen') || messageLower.includes('imágenes') || messageLower.includes('image')) ||
-    messageLower.includes('crea') && (messageLower.includes('imagen') || messageLower.includes('banner') || messageLower.includes('post')) ||
-    messageLower.includes('quiero una imagen') ||
-    messageLower.includes('hazme una imagen') ||
-    messageLower.includes('crear imagen') ||
-    messageLower.includes('generar imagen') ||
-    messageLower.includes('diseña') && (messageLower.includes('banner') || messageLower.includes('post') || messageLower.includes('imagen')) ||
-    messageLower.includes('instagram') && (messageLower.includes('imagen') || messageLower.includes('post') || messageLower.includes('crea') || messageLower.includes('genera')) ||
-    messageLower.includes('linkedin') && (messageLower.includes('imagen') || messageLower.includes('post') || messageLower.includes('crea')) ||
-    messageLower.includes('twitter') && (messageLower.includes('imagen') || messageLower.includes('post')) ||
-    messageLower.includes('tiktok') && (messageLower.includes('imagen') || messageLower.includes('thumbnail')) ||
-    messageLower.includes('banner para') ||
-    messageLower.includes('imagen para') ||
-    messageLower.includes('post para') ||
-    messageLower.includes('thumbnail') ||
-    messageLower.includes('hero image') ||
-    messageLower.includes('imagen de portada') ||
-    messageLower.includes('diseño para') && (messageLower.includes('red') || messageLower.includes('social'))
-  );
-  
-  // Detectar si quiere análisis de marketing/marca
-  const wantsBrandAnalysis = (
-    messageLower.includes('analiza') && (messageLower.includes('marca') || messageLower.includes('brand') || messageLower.includes('web') || messageLower.includes('sitio')) ||
-    messageLower.includes('plan de marketing') ||
-    messageLower.includes('estrategia de marketing') ||
-    messageLower.includes('marketing plan') ||
-    messageLower.includes('analizar mi marca') ||
-    messageLower.includes('análisis de marca') ||
-    messageLower.includes('identidad de marca') ||
-    messageLower.includes('branding')
-  );
-  
-  // Detectar si quiere análisis de métricas
-  const wantsMetrics = (
-    messageLower.includes('métrica') ||
-    messageLower.includes('metrica') ||
-    messageLower.includes('analiza') && (messageLower.includes('dato') || messageLower.includes('número') || messageLower.includes('estadística')) ||
-    messageLower.includes('kpi') ||
-    messageLower.includes('rendimiento') ||
-    messageLower.includes('crecimiento') && (messageLower.includes('analiza') || messageLower.includes('cómo va'))
-  );
-  
-  // Extraer URL del mensaje si la hay
-  const urlMatch = message.match(/https?:\/\/[^\s]+/);
-  let detectedUrl = websiteUrl || (urlMatch ? urlMatch[0] : null);
-  
-  // Si pide imagen pero no tiene URL, pedirla o usar contexto
-  console.log('[CHAT] Intent detection:', { wantsImage, wantsBrandAnalysis, wantsMetrics, detectedUrl });
-  // ============ END INTENT DETECTION ============
-
-  try {
-    console.log('[CHAT] Saving user message to DB...');
-    // Guardar mensaje del usuario
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'user', ?, datetime('now'))
-    `).bind(user.userId, message).run();
-    console.log('[CHAT] User message saved successfully');
-
-    let railwayUrl = c.env.RAILWAY_API_URL || 'http://localhost:5000';
-    
-    // Asegurar que la URL tenga protocolo
-    if (railwayUrl && !railwayUrl.startsWith('http://') && !railwayUrl.startsWith('https://')) {
-      railwayUrl = 'https://' + railwayUrl;
-    }
-    
-    // ============ AUTO-ROUTE TO RAILWAY AGENTS ============
-    
-    // Si quiere generar imagen, llamar al brand agent de Railway
-    if (wantsImage && railwayUrl && !railwayUrl.includes('localhost')) {
-      console.log('[CHAT] Auto-routing to Railway for image generation...');
-      
+    if (merged.startup_name) {
       try {
-        const agentResponse = await fetch(`${railwayUrl}/api/agents/brand/generate-images`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            website_url: detectedUrl || 'general',
-            user_id: String(user.userId || user.id || '1'),
-            cloudflare_api_url: new URL(c.req.url).origin,
-            custom_prompt: message  // Pasar el mensaje completo como prompt
-          })
-        });
+        const existingProduct = await db.prepare(
+          'SELECT id, title FROM beta_products WHERE company_user_id = ? LIMIT 1'
+        ).bind(userId).first() as any;
 
-        if (agentResponse.ok) {
-          const result = await agentResponse.json() as any;
-          
-          let responseMsg = '🎨 **Generating marketing images...**\n\n';
-          if (result.analysis) {
-            responseMsg += result.analysis + '\n\n';
-          }
-          if (result.images_generated > 0) {
-            responseMsg += `✅ **${result.images_generated} image(s) generated!**\n\n`;
-            responseMsg += '📸 You can view and approve them in the **AI CMO** section of the menu.\n\n';
-            responseMsg += '💡 *Tip: Approve the ones you like to download them in high resolution.*';
-          } else {
-            responseMsg += '⏳ Images are being processed. Check the **AI CMO** section in a moment.';
-          }
-          
-          await c.env.DB.prepare(`
-            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-            VALUES (?, 'assistant', ?, datetime('now'))
-          `).bind(user.userId, responseMsg).run();
+        const productTitle = merged.startup_name;
+        const productDesc = [
+          merged.problem ? `Problem: ${merged.problem}` : null,
+          merged.solution ? `Solution: ${merged.solution}` : null,
+          merged.sector ? `Sector: ${merged.sector}` : null,
+          merged.fundraising_stage ? `Stage: ${merged.fundraising_stage}` : null,
+        ].filter(Boolean).join(' | ') || `${merged.startup_name} — startup on ASTAR*`;
 
-          return c.json({ message: responseMsg });
-        }
-      } catch (imageError) {
-        console.error('[CHAT] Error generating images:', imageError);
-        // Continue to normal chat flow if image generation fails
-      }
-    }
-    
-    // Si quiere análisis de marca con URL
-    if (wantsBrandAnalysis && detectedUrl && railwayUrl && !railwayUrl.includes('localhost')) {
-      console.log('[CHAT] Auto-routing to Railway for brand analysis...');
-      
-      try {
-        const agentResponse = await fetch(`${railwayUrl}/api/agents/brand/analyze`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            website_url: detectedUrl,
-            custom_prompt: message
-          })
-        });
+        const productCategory = merged.sector
+          ? merged.sector.toLowerCase().includes('ai') ? 'AI/ML'
+          : merged.sector.toLowerCase().includes('saas') ? 'SaaS'
+          : merged.sector.toLowerCase().includes('fin') ? 'Fintech'
+          : merged.sector.toLowerCase().includes('health') ? 'HealthTech'
+          : merged.sector.toLowerCase().includes('ed') ? 'EdTech'
+          : merged.sector
+          : 'SaaS';
 
-        if (agentResponse.ok) {
-          const result = await agentResponse.json() as any;
-          
-          if (result.success && result.response) {
-            const formattedResponse = `🎨 **BRAND ANALYSIS**\n\n${result.response}`;
-            
-            await c.env.DB.prepare(`
-              INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-              VALUES (?, 'assistant', ?, datetime('now'))
-            `).bind(user.userId, formattedResponse).run();
-
-            return c.json({ message: formattedResponse });
-          }
-        }
-      } catch (brandError) {
-        console.error('[CHAT] Error in brand analysis:', brandError);
-        // Continue to normal chat flow
-      }
-    }
-    
-    // ============ END AUTO-ROUTE ============
-    
-    console.log('[CHAT] Railway URL configured as:', railwayUrl);
-    console.log('[CHAT] Environment check - RAILWAY_API_URL exists:', !!c.env.RAILWAY_API_URL);
-
-    // Si se solicita el brand marketing agent
-    if (useBrandAgent && websiteUrl) {
-      console.log('[CHAT] Delegating to Brand Marketing Agent on Railway...');
-      console.log('[CHAT] Website URL:', websiteUrl);
-      console.log('[CHAT] Target URL:', `${railwayUrl}/api/agents/brand/analyze`);
-      
-      // Verificar si Railway está configurado
-      if (railwayUrl.includes('your-railway-app') || railwayUrl === 'http://localhost:5000') {
-        console.error('[CHAT] Railway URL not configured! Using placeholder.');
-        const errorMsg = '⚠️ **Railway is not configured**\n\nConfigure `RAILWAY_API_URL` in Cloudflare Dashboard > Settings > Environment Variables.\n\n💡 In the meantime, use the normal chat for questions.';
-        
-        try {
-          await c.env.DB.prepare(`
-            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-            VALUES (?, 'assistant', ?, datetime('now'))
-          `).bind(user.userId, errorMsg).run();
-        } catch (dbError) {
-          console.error('[CHAT] DB error saving message:', dbError);
-        }
-        
-        return c.json({ message: errorMsg });
-      }
-      
-      try {
-        // Llamar al brand agent en Railway
-        const agentResponse = await fetch(`${railwayUrl}/api/agents/brand/analyze`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            website_url: websiteUrl,
-            custom_prompt: message
-          })
-        });
-
-        console.log('[CHAT] Railway response status:', agentResponse.status);
-
-        if (agentResponse.ok) {
-          const result = await agentResponse.json();
-          console.log('[CHAT] Railway response:', result);
-          
-          if (result.success && result.response) {
-            // Formatear respuesta bonita
-            const formattedResponse = `🎨 **BRAND ANALYSIS**\n\n${result.response}\n\n---\n*Analysis generated by ASTAR* Brand Marketing Agent 🚀*`;
-            
-            await c.env.DB.prepare(`
-              INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-              VALUES (?, 'assistant', ?, datetime('now'))
-            `).bind(user.userId, formattedResponse).run();
-
-            return c.json({ message: formattedResponse });
-          } else {
-            throw new Error(result.error || 'Agent returned no response');
-          }
+        if (existingProduct) {
+          await db.prepare(`
+            UPDATE beta_products
+            SET title = ?, description = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).bind(productTitle, productDesc, productCategory, existingProduct.id).run();
         } else {
-          const errorText = await agentResponse.text();
-          console.error('[CHAT] Railway API error response:', errorText);
-          throw new Error(`Railway API error: ${agentResponse.status} - ${errorText}`);
+          await db.prepare(`
+            INSERT INTO beta_products (
+              company_user_id, title, description, category, stage,
+              looking_for, compensation_type, compensation_amount,
+              pricing_model, duration_days, validators_needed, requirements, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+          `).bind(
+            userId,
+            productTitle,
+            productDesc,
+            productCategory,
+            merged.fundraising_stage || 'mvp',
+            'Feedback and investor introductions',
+            'free_access',
+            0,
+            'subscription_monthly',
+            30,
+            3,
+            '{}'
+          ).run();
         }
-      } catch (brandError) {
-        console.error('[CHAT] Error calling Railway brand agent:', brandError);
-        
-        const errorMsg = `⚠️ **Error conectando con Railway**\n\n${brandError instanceof Error ? brandError.message : String(brandError)}\n\n**Verifica:**\n- Railway está corriendo\n- RAILWAY_API_URL configurado correctamente\n- Endpoint /api/agents/brand/analyze existe`;
-        
-        try {
-          await c.env.DB.prepare(`
-            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-            VALUES (?, 'assistant', ?, datetime('now'))
-          `).bind(user.userId, errorMsg).run();
-        } catch (dbError) {
-          console.error('[CHAT] DB error:', dbError);
-        }
-        
-        return c.json({ message: errorMsg });
+        console.log('[ASTRO-SAVE] beta_products upserted for user:', userId, '| startup:', productTitle);
+      } catch (e) {
+        console.error('[ASTRO-SAVE] beta_products upsert error:', e);
       }
     }
+  } catch (e) {
+    console.error('[ASTRO-SAVE] DB save error:', e);
+  }
+}
 
-    // Si se solicita el metrics agent
-    if (useMetricsAgent) {
-      console.log('[CHAT] Delegating to Metrics Agent on Railway...');
-      console.log('[CHAT] Target URL:', `${railwayUrl}/api/agents/metrics/chat`);
-      
-      // Verificar si Railway está configurado
-      if (railwayUrl.includes('your-railway-app') || railwayUrl === 'http://localhost:5000') {
-        console.error('[CHAT] Railway URL not configured!');
-        const errorMsg = '⚠️ **Railway no está configurado**\n\nConfigura `RAILWAY_API_URL` en Cloudflare Dashboard.';
-        
-        try {
-          await c.env.DB.prepare(`
-            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-            VALUES (?, 'assistant', ?, datetime('now'))
-          `).bind(user.userId, errorMsg).run();
-        } catch (dbError) {
-          console.error('[CHAT] DB error:', dbError);
-        }
-        
-        return c.json({ message: errorMsg });
-      }
-      
-      try {
-        // Llamar al metrics agent en Railway
-        const agentResponse = await fetch(`${railwayUrl}/api/agents/metrics/chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            user_id: user.userId,
-            message: message,
-            session_id: `chat_${user.userId}_${Date.now()}`,
-            industry: industry || 'SaaS',
-            stage: stage || 'seed'
-          })
-        });
-
-        console.log('[CHAT] Metrics agent response status:', agentResponse.status);
-
-        if (agentResponse.ok) {
-          const result = await agentResponse.json();
-          console.log('[CHAT] Metrics agent response:', result);
-          
-          if (result.success && result.response) {
-            // Formatear respuesta bonita con emojis
-            const formattedResponse = `📊 **ANÁLISIS DE MÉTRICAS**\n\n${result.response}\n\n---\n*Análisis generado por ASTAR* Metrics Agent 📈*`;
-            
-            await c.env.DB.prepare(`
-              INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-              VALUES (?, 'assistant', ?, datetime('now'))
-            `).bind(user.userId, formattedResponse).run();
-
-            return c.json({ message: formattedResponse });
-          } else {
-            throw new Error(result.error || 'Agent returned no response');
-          }
-        } else {
-          const errorText = await agentResponse.text();
-          console.error('[CHAT] Metrics API error response:', errorText);
-          throw new Error(`Railway API error: ${agentResponse.status} - ${errorText}`);
-        }
-      } catch (metricsError) {
-        console.error('[CHAT] Error calling Railway metrics agent:', metricsError);
-        
-        const errorMsg = `⚠️ **Error conectando con Metrics Agent**\n\n${metricsError instanceof Error ? metricsError.message : String(metricsError)}\n\nVerifica Railway y RAILWAY_API_URL`;
-        
-        try {
-          await c.env.DB.prepare(`
-            INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-            VALUES (?, 'assistant', ?, datetime('now'))
-          `).bind(user.userId, errorMsg).run();
-        } catch (dbError) {
-          console.error('[CHAT] DB error:', dbError);
-        }
-        
-        return c.json({ message: errorMsg });
-      }
-    }
-
-    // Flujo normal del chat agent (solo si no se usó Railway agents)
-    // Get chat history
-
-    // Retrieve chat history (last 50 messages)
-    const historyResult = await c.env.DB.prepare(`
-      SELECT role, content, created_at 
-      FROM agent_chat_messages 
-      WHERE user_id = ?
-      ORDER BY created_at DESC 
-      LIMIT 50
-    `).bind(user.userId).all();
-    
-    // Reverse to chronological order (oldest first)
-    const chatHistory = (historyResult.results || []).reverse();
-    console.log('[CHAT] Retrieved chat history:', chatHistory.length, 'messages');
-
-    // Get startup context
-    const context = await getStartupContext(c.env.DB, user.userId);
-
-    // Try Groq first, fallback to Cloudflare AI
-    const groqKey = c.env.GROQ_API_KEY;
-    console.log('[CHAT] GROQ API Key available:', !!groqKey);
-    
-    let assistantMessage: string;
-
+// Helper: auto-create goals in the goals table from Astro action items (avoids duplicates)
+async function createAstroGoals(db: any, userId: number, items: string[], weekOf: string, userName?: string): Promise<any[]> {
+  const created: any[] = [];
+  for (const item of items.slice(0, 5)) {
     try {
-      // Generate AI response with function calling capability
-      const systemPrompt = `You are ASTAR* Agent 🚀, a growth assistant for startups.
+      const existing = await db.prepare(
+        `SELECT id FROM goals WHERE user_id = ? AND description = ? AND status = 'active' LIMIT 1`
+      ).bind(userId, item).first();
+      if (existing) continue;
 
-🚫 ABSOLUTELY PROHIBITED:
-- NEVER create goals directly
-- NEVER use ACTION:CREATE_GOAL (that command DOES NOT EXIST)
-- NEVER respond with "New Goal created" or goal data
-- NEVER show IDs, categories, or technical values
+      const goal = await db.prepare(`
+        INSERT INTO goals (
+          user_id, description, target_value, current_value, category,
+          task, priority, priority_label, cadence, dri, goal_status, week_of, order_index, status
+        )
+        VALUES (?, ?, 100, 0, 'Traction', ?, 'P1', 'Urgent or important', 'One time', ?, 'To start', ?, 0, 'active')
+        RETURNING *
+      `).bind(userId, item, item, userName || null, weekOf).first();
 
-⚠️ RULE #1 - CREATE GOALS:
-When user asks to create a goal, respond EXACTLY with these 2 words:
-TRIGGER:START_GOAL_FLOW
-
-Do NOT add ANYTHING else. Just those 2 words.
-
-CORRECT Examples:
-User: "create goal" 
-You: TRIGGER:START_GOAL_FLOW
-
-User: "new goal"
-You: TRIGGER:START_GOAL_FLOW
-
-User: "I want to create a goal"
-You: TRIGGER:START_GOAL_FLOW
-
-User: "add goal"
-You: TRIGGER:START_GOAL_FLOW
-
-❌ WRONG (DON'T DO THIS):
-User: "create goal"
-You: "New Goal created: ID: 177..." ← NEVER DO THIS!
-
-📊 COMMANDS FOR METRICS (USERS AND REVENUE):
-
-🔴 IMPORTANT: The context provides current metrics from database:
-- Current users: ${context.metrics.current.users}
-- Current revenue: $${context.metrics.current.revenue}
-
-USE THESE DATABASE VALUES when responding about metrics!
-
-ACTION:SET_USERS|value - Set ABSOLUTE number of users (use when user says "I have X users", "update to X", "we are at X")
-ACTION:SET_REVENUE|value - Set ABSOLUTE revenue (use when user says "revenue is X", "update to $X")
-ACTION:ADD_USERS|value - Add users to current total (ONLY when user says "got X NEW users", "X MORE users", "gained X")
-ACTION:ADD_REVENUE|value - Add revenue to current total (ONLY when user says "made $X today", "X MORE in sales", "gained $X")
-
-📝 METRIC EXAMPLES (ALWAYS include ACTION first, then response):
-
-User: "we have 500 users"
-You: ACTION:SET_USERS|500
-👥 Set to 500 users!
-
-User: "actualiza a 15 usuarios" or "update users to 15"
-You: ACTION:SET_USERS|15
-👥 Set to 15 users!
-
-User: "tengo 100 usuarios" or "I have 100 users"
-You: ACTION:SET_USERS|100
-👥 Set to 100 users!
-
-User: "update revenue to 15000"
-You: ACTION:SET_REVENUE|15000
-💰 Revenue set to $15,000!
-
-User: "we got 50 NEW users" or "50 MORE users" (current DB: ${context.metrics.current.users})
-You: ACTION:ADD_USERS|50
-🎉 +50 users! Now you have ${context.metrics.current.users + 50} total.
-
-User: "gained 30 users today" (current DB: ${context.metrics.current.users})
-You: ACTION:ADD_USERS|30
-🎉 +30 users! Now you have ${context.metrics.current.users + 30} total.
-
-User: "we made 2000 in sales today" (current DB: $${context.metrics.current.revenue})
-You: ACTION:ADD_REVENUE|2000
-💵 +$2,000! Total revenue: $${context.metrics.current.revenue + 2000}
-
-User: "we now have 1200 users and $8000 revenue"
-You: ACTION:SET_USERS|1200
-ACTION:SET_REVENUE|8000
-📊 Metrics set! 1,200 users and $8,000 revenue.
-
-⚠️ CRITICAL: ALWAYS output ACTION: commands on their own lines BEFORE your response text!
-
-🔧 COMMANDS TO EDIT EXISTING GOALS:
-
-ACTION:UPDATE_GOAL_STATUS|goal_id|status - Change status (WIP, To start, Done, etc.)
-ACTION:UPDATE_GOAL_DESCRIPTION|goal_id|new_description - Change description
-ACTION:COMPLETE_GOAL|goal_id - Mark as completed
-ACTION:DELETE_GOAL|goal_id - Delete goal
-
-📝 EDITING EXAMPLES:
-
-User: "complete goal 145"
-You: ACTION:COMPLETE_GOAL|145
-🎉 Goal completed!
-
-User: "delete goal 136"
-You: ACTION:DELETE_GOAL|136
-🗑️ Deleted
-
-📊 USER CONTEXT:
-- Has \${context.goals.totalCount} goals (\${context.goals.completedCount} completed)
-- \${context.metrics.current.users} users, $\${context.metrics.current.revenue} revenue
-
-🎯 ACTIVE GOALS (use these IDs to edit):
-\${context.goals.active.slice(0, 10).map((g: any) => \`[ID:\${g.id}] \${g.description} - Status: \${g.status}\`).join('\\n')}
-
-REMEMBER:
-- To CREATE → respond ONLY: TRIGGER:START_GOAL_FLOW
-- To EDIT → use ACTION: with the correct ID
-- Be brief and natural
-- Respond in English`;
-
-      const aiResponse = await generateAIResponse(groqKey || '', systemPrompt, message, context, c.env.AI, chatHistory);
-      assistantMessage = await processAIActions(c.env.DB, user.userId, aiResponse, context);
-    } catch (error) {
-      console.error('[CHAT] AI error:', error);
-      assistantMessage = generateFallbackResponse(message, context);
+      if (goal) created.push(goal);
+    } catch (e) {
+      console.error('[ASTRO-GOALS] Error creating goal:', e);
     }
-
-    // Save assistant response
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'assistant', ?, datetime('now'))
-    `).bind(user.userId, assistantMessage).run();
-
-    return c.json({ message: assistantMessage });
-
-  } catch (error) {
-    console.error('[CHAT] ===== ERROR PROCESSING MESSAGE =====');
-    console.error('[CHAT] Error type:', typeof error);
-    console.error('[CHAT] Error:', error);
-    console.error('[CHAT] Error stack:', error instanceof Error ? error.stack : 'No stack');
-    console.error('[CHAT] Error name:', error instanceof Error ? error.name : 'Unknown');
-    console.error('[CHAT] Error message:', error instanceof Error ? error.message : String(error));
-    console.error('[CHAT] ===== END ERROR =====');
-    
-    // Determine error type for better user messaging
-    let userMessage = 'Lo siento, ocurrió un error. Por favor intenta de nuevo.';
-    let errorType = 'unknown';
-    
-    if (error instanceof Error) {
-      if (error.name === 'AbortError' || error.message.includes('aborted')) {
-        userMessage = 'La respuesta tardó demasiado. Intenta con una pregunta más corta.';
-        errorType = 'timeout';
-      } else if (error.message.includes('429')) {
-        userMessage = 'Muchas solicitudes. Espera un momento e intenta de nuevo.';
-        errorType = 'rate_limit';
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        userMessage = 'Problema de conexión. Verifica tu internet e intenta de nuevo.';
-        errorType = 'network';
-      }
-    }
-    
-    return c.json({ 
-      error: 'Failed to process message',
-      errorType,
-      message: userMessage,
-      details: error instanceof Error ? error.message : String(error)
-    }, 500);
   }
-});
+  return created;
+}
 
-// Determine category for a goal using AI
-app.post('/determine-category', jwtMiddleware, async (c) => {
-  const user = c.get('user') as AuthContext;
-  const { description, task } = await c.req.json();
-
-  if (!description || !task) {
-    return c.json({ category: 'OTHER' });
-  }
-
+app.post('/astro-chat', async (c) => {
   try {
-    const groqKey = c.env.GROQ_API_KEY;
-    
-    if (!groqKey) {
-      // Fallback: simple keyword matching
-      const text = `${description} ${task}`.toLowerCase();
-      if (text.includes('astar') || text.includes('blockchain') || text.includes('web3')) {
-        return c.json({ category: 'ASTAR' });
-      } else if (text.includes('magcient') || text.includes('ai') || text.includes('machine learning')) {
-        return c.json({ category: 'MAGCIENT' });
-      }
-      return c.json({ category: 'OTHER' });
+    // Optional JWT auth — saves to DB if logged in, works without token too
+    const authToken = c.req.header('Authorization')?.replace('Bearer ', '') ||
+                     c.req.header('Cookie')?.match(/authToken=([^;]+)/)?.[1] ||
+                     c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+    let userId: number | null = null;
+    if (authToken) {
+      try {
+        const payload = await verify(authToken, c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var') as any;
+        userId = payload.userId || null;
+      } catch {}
     }
 
-    // Use AI to determine category
+    const astroUserId: number | null = userId;
+
+    const body = await c.req.json();
+    const { message, conversationHistory = [], collectedData = {}, isWeeklyCheckin: clientWeeklyCheckin = false } = body;
+    const groqKey = c.env.GROQ_API_KEY;
+
+    // ── Detect voice transcript messages ──────────────────────────────
+    const isVoiceTranscript = typeof message === 'string' && message.startsWith('[VOICE_TRANSCRIPT]');
+    const cleanedMessage = isVoiceTranscript ? message.replace('[VOICE_TRANSCRIPT]', '').trim() : message;
+
+    // ── Detect language from latest message or history ─────────────────
+    const allText = [message, ...conversationHistory.slice(-3).map((m: any) => m.content)]
+      .filter(Boolean).join(' ');
+    const looksEnglish = allText && /\b(the|is|are|my|we|our|have|startup|raising|looking|team|users|revenue|I want|can you|what|how)\b/i.test(allText);
+    const detectedLang = looksEnglish ? 'en' : 'es';
+
+    // ── Load prior session from DB (for memory + weekly check-in) ──────
+    let priorSession: any = null;
+    let isWeeklyReturn = false;
+    let isReturningUser = false;
+    if (astroUserId) {
+      try {
+        priorSession = await c.env.DB.prepare('SELECT * FROM astro_sessions WHERE user_id = ?').bind(astroUserId).first() as any;
+        if (priorSession) {
+          isReturningUser = true;
+          if (priorSession.last_seen_at) {
+            const daysSince = (Date.now() - new Date(priorSession.last_seen_at).getTime()) / 86400000;
+            isWeeklyReturn = daysSince >= 6;
+          }
+        }
+      } catch {}
+    }
+
+    // ── Load pending goals for returning users ───────────────────────
+    let pendingAstroGoals: any[] = [];
+    if (userId && isReturningUser) {
+      try {
+        const goalsRes = await c.env.DB.prepare(`
+          SELECT id, description, goal_status, week_of
+          FROM goals
+          WHERE user_id = ? AND goal_status != 'Done' AND status = 'active'
+          ORDER BY created_at DESC LIMIT 5
+        `).bind(userId).all();
+        pendingAstroGoals = goalsRes.results || [];
+      } catch {}
+    }
+
+    // ── Merge prior session into collectedData for full context ────────
+    const fullCollectedData = { ...collectedData };
+    if (priorSession) {
+      if (priorSession.startup_name && !fullCollectedData.startup_name) fullCollectedData.startup_name = priorSession.startup_name;
+      if (priorSession.problem && !fullCollectedData.problem) fullCollectedData.problem = priorSession.problem;
+      if (priorSession.solution && !fullCollectedData.solution) fullCollectedData.solution = priorSession.solution;
+      if (priorSession.sector && !fullCollectedData.sector) fullCollectedData.sector = priorSession.sector;
+      if (priorSession.geography && !fullCollectedData.geography) fullCollectedData.geography = priorSession.geography;
+      if (priorSession.mrr > 0 && !fullCollectedData.mrr) fullCollectedData.mrr = priorSession.mrr;
+      if (priorSession.arr > 0 && !fullCollectedData.arr) fullCollectedData.arr = priorSession.arr;
+      if (priorSession.active_users > 0 && !fullCollectedData.active_users) fullCollectedData.active_users = priorSession.active_users;
+      if (priorSession.team_size > 1 && !fullCollectedData.team_size) fullCollectedData.team_size = priorSession.team_size;
+      if (priorSession.fundraising_stage && !fullCollectedData.fundraising_stage) fullCollectedData.fundraising_stage = priorSession.fundraising_stage;
+      if (priorSession.fundraising_goal && !fullCollectedData.fundraising_goal) fullCollectedData.fundraising_goal = priorSession.fundraising_goal;
+    }
+
+    // ── Query VCs from DB based on what we already know ────────────────
+    let vcDatabaseText = '';
+    let matchedVCs: any[] = [];
+    try {
+      const stage = fullCollectedData.fundraising_stage || null;
+      const sector = fullCollectedData.sector || null;
+      const geo = fullCollectedData.geography || null;
+
+      const vcRows = await c.env.DB.prepare(`
+        SELECT name, country, geography, stage, sectors, min_ticket_usd, max_ticket_usd,
+               typical_equity_pct, website, description, portfolio_examples
+        FROM venture_capitals
+        WHERE is_active = 1
+          AND (
+            (? IS NULL OR stage LIKE '%' || ? || '%')
+            OR (? IS NULL OR sectors LIKE '%' || ? || '%')
+          )
+        ORDER BY
+          CASE WHEN stage LIKE '%' || COALESCE(?,stage) || '%' THEN 0 ELSE 1 END,
+          CASE WHEN sectors LIKE '%' || COALESCE(?,sectors) || '%' THEN 0 ELSE 1 END,
+          CASE WHEN geography LIKE '%' || COALESCE(?,geography) || '%' THEN 0 ELSE 1 END
+        LIMIT 30
+      `).bind(stage, stage, sector, sector, stage, sector, geo).all();
+
+      matchedVCs = vcRows.results || [];
+      if (matchedVCs.length > 0) {
+        vcDatabaseText = (detectedLang === 'en' ? '\n\nREAL VC DATABASE (use ONLY these):\n' : '\n\nBASE DE DATOS REAL DE VCs (usa SOLO estos):\n') +
+          matchedVCs.map((vc: any) => {
+            const ticketStr = vc.min_ticket_usd > 0
+              ? `$${vc.min_ticket_usd/1000}K–$${(vc.max_ticket_usd/1000000).toFixed(1)}M`
+              : 'Varies';
+            return `• ${vc.name} [${vc.country}] | Stages: ${vc.stage} | Sectors: ${vc.sectors} | Ticket: ${ticketStr} | ${vc.description}`;
+          }).join('\n');
+      }
+    } catch (e) {
+      console.error('[ASTRO-CHAT] VC DB query error:', e);
+    }
+
+    // ── Build returning-user context section ───────────────────────────
+    const effectiveWeeklyCheckin = isWeeklyReturn || clientWeeklyCheckin;
+    let returningContext = '';
+    if (isReturningUser && conversationHistory.length === 0) {
+      const priorActionItems = priorSession?.action_items
+        ? (() => { try { return JSON.parse(priorSession.action_items); } catch { return []; } })()
+        : [];
+
+      if (isWeeklyReturn) {
+        const pendingGoalsText = pendingAstroGoals.length > 0
+          ? pendingAstroGoals.map((g: any, i: number) => `${i+1}. [${g.goal_status}] ${g.description}`).join(' | ')
+          : 'none';
+        const prevMrr    = priorSession.mrr > 0 ? `$${priorSession.mrr}` : 'not recorded';
+        const prevUsers  = priorSession.active_users > 0 ? `${priorSession.active_users}` : 'not recorded';
+        const prevArr    = priorSession.arr > 0 ? `$${priorSession.arr}` : 'not recorded';
+        returningContext = detectedLang === 'en'
+          ? `\n\nWEEKLY CHECK-IN MODE: This founder is returning after ${Math.floor((Date.now() - new Date(priorSession.last_seen_at).getTime()) / 86400000)} days.
+LAST SESSION SUMMARY for ${priorSession.startup_name || 'their startup'}:
+- Previous metrics: MRR ${prevMrr} | Active users ${prevUsers} | ARR ${prevArr} | Stage: ${priorSession.fundraising_stage || 'unknown'}
+- Action items we gave them: ${priorActionItems.length > 0 ? priorActionItems.map((a: string, i: number) => `${i+1}. ${a}`).join(' | ') : 'none recorded'}
+- Goals pending in their Hub (status ≠ Done): ${pendingGoalsText}
+OPENING INSTRUCTION — send ONE short message only, then WAIT:
+Welcome them back warmly (1 sentence mentioning their startup name), then ask: "Take a minute — talk me through how the week went. What shipped? How are the numbers moving (MRR, users)? And what's the one thing that's blocking you right now?"
+DO NOT ask about individual goals yet. DO NOT ask separate metric questions. Let them talk first.
+Once they reply, THEN dig into specifics: celebrate wins, ask about pending goals one at a time, and suggest [ACTION_ITEMS: ...] for the next week.
+Context you have (use as reference, don't repeat back verbatim): MRR was ${prevMrr}, active users ${prevUsers}, pending goals: ${pendingGoalsText}.
+Keep tone warm, energetic — like a cofounder excited to catch up. Max 4 short sentences in your opener.`
+          : `\n\nMODO CHECK-IN SEMANAL: Este founder vuelve después de ${Math.floor((Date.now() - new Date(priorSession.last_seen_at).getTime()) / 86400000)} días.
+RESUMEN DE ÚLTIMA SESIÓN para ${priorSession.startup_name || 'su startup'}:
+- Métricas anteriores: MRR ${prevMrr} | Usuarios activos ${prevUsers} | ARR ${prevArr} | Etapa: ${priorSession.fundraising_stage || 'desconocida'}
+- Pasos acordados: ${priorActionItems.length > 0 ? priorActionItems.map((a: string, i: number) => `${i+1}. ${a}`).join(' | ') : 'ninguno registrado'}
+- Goals pendientes en su Hub (estado ≠ Done): ${pendingGoalsText}
+INSTRUCCIÓN DE APERTURA — envía UN SOLO mensaje corto y espera:
+Da la bienvenida calurosamente (1 frase mencionando el nombre de su startup), luego pregunta: "Tómate un minuto — cuéntame cómo fue la semana. ¿Qué lanzaste? ¿Cómo van los números (MRR, usuarios)? ¿Y cuál es el bloqueo más grande ahora mismo?"
+NO preguntes por goals individuales todavía. NO hagas preguntas de métricas por separado. Déjales hablar primero.
+Cuando respondan, entonces profundiza: celebra los logros, pregunta por los goals pendientes de uno en uno y sugiere [ACTION_ITEMS: ...] para la próxima semana.
+Contexto que tienes (úsalo como referencia, no lo repitas textualmente): MRR era ${prevMrr}, usuarios activos ${prevUsers}, goals pendientes: ${pendingGoalsText}.
+Tono cálido y energético — como un cofounder emocionado por ponerse al día. Máximo 4 frases cortas en tu apertura.`;
+      } else {
+        // Non-weekly return (same day or < 6 days) — still use focused single-opener.
+        const pendingGoalsText2 = pendingAstroGoals.length > 0
+          ? pendingAstroGoals.map((g: any, i: number) => `${i+1}. [${g.goal_status}] ${g.description}`).join(' | ')
+          : 'none';
+        const prevMrr2   = priorSession.mrr > 0 ? `$${priorSession.mrr}` : 'not recorded';
+        const prevUsers2 = priorSession.active_users > 0 ? `${priorSession.active_users}` : 'not recorded';
+        returningContext = detectedLang === 'en'
+          ? `\n\nRETURNING FOUNDER — FRESH SESSION START:
+You already know this founder. Startup: ${priorSession.startup_name || 'unknown'} | Sector: ${priorSession.sector || 'unknown'} | Stage: ${priorSession.fundraising_stage || 'unknown'} | Last MRR: ${prevMrr2} | Last active users: ${prevUsers2} | Pending goals: ${pendingGoalsText2}.
+OPENING INSTRUCTION — send EXACTLY ONE short message, then WAIT for their reply:
+Greet them warmly (1 sentence using their startup name). Then ask ONLY this single open question: "Take a minute — what's been happening since we last spoke? What moved forward, what's stuck, and what do you need help with right now?"
+ABSOLUTELY DO NOT: ask about metrics separately, list suggestions, ask multiple questions, or give advice in your opener.
+Wait for their answer. THEN respond to what they actually share.`
+          : `\n\nFOUNDER RECURRENTE — INICIO DE SESIÓN NUEVA:
+Ya conoces a este founder. Startup: ${priorSession.startup_name || 'desconocida'} | Sector: ${priorSession.sector || 'desconocido'} | Etapa: ${priorSession.fundraising_stage || 'desconocida'} | Último MRR: ${prevMrr2} | Últimos usuarios activos: ${prevUsers2} | Goals pendientes: ${pendingGoalsText2}.
+INSTRUCCIÓN DE APERTURA — envía EXACTAMENTE UN mensaje corto y ESPERA su respuesta:
+Salúdale calurosamente (1 frase usando el nombre de su startup). Luego haz SOLO esta pregunta abierta: "Tómate un minuto — ¿qué ha pasado desde la última vez? ¿Qué avanzó, qué se atascó y en qué necesitas ayuda ahora mismo?"
+ABSOLUTAMENTE NO: preguntes métricas por separado, hagas sugerencias, hagas varias preguntas, ni des consejos en tu mensaje de apertura.
+Espera su respuesta. ENTONCES responde a lo que compartan.`;
+      }
+    } else if (effectiveWeeklyCheckin && conversationHistory.length > 0) {
+      const pendingGoalsText = pendingAstroGoals.length > 0
+        ? pendingAstroGoals.map((g: any, i: number) => `${i+1}. [${g.goal_status}] ${g.description}`).join(' | ')
+        : 'none';
+      returningContext = detectedLang === 'en'
+        ? `\n\nONGOING WEEKLY CHECK-IN — IMPORTANT: You are in the middle of a weekly check-in session. DO NOT jump to Phase 7 (VC recommendations) yet. Continue asking about: pending goals (${pendingGoalsText}) and metric updates (MRR, users, growth). Only move to Phase 7 after the founder has clearly answered your check-in questions about goals and metrics.`
+        : `\n\nCHECK-IN SEMANAL EN CURSO — IMPORTANTE: Estás en medio de una sesión de check-in semanal. NO saltes a la Fase 7 (recomendaciones de VCs) todavía. Continúa preguntando sobre: goals pendientes (${pendingGoalsText}) y actualizaciones de métricas (MRR, usuarios, crecimiento). Solo pasa a la Fase 7 después de que el founder haya respondido claramente las preguntas del check-in sobre goals y métricas.`;
+    }
+
+    // ── Determine which onboarding phases are already complete ─────────
+    const d = fullCollectedData;
+    const priorItems = priorSession?.action_items
+      ? (() => { try { return JSON.parse(priorSession.action_items); } catch { return []; } })()
+      : [];
+    const phasesDone = {
+      intro:        !!(d.startup_name && d.problem),
+      product:      !!(d.solution),
+      traction:     !!(d.active_users !== undefined || d.mrr !== undefined),
+      team:         !!(d.team_size),
+      goals:        priorItems.length > 0,
+      fundraising:  !!(d.fundraising_stage && d.fundraising_goal),
+      vcs:          !!(priorSession?.vc_recommendations),
+    };
+    const onboardingComplete = phasesDone.intro && phasesDone.product && phasesDone.traction && phasesDone.team && phasesDone.fundraising;
+
+    const knownFacts = [
+      d.startup_name   ? `startup: ${d.startup_name}`                                         : null,
+      d.problem        ? `problem they solve: ${d.problem}`                                    : null,
+      d.solution       ? `solution/product: ${d.solution}`                                     : null,
+      d.sector         ? `sector: ${d.sector}`                                                 : null,
+      d.geography      ? `geography: ${d.geography}`                                           : null,
+      d.active_users !== undefined ? `active users: ${d.active_users || 'pre-launch (0)'}`    : null,
+      d.mrr !== undefined          ? `MRR: ${d.mrr > 0 ? '$' + d.mrr : 'pre-revenue ($0)'}`  : null,
+      d.arr !== undefined          ? `ARR: ${d.arr > 0 ? '$' + d.arr : 'n/a'}`               : null,
+      d.growth_rate_percent        ? `monthly growth: ${d.growth_rate_percent}%`               : null,
+      d.team_size                  ? `team size: ${d.team_size}`                               : null,
+      d.fundraising_stage          ? `fundraising stage: ${d.fundraising_stage}`               : null,
+      d.fundraising_goal           ? `fundraising goal: $${d.fundraising_goal}`                : null,
+      priorItems.length > 0        ? `goals set: ${priorItems.join(', ')}`                     : null,
+    ].filter(Boolean).join('\n  • ');
+
+    const nextPhase = !phasesDone.intro ? 'phase1_intro'
+      : !phasesDone.product    ? 'phase2_product'
+      : !phasesDone.traction   ? 'phase3_traction'
+      : !phasesDone.team       ? 'phase4_team'
+      : !phasesDone.goals      ? 'phase5_goals'
+      : !phasesDone.fundraising ? 'phase6_fundraising'
+      : !phasesDone.vcs        ? 'phase7_vcs'
+      : 'cofounder_mode';
+
+    // ── System prompt (bilingual, adaptive) ───────────────────────────
+    const personality_en = `You are Astro ⚡, the AI Cofounder of ASTAR*. Expert in sales, marketing and fundraising for startups.
+PERSONALITY: Senior cofounder and mentor tone. Direct, smart, warm, energetic. Celebrate wins. Use emojis sparingly. Never sound like a chatbot.
+RESPONSE FORMAT — NON-NEGOTIABLE:
+- Write like a real cofounder TEXTING, not writing a consulting report.
+- MAX 3-4 short paragraphs per reply. Aim for under 120 words. If you need more, split into multiple turns.
+- NEVER use markdown tables (not even once).
+- NEVER use ## or # headers in your replies — use **bold** inline instead.
+- NEVER produce walls of text. If you catch yourself writing more than 5 lines, stop and cut it down.
+- Bullets are OK for 2-3 items max. No long bulleted lists.`;
+
+    const personality_es = `Eres Astro ⚡, el AI Cofounder de ASTAR*. Experto en ventas, marketing y fundraising para startups.
+PERSONALIDAD: Tono de cofounder senior y mentor. Directo, inteligente, cálido, enérgico. Celebra los logros. Usa emojis con moderación. Nunca suenes como un chatbot.
+FORMATO DE RESPUESTA — INNEGOCIABLE:
+- Escribe como un cofounder ENVIANDO UN MENSAJE DE TEXTO, no redactando un informe.
+- MÁXIMO 3-4 párrafos cortos por respuesta. Apunta a menos de 120 palabras. Si necesitas más, divide en varios turnos.
+- NUNCA uses tablas markdown (ni una sola vez).
+- NUNCA uses ## o # encabezados — usa **negrita** inline en su lugar.
+- NUNCA escribas parrafadas. Si llevas más de 5 líneas, para y recórtalo.
+- Las viñetas están bien para 2-3 elementos máximo. Sin listas largas.`;
+
+    const memory_en = knownFacts
+      ? `\nWHAT YOU ALREADY KNOW — NEVER ASK AGAIN:\n  • ${knownFacts}\n`
+      : '';
+    const memory_es = knownFacts
+      ? `\nLO QUE YA SABES — NO VUELVAS A PREGUNTAR:\n  • ${knownFacts}\n`
+      : '';
+
+    const cofounterPrompt_en = `${personality_en}
+${memory_en}
+COFOUNDER MODE — onboarding is complete. You are now their always-on AI cofounder.
+
+HOW TO BEHAVE:
+1. Start by asking what they need help with today (pitch, growth, investors, product, hiring, strategy...).
+2. Dive deep into whatever they ask. Give concrete advice, frameworks, scripts, or intros as needed.
+3. If they haven't shared metric updates this session yet, naturally ask for one metric update (MRR or active users) as part of the conversation — not as a separate question.
+4. Whenever relevant, suggest new goals and tag them: [ACTION_ITEMS: goal1 | goal2 | goal3]
+5. If they ask about investors, give VC recs (2-3 conversational sentences, no tables) and tag: [VC_MATCH: name1, name2]
+
+ABSOLUTE RULES:
+- NEVER ask for data already in "what you already know" above.
+- ONE topic at a time. Don't ask multiple questions in the same message.
+- NEVER use markdown tables — not a single one, ever.
+- NEVER use ## or # section headers in your replies.
+- NEVER write more than 4 short paragraphs in one message. Keep it under 120 words.
+- Write like you're texting a founder friend, NOT writing a consulting report.
+- ALWAYS end every message with exactly one follow-up question to keep the conversation going.
+- Metrics (MRR, users, growth) CAN be asked once per session as an update — frame them as "last time you had X, what's the number now?"
+- If founder says "ok", "perfecto", "sure" after getting VC recs → move to next steps, don't repeat VC message.
+- ALWAYS respond in English when the founder writes in English.
+${returningContext}${vcDatabaseText}`;
+
+    const cofounterPrompt_es = `${personality_es}
+${memory_es}
+MODO COFOUNDER — el onboarding está completo. Ahora eres su cofounder AI siempre disponible.
+
+CÓMO COMPORTARTE:
+1. Empieza preguntando en qué necesitan ayuda hoy (pitch, crecimiento, inversores, producto, equipo, estrategia...).
+2. Profundiza en lo que pidan. Da consejos concretos, frameworks, scripts o intros según lo que necesiten.
+3. Si aún no han compartido actualizaciones de métricas en esta sesión, pregunta de forma natural por una métrica (MRR o usuarios activos) — no como pregunta separada, sino dentro de la conversación.
+4. Cuando sea relevante, propón nuevos goals y etiquétalos: [ACTION_ITEMS: goal1 | goal2 | goal3]
+5. Si preguntan por inversores, da recs de VCs (2-3 frases conversacionales, sin tablas) y etiqueta: [VC_MATCH: nombre1, nombre2]
+
+REGLAS ABSOLUTAS:
+- NUNCA preguntes datos que ya están en "lo que ya sabes" arriba.
+- UN tema a la vez. No hagas varias preguntas en el mismo mensaje.
+- NUNCA uses tablas markdown — ni una sola, nunca.
+- NUNCA uses ## o # encabezados de sección en tus respuestas.
+- NUNCA escribas más de 4 párrafos cortos en un mensaje. Apunta a menos de 120 palabras.
+- Escribe como si estuvieras enviando un mensaje de texto a un founder amigo, NO redactando un informe.
+- SIEMPRE termina cada mensaje con exactamente una pregunta de seguimiento.
+- Las métricas (MRR, usuarios, crecimiento) SÍ se pueden pedir UNA VEZ por sesión como actualización — enmarcalas como "la última vez tenías X, ¿cuál es el número ahora?"
+- Si el founder dice "ok", "perfecto", "sí", "genial" después de los VCs → pasa a próximos pasos, no repitas el mensaje de VCs.
+- SIEMPRE responde en español cuando el founder escribe en español.
+${returningContext}${vcDatabaseText}`;
+
+    const onboardingPrompt_en = `${personality_en}
+${memory_en}
+ONBOARDING FLOW — collect missing data ONE question at a time, then move to cofounder mode.
+
+PHASES (only execute the NEXT incomplete one — skip all phases already in "what you already know"):
+Phase 1 – INTRO: startup name + specific problem they solve.
+Phase 2 – PRODUCT: how they solve it (key product/solution).
+Phase 3 – TRACTION (one sub-question per turn):
+  3a. Active users/customers right now (accept "0" or "none" and move on).
+  3b. Revenue: MRR/ARR or pre-revenue (accept any answer).
+  3c. Monthly growth rate last 30 days (accept "don't know" and move on).
+Phase 4 – TEAM: team size + founders' backgrounds.
+Phase 5 – GOAL-SETTING: propose 2-3 specific 4-week goals based on what you know. Ask which resonate. Tag: [ACTION_ITEMS: goal1 | goal2 | goal3]
+Phase 6 – FUNDRAISING: how much to raise and at what stage.
+Phase 7 – VC RECS: 2-3 warm conversational sentences (NO tables, NO lists). End with follow-up question. Tag: [VC_MATCH: name1, name2, name3]
+Phase 8 – NEXT STEPS: 3-5 concrete actions. Tag: [ACTION_ITEMS: step1 | step2 | step3]
+
+NEXT PHASE TO EXECUTE: ${nextPhase}
+
+ABSOLUTE RULES:
+- ONE question per message. Never two.
+- NEVER ask for anything already collected (see "what you already know").
+- NEVER use markdown tables — not even once.
+- NEVER use ## or # section headers in your replies.
+- NEVER write more than 4 short paragraphs. Under 120 words per message.
+- Write like you're texting, NOT writing a report.
+- ALWAYS end every message with exactly one question.
+- If founder says "ok"/"sure" after VC recs → Phase 8, don't repeat VCs.
+- ALWAYS respond in English when the founder writes in English.
+${returningContext}${vcDatabaseText}`;
+
+    const onboardingPrompt_es = `${personality_es}
+${memory_es}
+FLUJO DE ONBOARDING — recoge los datos que faltan UNA pregunta por turno, luego pasa a modo cofounder.
+
+FASES (ejecuta solo la SIGUIENTE incompleta — salta todas las que ya están en "lo que ya sabes"):
+Fase 1 – INTRO: nombre del startup + problema específico que resuelven.
+Fase 2 – PRODUCTO: cómo lo resuelven (producto/solución clave).
+Fase 3 – TRACCIÓN (una sub-pregunta por turno):
+  3a. Usuarios/clientes activos ahora mismo (acepta "0" o "ninguno" y continúa).
+  3b. Revenue: MRR/ARR o pre-revenue (acepta cualquier respuesta).
+  3c. Tasa de crecimiento mensual últimos 30 días (acepta "no sé" y continúa).
+Fase 4 – EQUIPO: tamaño del equipo + backgrounds de los fundadores.
+Fase 5 – GOALS: propone 2-3 goals específicos para 4 semanas según lo que sabes. Pregunta cuáles resuenan. Tag: [ACTION_ITEMS: goal1 | goal2 | goal3]
+Fase 6 – FUNDRAISING: cuánto levantar y en qué etapa.
+Fase 7 – VCs: 2-3 frases conversacionales cálidas (SIN tablas, SIN listas). Termina con pregunta de seguimiento. Tag: [VC_MATCH: nombre1, nombre2, nombre3]
+Fase 8 – PRÓXIMOS PASOS: 3-5 acciones concretas. Tag: [ACTION_ITEMS: paso1 | paso2 | paso3]
+
+PRÓXIMA FASE A EJECUTAR: ${nextPhase}
+
+REGLAS ABSOLUTAS:
+- UNA pregunta por mensaje. Nunca dos.
+- NUNCA preguntes nada que ya esté recopilado (ver "lo que ya sabes").
+- NUNCA uses tablas markdown — ni una sola, nunca.
+- NUNCA uses ## o # encabezados en tus respuestas.
+- NUNCA escribas más de 4 párrafos cortos. Menos de 120 palabras por mensaje.
+- Escribe como si estuvieras enviando un mensaje de texto, NO redactando un informe.
+- SIEMPRE termina cada mensaje con exactamente una pregunta.
+- Si el founder dice "ok"/"perfecto"/"sí" después de los VCs → Fase 8, no repitas los VCs.
+- SIEMPRE responde en español cuando el founder escribe en español.
+${returningContext}${vcDatabaseText}`;
+
+    // ── Voice transcript extra instructions ─────────────────────────
+    const voiceContext = isVoiceTranscript
+      ? (detectedLang === 'en'
+        ? `\n\nVOICE CHECK-IN TRANSCRIPT: The founder just recorded a 60-second voice note instead of typing. The transcript is below. Your job:
+1. In 1-2 sentences, acknowledge what they shared (startup name, week summary, any specific wins or blockers they mentioned).
+2. Identify the 2 most important things they mentioned that need more detail — ask about ONE of them now.
+3. After this follow-up exchange, provide: matching VCs from the database (tag [VC_MATCH:...]) and 3-5 concrete weekly action items (tag [ACTION_ITEMS:...]).
+Tone: warm, energetic, like a cofounder who just listened carefully. Keep it conversational, not robotic.`
+        : `\n\nTRANSCRIPCIÓN DE VOICE CHECK-IN: El founder acaba de grabar una nota de voz de 60 segundos en lugar de escribir. La transcripción está abajo. Tu tarea:
+1. En 1-2 frases, reconoce lo que compartió (nombre de la startup, resumen de la semana, logros o bloqueos mencionados).
+2. Identifica las 2 cosas más importantes que mencionó y que necesitan más detalle — pregunta sobre UNA ahora.
+3. Después de este intercambio, proporciona: VCs que encajen de la base de datos (etiqueta [VC_MATCH:...]) y 3-5 acciones concretas para la semana (etiqueta [ACTION_ITEMS:...]).
+Tono: cálido, enérgico, como un cofounder que acaba de escuchar con atención. Conversacional, no robótico.`)
+      : '';
+
+    const systemPrompt = (detectedLang === 'en'
+      ? (onboardingComplete ? cofounterPrompt_en : onboardingPrompt_en)
+      : (onboardingComplete ? cofounterPrompt_es : onboardingPrompt_es)) + voiceContext;
+
+    const messages: any[] = [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory.map((msg: any) => ({
+        role: msg.role === 'astro' ? 'assistant' : 'user',
+        content: msg.content
+      }))
+    ];
+    if (cleanedMessage) messages.push({ role: 'user', content: cleanedMessage });
+
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-        messages: [
-          { 
-            role: 'system', 
-            content: `You are a goal classifier for startups. You must classify each goal into one of these 3 categories:
-
-- ASTAR: Everything related to blockchain, web3, Astar Network, smart contracts, DeFi, NFTs, crypto
-- MAGCIENT: Everything related to AI, Machine Learning, automation, data science, AI agents, LLMs
-- OTHER: Everything else (marketing, sales, product, operations, finance, etc.)
-
-Respond ONLY with one word: ASTAR, MAGCIENT or OTHER.`
-          },
-          { 
-            role: 'user', 
-            content: `Description: ${description}\nTask: ${task}\n\nCategory?` 
-          }
-        ],
-        max_tokens: 10,
-        temperature: 0.3
-      })
+      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'openai/gpt-oss-120b', messages, temperature: 0.75, max_tokens: 2000 })
     });
 
-    if (!response.ok) {
-      return c.json({ category: 'OTHER' });
-    }
-
+    if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
     const data = await response.json() as any;
-    const category = data.choices[0]?.message?.content?.trim().toUpperCase() || 'OTHER';
-    
-    // Validate category
-    if (['ASTAR', 'MAGCIENT', 'OTHER'].includes(category)) {
-      return c.json({ category });
-    }
-    
-    return c.json({ category: 'OTHER' });
+    let aiResponse = data.choices[0]?.message?.content || '';
 
-  } catch (error) {
-    console.error('[DETERMINE-CATEGORY] Error:', error);
-    return c.json({ category: 'OTHER' });
-  }
-});
+    // ── Extract [VC_MATCH: ...] tag ────────────────────────────────────
+    const vcMatchRegex = /\[VC_MATCH:\s*([^\]]+)\]/i;
+    const vcMatchResult = aiResponse.match(vcMatchRegex);
+    let recommendedVCNames: string[] = [];
+    let recommendedVCCards: any[] = [];
 
-// Process AI actions (create goals, add metrics, etc.)
-async function processAIActions(db: any, userId: number, aiResponse: string, context: any): Promise<string> {
-  console.log('[PROCESS-ACTIONS] AI Response:', aiResponse);
-  console.log('[PROCESS-ACTIONS] User ID:', userId);
-  
-  const actions = aiResponse.match(/ACTION:([A-Z_]+)\|([^\n]+)/g);
-  console.log('[PROCESS-ACTIONS] Found actions:', actions);
-  
-  if (!actions || actions.length === 0) {
-    console.log('[PROCESS-ACTIONS] No actions found in response');
-    return aiResponse;
-  }
-  
-  let responseText = aiResponse;
-  let executionResults: string[] = [];
-  
-  for (const action of actions) {
-    const parts = action.replace('ACTION:', '').split('|');
-    const actionType = parts[0];
-    console.log('[PROCESS-ACTIONS] Processing action:', actionType, 'with parts:', parts);
-    
-    try {
-      // ============ METRICS COMMANDS ============
-      if (actionType === 'SET_USERS') {
-        const [, value] = parts;
-        const today = new Date().toISOString().split('T')[0];
-        const numValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
-        
-        if (isNaN(numValue)) {
-          executionResults.push(`❌ Valor inválido para usuarios: ${value}`);
-        } else {
-          // Delete today's entry if exists, then insert new one
-          await db.prepare(`
-            DELETE FROM user_metrics 
-            WHERE user_id = ? AND metric_name = 'users' AND recorded_date = ?
-          `).bind(userId, today).run();
-          
-          await db.prepare(`
-            INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-            VALUES (?, 'users', ?, ?)
-          `).bind(userId, numValue, today).run();
-          
-          executionResults.push(`👥 Updated! You now have ${numValue.toLocaleString()} users.`);
-          console.log('[ACTION] Users set to:', numValue);
-        }
-      }
-      else if (actionType === 'SET_REVENUE') {
-        const [, value] = parts;
-        const today = new Date().toISOString().split('T')[0];
-        const numValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
-        
-        if (isNaN(numValue)) {
-          executionResults.push(`❌ Valor inválido para revenue: ${value}`);
-        } else {
-          // Delete today's entry if exists, then insert new one
-          await db.prepare(`
-            DELETE FROM user_metrics 
-            WHERE user_id = ? AND metric_name = 'revenue' AND recorded_date = ?
-          `).bind(userId, today).run();
-          
-          await db.prepare(`
-            INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-            VALUES (?, 'revenue', ?, ?)
-          `).bind(userId, numValue, today).run();
-          
-          executionResults.push(`💰 Revenue updated to $${numValue.toLocaleString()}!`);
-          console.log('[ACTION] Revenue set to:', numValue);
-        }
-      }
-      else if (actionType === 'ADD_USERS') {
-        const [, value] = parts;
-        const today = new Date().toISOString().split('T')[0];
-        const addValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
-        
-        if (isNaN(addValue)) {
-          executionResults.push(`❌ Valor inválido para usuarios: ${value}`);
-        } else {
-          // Get current value
-          const currentMetric = await db.prepare(`
-            SELECT metric_value FROM user_metrics 
-            WHERE user_id = ? AND metric_name = 'users'
-            ORDER BY recorded_date DESC LIMIT 1
-          `).bind(userId).first();
-          
-          const currentValue = currentMetric?.metric_value || 0;
-          const newValue = currentValue + addValue;
-          
-          // Delete today's entry if exists, then insert new one
-          await db.prepare(`
-            DELETE FROM user_metrics 
-            WHERE user_id = ? AND metric_name = 'users' AND recorded_date = ?
-          `).bind(userId, today).run();
-          
-          await db.prepare(`
-            INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-            VALUES (?, 'users', ?, ?)
-          `).bind(userId, newValue, today).run();
-          
-          executionResults.push(`🎉 ¡+${addValue.toLocaleString()} usuarios! Total: ${newValue.toLocaleString()}`);
-          console.log('[ACTION] Users added:', addValue, 'Total:', newValue);
-        }
-      }
-      else if (actionType === 'ADD_REVENUE') {
-        const [, value] = parts;
-        const today = new Date().toISOString().split('T')[0];
-        const addValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
-        
-        if (isNaN(addValue)) {
-          executionResults.push(`❌ Valor inválido para revenue: ${value}`);
-        } else {
-          // Get current value
-          const currentMetric = await db.prepare(`
-            SELECT metric_value FROM user_metrics 
-            WHERE user_id = ? AND metric_name = 'revenue'
-            ORDER BY recorded_date DESC LIMIT 1
-          `).bind(userId).first();
-          
-          const currentValue = currentMetric?.metric_value || 0;
-          const newValue = currentValue + addValue;
-          
-          // Delete today's entry if exists, then insert new one
-          await db.prepare(`
-            DELETE FROM user_metrics 
-            WHERE user_id = ? AND metric_name = 'revenue' AND recorded_date = ?
-          `).bind(userId, today).run();
-          
-          await db.prepare(`
-            INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-            VALUES (?, 'revenue', ?, ?)
-          `).bind(userId, newValue, today).run();
-          
-          executionResults.push(`💵 ¡+$${addValue.toLocaleString()}! Revenue total: $${newValue.toLocaleString()}`);
-          console.log('[ACTION] Revenue added:', addValue, 'Total:', newValue);
-        }
-      }
-      // ============ END METRICS COMMANDS ============
-      else if (actionType === 'ADD_METRIC') {
-        const [, metricName, value] = parts;
-        const today = new Date().toISOString().split('T')[0];
-        
-        await db.prepare(`
-          INSERT INTO user_metrics (user_id, metric_name, metric_value, recorded_date)
-          VALUES (?, ?, ?, ?)
-        `).bind(userId, metricName, parseFloat(value), today).run();
-        
-        executionResults.push(`✅ Métrica registrada: ${metricName} = ${value}`);
-        console.log('[ACTION] Metric added:', metricName, value);
-      }
-      else if (actionType === 'UPDATE_GOAL') {
-        const [, goalId, newDescription] = parts;
-        console.log('[ACTION] ========== UPDATE_GOAL START ==========');
-        console.log('[ACTION] UPDATE_GOAL - goalId:', goalId);
-        console.log('[ACTION] UPDATE_GOAL - newDescription:', newDescription);
-        console.log('[ACTION] UPDATE_GOAL - userId:', userId);
-        
-        const result = await db.prepare(`
-          UPDATE goals 
-          SET description = ?,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = ? AND user_id = ?
-        `).bind(newDescription, parseInt(goalId), userId).run();
-        
-        console.log('[ACTION] UPDATE_GOAL - Rows affected:', result.meta?.changes);
-        console.log('[ACTION] ========== UPDATE_GOAL END ==========');
-        
-        if (result.meta?.changes === 0) {
-          executionResults.push(`❌ Goal ${goalId} not found`);
-        } else {
-          executionResults.push(`✅ Goal ${goalId} updated`);
-        }
-      }
-      else if (actionType === 'UPDATE_GOAL_STATUS') {
-        const [, goalId, newGoalStatus] = parts;
-        const validStatuses = ['WIP', 'To start', 'On Hold', 'Delayed', 'Blocked', 'Done'];
-        console.log('[ACTION] ========== UPDATE_GOAL_STATUS START ==========');
-        console.log('[ACTION] UPDATE_GOAL_STATUS - goalId:', goalId);
-        console.log('[ACTION] UPDATE_GOAL_STATUS - newGoalStatus:', newGoalStatus);
-        console.log('[ACTION] UPDATE_GOAL_STATUS - userId:', userId);
-        console.log('[ACTION] UPDATE_GOAL_STATUS - Valid statuses:', validStatuses);
-        
-        if (!validStatuses.includes(newGoalStatus)) {
-          console.log('[ACTION] UPDATE_GOAL_STATUS - Invalid status provided');
-          executionResults.push(`❌ Invalid status. Use: WIP, To start, On Hold, Delayed, Blocked, Done`);
-        } else {
-          const result = await db.prepare(`
-            UPDATE goals 
-            SET goal_status = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND user_id = ?
-          `).bind(newGoalStatus, parseInt(goalId), userId).run();
-          
-          console.log('[ACTION] UPDATE_GOAL_STATUS result:', JSON.stringify(result));
-          console.log('[ACTION] UPDATE_GOAL_STATUS - Rows affected:', result.meta?.changes);
-          console.log('[ACTION] ========== UPDATE_GOAL_STATUS END ==========');
-          
-          if (result.meta?.changes === 0) {
-            executionResults.push(`❌ Goal ${goalId} not found`);
-          } else {
-            const statusEmoji = newGoalStatus === 'Done' ? '✅' : newGoalStatus === 'WIP' ? '🔄' : '⏳';
-            executionResults.push(`${statusEmoji} Status updated to ${newGoalStatus}`);
-          }
-          console.log('[ACTION] Goal status updated:', goalId, newGoalStatus);
-        }
-      }
-      else if (actionType === 'UPDATE_GOAL_DESCRIPTION') {
-        const [, goalId, ...descParts] = parts;
-        const newDescription = descParts.join('|');
-        
-        await db.prepare(`
-          UPDATE goals 
-          SET description = ?,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = ? AND user_id = ?
-        `).bind(newDescription, parseInt(goalId), userId).run();
-        
-        executionResults.push(`📝`);
-        console.log('[ACTION] Goal description updated:', goalId);
-      }
-      else if (actionType === 'UPDATE_GOAL_DEADLINE') {
-        const [, goalId, deadline] = parts;
-        
-        await db.prepare(`
-          UPDATE goals 
-          SET deadline = ?,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = ? AND user_id = ?
-        `).bind(deadline, parseInt(goalId), userId).run();
-        
-        executionResults.push(`📅`);
-        console.log('[ACTION] Goal deadline updated:', goalId, deadline);
-      }
-      else if (actionType === 'UPDATE_GOAL_CATEGORY') {
-        const [, goalId, category] = parts;
-        
-        await db.prepare(`
-          UPDATE goals 
-          SET category = ?,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = ? AND user_id = ?
-        `).bind(category, parseInt(goalId), userId).run();
-        
-        const categoryEmoji = category === 'high' ? '🔥' : category === 'medium' ? '⚡' : '📌';
-        executionResults.push(`${categoryEmoji}`);
-        console.log('[ACTION] Goal category updated:', goalId, category);
-      }
-      else if (actionType === 'COMPLETE_GOAL') {
-        const [, goalId] = parts;
-        console.log('[ACTION] COMPLETE_GOAL - goalId:', goalId, 'userId:', userId);
-        
-        const result = await db.prepare(`
-          UPDATE goals 
-          SET status = 'completed',
-              current_value = target_value,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = ? AND user_id = ?
-        `).bind(parseInt(goalId), userId).run();
-        
-        console.log('[ACTION] COMPLETE_GOAL result:', JSON.stringify(result));
-        console.log('[ACTION] Rows affected:', result.meta?.changes);
-        
-        if (result.meta?.changes === 0) {
-          executionResults.push(`❌ No se encontró el objetivo ${goalId}`);
-        } else {
-          executionResults.push(`🎉`);
-        }
-        console.log('[ACTION] Goal completed:', goalId);
-      }
-      else if (actionType === 'DELETE_GOAL') {
-        const [, goalId] = parts;
-        console.log('[ACTION] DELETE_GOAL - goalId:', goalId, 'userId:', userId);
-        
-        const result = await db.prepare(`
-          DELETE FROM goals 
-          WHERE id = ? AND user_id = ?
-        `).bind(parseInt(goalId), userId).run();
-        
-        console.log('[ACTION] DELETE_GOAL result:', JSON.stringify(result));
-        console.log('[ACTION] Rows affected:', result.meta?.changes);
-        
-        if (result.meta?.changes === 0) {
-          executionResults.push(`❌ No se encontró el objetivo ${goalId}`);
-        } else {
-          executionResults.push(`🗑️`);
-        }
-        console.log('[ACTION] Goal deleted:', goalId);
-      }
-      else if (actionType === 'FETCH_LEADERBOARD') {
-        const [, leaderboardType] = parts;
-        console.log('[ACTION] Fetching leaderboard:', leaderboardType);
-        
-        if (leaderboardType === 'global') {
-          // Get global leaderboard (projects + products)
-          // First get projects
-          const projects = await db.prepare(`
-            SELECT 
-              p.id,
-              p.title,
-              p.description,
-              p.rating_average,
-              p.votes_count,
-              u.name as founder_name,
-              u.avatar_url as founder_avatar,
-              'project' as type
-            FROM projects p
-            JOIN users u ON p.user_id = u.id
-            ORDER BY p.rating_average DESC, p.votes_count DESC
-            LIMIT 10
-          `).all();
-          
-          // Then get products
-          const products = await db.prepare(`
-            SELECT 
-              bp.id,
-              bp.title,
-              bp.description,
-              COALESCE(bp.rating_average, 0) as rating_average,
-              COALESCE(bp.votes_count, 0) as votes_count,
-              u.name as founder_name,
-              u.avatar_url as founder_avatar,
-              'product' as type
-            FROM beta_products bp
-            JOIN users u ON bp.company_user_id = u.id
-            ORDER BY bp.rating_average DESC, bp.votes_count DESC
-            LIMIT 10
-          `).all();
-          
-          // Combine and sort
-          const allItems = [
-            ...(projects.results || []),
-            ...(products.results || [])
-          ].sort((a: any, b: any) => {
-            if (b.rating_average !== a.rating_average) {
-              return b.rating_average - a.rating_average;
-            }
-            return b.votes_count - a.votes_count;
-          }).slice(0, 10);
-          
-          if (allItems.length > 0) {
-            let result = '🏆 **GLOBAL LEADERBOARD** (Top startups):\n\n';
-            allItems.forEach((item: any, idx: number) => {
-              result += `${idx + 1}. **${item.title}** - ${item.founder_name}\n`;
-              result += `   ⭐ Rating: ${item.rating_average || 0} | 👥 Votes: ${item.votes_count || 0}\n`;
-              result += `   Type: ${item.type === 'project' ? '📊 Startup' : '🚀 Product'}\n\n`;
-            });
-            executionResults.push(result);
-          } else {
-            executionResults.push('📊 No startups in the leaderboard yet.');
-          }
-        }
-        else if (leaderboardType === 'goals') {
-          // Get goals leaderboard
-          const leaderboard = await db.prepare(`
-            SELECT 
-              u.id,
-              u.name,
-              u.avatar_url,
-              COUNT(CASE WHEN g.status = 'completed' THEN 1 END) as completed_goals,
-              COUNT(g.id) as total_goals,
-              CAST(COUNT(CASE WHEN g.status = 'completed' THEN 1 END) AS REAL) * 10 as score
-            FROM users u
-            LEFT JOIN goals g ON u.id = g.user_id
-            GROUP BY u.id, u.name, u.avatar_url
-            HAVING COUNT(g.id) > 0
-            ORDER BY score DESC, completed_goals DESC
-            LIMIT 10
-          `).all();
-          
-          const founders = leaderboard.results || [];
-          if (founders.length > 0) {
-            let result = '🎯 **GOALS LEADERBOARD** (Top founders):\n\n';
-            founders.forEach((founder: any, idx: number) => {
-              result += `${idx + 1}. **${founder.name}**\n`;
-              result += `   ✅ Completed: ${founder.completed_goals} / ${founder.total_goals}\n`;
-              result += `   🏅 Score: ${founder.score}\n\n`;
-            });
-            executionResults.push(result);
-          } else {
-            executionResults.push('🎯 No completed goals yet.');
-          }
-        }
-        else if (leaderboardType === 'competitions') {
-          // Get active competitions
-          const competitions = await db.prepare(`
-            SELECT 
-              c.id,
-              c.title,
-              c.description,
-              c.prize_amount,
-              c.event_date,
-              c.status,
-              COUNT(DISTINCT cp.id) as participants_count
-            FROM competitions c
-            LEFT JOIN competition_participants cp ON c.id = cp.competition_id
-            WHERE c.status = 'active'
-            GROUP BY c.id, c.title, c.description, c.prize_amount, c.event_date, c.status
-            ORDER BY c.event_date DESC
-            LIMIT 5
-          `).all();
-          
-          const comps = competitions.results || [];
-          if (comps.length > 0) {
-            let result = '🏅 **ACTIVE COMPETITIONS:**\n\n';
-            comps.forEach((comp: any) => {
-              result += `**${comp.title}**\n`;
-              result += `💰 Prize: $${comp.prize_amount}\n`;
-              result += `👥 Participants: ${comp.participants_count}\n`;
-              result += `📅 Date: ${comp.event_date}\n\n`;
-            });
-            result += '\n💡 To see the ranking of a specific competition, visit /competitions';
-            executionResults.push(result);
-          } else {
-            executionResults.push('🏅 No active competitions at the moment.');
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[ACTION-ERROR]', actionType, 'Error details:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      executionResults.push(`❌ Error executing ${actionType}: ${errorMessage}`);
-    }
-    
-    // Remove action command from response
-    responseText = responseText.replace(action, '').trim();
-  }
-  
-  // Add execution results to the response
-  if (executionResults.length > 0) {
-    return executionResults.join('\n') + '\n\n' + responseText;
-  }
-  
-  return responseText;
-}
-
-// Fallback response generator when AI is not available
-function generateFallbackResponse(message: string, context: any): string {
-  const lowerMessage = message.toLowerCase();
-  
-  // Check if user wants to create a goal
-  if (lowerMessage.includes('añadir') || lowerMessage.includes('crear') || lowerMessage.includes('nuevo objetivo') || lowerMessage.includes('new goal') || lowerMessage.includes('add') || lowerMessage.includes('create') || (lowerMessage.includes('quiero') && !lowerMessage.includes('analiza'))) {
-    return `🎯 **To enable the AI that creates goals automatically:**\n\n` +
-      `1. Get a free API key at https://console.groq.com/\n` +
-      `2. Add it to your project in Cloudflare\n\n` +
-      `**In the meantime**, you can:\n` +
-      `• Go to the **Traction** view in the dashboard\n` +
-      `• Click on "Add Goal"\n` +
-      `• Create your goals manually\n\n` +
-      `💡 With the API key configured, I can create goals just by telling me "I want to reach 1000 users"`;
-  }
-  
-  if (lowerMessage.includes('objetivo') || lowerMessage.includes('goal') || lowerMessage.includes('meta') || lowerMessage.includes('analiza') || lowerMessage.includes('analyze')) {
-    const { goals } = context;
-    if (goals.totalCount === 0) {
-      return `📊 You don't have any goals registered yet.\n\n💡 I recommend creating your first goal. Go to the Traction section and add goals like:\n- Get X users\n- Reach $X in revenue\n- Launch X feature`;
-    }
-    
-    let response = `📊 **Analysis of your goals:**\n\n`;
-    response += `• Total: ${goals.totalCount} goals\n`;
-    response += `• Completed: ${goals.completedCount} (${goals.completionRate}%)\n`;
-    response += `• Active: ${goals.active.length}\n\n`;
-    
-    if (goals.active.length > 0) {
-      response += `**Active goals:**\n`;
-      goals.active.slice(0, 5).forEach((g: any, i: number) => {
-        const progress = g.target_value > 0 ? Math.round((g.current_value / g.target_value) * 100) : 0;
-        response += `${i + 1}. ${g.description} - ${progress}% (${g.current_value}/${g.target_value})\n`;
-      });
-    }
-    
-    return response;
-  }
-  
-  if (lowerMessage.includes('métrica') || lowerMessage.includes('metric') || lowerMessage.includes('crecimiento') || lowerMessage.includes('growth')) {
-    const { metrics } = context;
-    let response = `📈 **Metrics summary:**\n\n`;
-    response += `• Current users: ${metrics.current.users}\n`;
-    response += `• Current revenue: $${metrics.current.revenue}\n`;
-    response += `• User growth: ${metrics.growth.users}%\n`;
-    response += `• Revenue growth: ${metrics.growth.revenue}%\n`;
-    
-    if (metrics.history.length < 2) {
-      response += `\n💡 Tip: Record metrics regularly to see growth trends.`;
-    }
-    
-    return response;
-  }
-  
-  if (lowerMessage.includes('marketing') || lowerMessage.includes('plan')) {
-    return `🚀 **Marketing Recommendations:**\n\n` +
-      `Based on your ${context.goals.totalCount} goals and ${context.metrics.current.users} users:\n\n` +
-      `1. **Content Marketing**: Create content that solves your users' problems\n` +
-      `2. **Social Proof**: Share testimonials and success stories\n` +
-      `3. **Referrals**: Implement a referral program\n` +
-      `4. **SEO**: Optimize your search engine presence\n\n` +
-      `💡 Would you like me to go deeper into any specific strategy?`;
-  }
-  
-  // Default response
-  return `👋 Hi! I'm your ASTAR Agent.\n\n` +
-    `I can help you with:\n` +
-    `• 📊 Analyze your goals\n` +
-    `• 📈 Review your growth metrics\n` +
-    `• 🎯 Create marketing plans\n` +
-    `• 💡 Generate content ideas\n\n` +
-    `**Your current summary:**\n` +
-    `• ${context.goals.totalCount} goals (${context.goals.completionRate}% completed)\n` +
-    `• ${context.metrics.current.users} users, $${context.metrics.current.revenue} revenue\n\n` +
-    `How can I help you?`;
-}
-
-// Analyze goals endpoint
-app.post('/analyze-goals', jwtMiddleware, async (c) => {
-  const user = c.get('user') as AuthContext;
-  console.log('[ANALYZE-GOALS] Starting analysis for user:', user.userId);
-
-  try {
-    console.log('[ANALYZE-GOALS] Fetching startup context...');
-    const context = await getStartupContext(c.env.DB, user.userId);
-    console.log('[ANALYZE-GOALS] Context fetched:', JSON.stringify(context).substring(0, 200));
-    
-    const apiKey = c.env.GROQ_API_KEY || c.env.OPENAI_API_KEY;
-    console.log('[ANALYZE-GOALS] API Key available:', !!apiKey);
-
-    let analysis: string;
-
-    if (!apiKey) {
-      console.log('[ANALYZE-GOALS] Using fallback response (no API key)');
-      analysis = generateFallbackResponse('analyze my goals', context);
-    } else {
-      console.log('[ANALYZE-GOALS] Generating AI response...');
-      const systemPrompt = `You are an expert startup analyst. Analyze the user's goals and provide:
-1. Current status of each goal with progress percentage
-2. Which goals are at risk of not being completed
-3. Specific recommendations for improvement
-4. Suggested prioritization
-
-Respond in English, be specific and use the provided data.`;
-
+    if (vcMatchResult) {
+      aiResponse = aiResponse.replace(vcMatchRegex, '').trim();
+      recommendedVCNames = vcMatchResult[1].split(',').map((s: string) => s.trim());
       try {
-        analysis = await generateAIResponse(apiKey, systemPrompt, 'Analyze my goals and give me recommendations', context);
-        console.log('[ANALYZE-GOALS] AI response generated successfully');
-      } catch (aiError) {
-        console.error('[ANALYZE-GOALS] AI generation failed:', aiError);
-        analysis = generateFallbackResponse('analiza mis objetivos', context);
+        for (const vcName of recommendedVCNames.slice(0, 5)) {
+          const vc = await c.env.DB.prepare(
+            `SELECT * FROM venture_capitals WHERE name LIKE ? AND is_active = 1 LIMIT 1`
+          ).bind(`%${vcName}%`).first() as any;
+          if (vc) recommendedVCCards.push(vc);
+        }
+      } catch {}
+    }
+
+    // ── Extract [ACTION_ITEMS: ...] tag ───────────────────────────────
+    const actionItemsRegex = /\[ACTION_ITEMS:\s*([^\]]+)\]/i;
+    const actionItemsResult = aiResponse.match(actionItemsRegex);
+    let actionItems: string[] = [];
+
+    if (actionItemsResult) {
+      aiResponse = aiResponse.replace(actionItemsRegex, '').trim();
+      actionItems = actionItemsResult[1].split('|').map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    const isVCRecommendation = recommendedVCCards.length > 0 || vcMatchResult !== null;
+
+    // ── Extract metrics and save to DB ────────────────────────────────
+    let extractedData: Record<string, any> = {};
+    let dataSaved = false;
+    let createdGoals: any[] = [];
+    let updatedMetrics: Record<string, { prev: any; next: any }> = {};
+
+    if (userId && message) {
+      try {
+        extractedData = await extractAstroMetrics(groqKey, conversationHistory, message);
+
+        const metricKeys: { key: string; label: string; prefix?: string; suffix?: string }[] = [
+          { key: 'mrr', label: 'MRR', prefix: '$' },
+          { key: 'arr', label: 'ARR', prefix: '$' },
+          { key: 'active_users', label: 'Usuarios activos' },
+          { key: 'growth_rate_percent', label: 'Crecimiento mensual', prefix: '', suffix: '%' },
+          { key: 'team_size', label: 'Equipo' },
+        ];
+        for (const { key, label, prefix = '', suffix = '' } of metricKeys) {
+          const prev = priorSession?.[key];
+          const next = extractedData[key];
+          if (next && next > 0 && prev !== next) {
+            updatedMetrics[key] = { prev: prev ? `${prefix}${prev}${suffix}` : null, next: `${prefix}${next}${suffix}` };
+          }
+        }
+
+        const vcJson = isVCRecommendation ? JSON.stringify(recommendedVCNames) : undefined;
+        await saveAstroData(
+          c.env.DB, astroUserId!,
+          { ...fullCollectedData, ...extractedData },
+          vcJson,
+          actionItems.length > 0 ? actionItems : undefined,
+          detectedLang
+        );
+        dataSaved = true;
+
+        // ── Save conversation messages to astro_messages ──────────────
+        try {
+          const sessionDate = new Date().toISOString().split('T')[0];
+          await c.env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS astro_messages (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER NOT NULL,
+              role TEXT NOT NULL,
+              content TEXT NOT NULL,
+              session_date TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `).run();
+          if (message) {
+            await c.env.DB.prepare(
+              'INSERT INTO astro_messages (user_id, role, content, session_date) VALUES (?, ?, ?, ?)'
+            ).bind(astroUserId, 'user', message, sessionDate).run();
+          }
+          if (aiResponse) {
+            await c.env.DB.prepare(
+              'INSERT INTO astro_messages (user_id, role, content, session_date) VALUES (?, ?, ?, ?)'
+            ).bind(astroUserId, 'astro', aiResponse, sessionDate).run();
+          }
+        } catch (e) {
+          console.error('[ASTRO-CHAT] Message save error:', e);
+        }
+
+        // ── Auto-create goals from action items ──────────────────────
+        if (actionItems.length > 0) {
+          const weekOf = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+          const userRecord = await c.env.DB.prepare('SELECT name FROM users WHERE id = ?').bind(userId).first() as any;
+          createdGoals = await createAstroGoals(c.env.DB, userId, actionItems, weekOf, userRecord?.name);
+          console.log(`[ASTRO-GOALS] Auto-created ${createdGoals.length} goals for user ${userId}`);
+        }
+      } catch (e) {
+        console.error('[ASTRO-CHAT] Save error:', e);
       }
+    } else if (astroUserId && !message) {
+      try {
+        await c.env.DB.prepare('UPDATE astro_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE user_id = ?').bind(astroUserId).run();
+      } catch {}
     }
 
-    // Save to chat history
-    console.log('[ANALYZE-GOALS] Saving to chat history...');
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'user', ?, datetime('now'))
-    `).bind(user.userId, 'Analiza mis objetivos').run();
-
-    await c.env.DB.prepare(`
-      INSERT INTO agent_chat_messages (user_id, role, content, created_at)
-      VALUES (?, 'assistant', ?, datetime('now'))
-    `).bind(user.userId, analysis).run();
-
-    console.log('[ANALYZE-GOALS] Success, returning analysis');
-    return c.json({ analysis });
-  } catch (error) {
-    console.error('[ANALYZE-GOALS] ERROR:', error);
-    console.error('[ANALYZE-GOALS] Error stack:', error instanceof Error ? error.stack : 'No stack');
-    console.error('[ANALYZE-GOALS] Error message:', error instanceof Error ? error.message : String(error));
-    return c.json({ 
-      error: 'Failed to analyze goals',
-      details: error instanceof Error ? error.message : String(error)
-    }, 500);
-  }
-});
-
-// Clear chat history
-app.delete('/history', jwtMiddleware, async (c) => {
-  const user = c.get('user') as AuthContext;
-
-  try {
-    await c.env.DB.prepare(`
-      DELETE FROM agent_chat_messages WHERE user_id = ?
-    `).bind(user.userId).run();
-
-    return c.json({ success: true });
-  } catch (error) {
-    console.error('Error clearing chat history:', error);
-    return c.json({ error: 'Failed to clear chat history' }, 500);
-  }
-});
-
-// Get startup summary (for chatbot context display)
-app.get('/startup-summary', jwtMiddleware, async (c) => {
-  const user = c.get('user') as AuthContext;
-
-  try {
-    const context = await getStartupContext(c.env.DB, user.userId);
-    return c.json(context);
-  } catch (error) {
-    console.error('Error getting startup summary:', error);
-    return c.json({ error: 'Failed to get startup summary' }, 500);
-  }
-});
-
-// Get global leaderboard (projects AND products ranking by votes and rating)
-app.get('/leaderboard/global', jwtMiddleware, async (c) => {
-  try {
-    const limit = parseInt(c.req.query('limit') || '10');
-    
-    // Get projects
-    const projects = await c.env.DB.prepare(`
-      SELECT 
-        p.id,
-        p.title,
-        p.description,
-        p.rating_average,
-        p.votes_count,
-        u.name as founder_name,
-        u.avatar_url as founder_avatar,
-        'project' as type
-      FROM projects p
-      JOIN users u ON p.user_id = u.id
-      ORDER BY p.rating_average DESC, p.votes_count DESC
-      LIMIT ?
-    `).bind(limit).all();
-    
-    // Get products
-    const products = await c.env.DB.prepare(`
-      SELECT 
-        bp.id,
-        bp.title,
-        bp.description,
-        COALESCE(bp.rating_average, 0) as rating_average,
-        COALESCE(bp.votes_count, 0) as votes_count,
-        u.name as founder_name,
-        u.avatar_url as founder_avatar,
-        'product' as type
-      FROM beta_products bp
-      JOIN users u ON bp.company_user_id = u.id
-      ORDER BY bp.rating_average DESC, bp.votes_count DESC
-      LIMIT ?
-    `).bind(limit).all();
-    
-    // Combine and sort
-    const allItems = [
-      ...(projects.results || []),
-      ...(products.results || [])
-    ].sort((a: any, b: any) => {
-      if (b.rating_average !== a.rating_average) {
-        return b.rating_average - a.rating_average;
-      }
-      return b.votes_count - a.votes_count;
-    }).slice(0, limit);
-
-    return c.json({ 
-      leaderboard: allItems,
-      type: 'global_combined'
+    return c.json({
+      response: aiResponse || (detectedLang === 'en'
+        ? 'Hi! I\'m Astro, your AI Cofounder from ASTAR* ⚡ What\'s your startup name and what problem does it solve?'
+        : '¡Hola! Soy Astro, tu AI Cofounder de ASTAR* ⚡ ¿Cómo se llama tu startup y qué problema resuelve?'),
+      isVCRecommendation,
+      recommendedVCCards,
+      actionItems,
+      createdGoals,
+      updatedMetrics,
+      extractedData,
+      dataSaved,
+      isReturningUser,
+      isWeeklyReturn,
+      pendingGoals: pendingAstroGoals,
+      priorSession: isReturningUser ? {
+        startup_name: priorSession?.startup_name,
+        action_items: priorSession?.action_items,
+        data_completeness: priorSession?.data_completeness,
+      } : null
     });
+
   } catch (error) {
-    console.error('Error getting global leaderboard:', error);
-    return c.json({ error: 'Failed to get global leaderboard' }, 500);
-  }
-});
-
-// Get goals leaderboard (founders by completed goals)
-app.get('/leaderboard/goals', jwtMiddleware, async (c) => {
-  try {
-    const limit = parseInt(c.req.query('limit') || '10');
-    
-    const leaderboard = await c.env.DB.prepare(`
-      SELECT 
-        u.id,
-        u.name,
-        u.avatar_url,
-        COUNT(CASE WHEN g.status = 'completed' THEN 1 END) as completed_goals,
-        COUNT(g.id) as total_goals,
-        CAST(COUNT(CASE WHEN g.status = 'completed' THEN 1 END) AS REAL) * 10 as score
-      FROM users u
-      LEFT JOIN goals g ON u.id = g.user_id
-      GROUP BY u.id, u.name, u.avatar_url
-      HAVING COUNT(g.id) > 0
-      ORDER BY score DESC, completed_goals DESC
-      LIMIT ?
-    `).bind(limit).all();
-
-    return c.json({ 
-      leaderboard: leaderboard.results || [],
-      type: 'goals_leaderboard'
+    console.error('[ASTRO-CHAT] Error:', error);
+    return c.json({
+      response: '¡Hola! Soy Astro, tu AI Cofounder de ASTAR* ⚡ ¿Cómo se llama tu startup y qué problema resuelve?',
+      isVCRecommendation: false,
+      recommendedVCCards: [],
+      actionItems: [],
+      extractedData: {},
+      dataSaved: false,
+      isReturningUser: false,
+      isWeeklyReturn: false,
+      priorSession: null
     });
-  } catch (error) {
-    console.error('Error getting goals leaderboard:', error);
-    return c.json({ error: 'Failed to get goals leaderboard' }, 500);
   }
 });
 
-// Get competitions leaderboard
-app.get('/leaderboard/competitions', jwtMiddleware, async (c) => {
+// GET /astro-profile — returns stored Astro session + matched VCs for the logged-in user
+app.get('/astro-profile', async (c) => {
+  const authToken = c.req.header('Authorization')?.replace('Bearer ', '') ||
+                   c.req.header('Cookie')?.match(/authToken=([^;]+)/)?.[1] ||
+                   c.req.header('cookie')?.match(/authToken=([^;]+)/)?.[1];
+  if (!authToken) return c.json({ error: 'Not authenticated' }, 401);
+
   try {
-    const competitions = await c.env.DB.prepare(`
-      SELECT 
-        c.id,
-        c.title,
-        c.description,
-        c.prize_amount,
-        c.event_date,
-        c.status,
-        COUNT(DISTINCT cp.id) as participants_count
-      FROM competitions c
-      LEFT JOIN competition_participants cp ON c.id = cp.competition_id
-      WHERE c.status = 'active'
-      GROUP BY c.id, c.title, c.description, c.prize_amount, c.event_date, c.status
-      ORDER BY c.event_date DESC
-      LIMIT 5
-    `).all();
+    const payload = await verify(authToken, c.env.JWT_SECRET || 'your-secret-key-change-in-production-use-env-var') as any;
+    const userId = payload.userId;
 
-    return c.json({ 
-      competitions: competitions.results || [],
-      type: 'active_competitions'
-    });
-  } catch (error) {
-    console.error('Error getting competitions list:', error);
-    return c.json({ error: 'Failed to get competitions' }, 500);
-  }
-});
+    const session = await c.env.DB.prepare('SELECT * FROM astro_sessions WHERE user_id = ?').bind(userId).first() as any;
+    if (!session) return c.json({ session: null });
 
-// Get specific competition leaderboard
-app.get('/leaderboard/competitions/:id', jwtMiddleware, async (c) => {
-  try {
-    const competitionId = c.req.param('id');
-    
-    const participants = await c.env.DB.prepare(`
-      SELECT 
-        cp.id,
-        cp.startup_name,
-        cp.current_rank,
-        cp.total_score,
-        cp.vote_score,
-        cp.growth_score,
-        u.name as founder_name,
-        u.avatar_url as founder_avatar,
-        COALESCE(p.title, bp.title) as project_title,
-        CASE WHEN p.id IS NOT NULL THEN 'project' ELSE 'product' END as type
-      FROM competition_participants cp
-      JOIN users u ON cp.user_id = u.id
-      LEFT JOIN projects p ON cp.project_id = p.id
-      LEFT JOIN beta_products bp ON cp.project_id = bp.id
-      WHERE cp.competition_id = ?
-      ORDER BY cp.current_rank ASC, cp.total_score DESC
-      LIMIT 20
-    `).bind(competitionId).all();
-
-    const competition = await c.env.DB.prepare(`
-      SELECT id, title, description, prize_amount
-      FROM competitions
-      WHERE id = ?
-    `).bind(competitionId).first();
-
-    return c.json({ 
-      competition,
-      leaderboard: participants.results || [],
-      type: 'competition_leaderboard'
-    });
-  } catch (error) {
-    console.error('Error getting competition leaderboard:', error);
-    return c.json({ error: 'Failed to get competition leaderboard' }, 500);
-  }
-});
-
-// Proxy endpoint for brand marketing agent - generate images
-app.post('/brand/generate-images', jwtMiddleware, async (c) => {
-  try {
-    const user = c.get('user');
-    const body = await c.req.json();
-    const { website_url, custom_prompt } = body;
-
-    console.log('[BRAND] User object:', JSON.stringify(user));
-
-    if (!website_url && !custom_prompt) {
-      return c.json({ error: 'website_url or custom_prompt is required' }, 400);
+    let matchedVCs: any[] = [];
+    if (session.fundraising_stage || session.sector) {
+      const vcRows = await c.env.DB.prepare(`
+        SELECT id, name, country, geography, stage, sectors,
+               min_ticket_usd, max_ticket_usd, typical_equity_pct, website, description, portfolio_examples
+        FROM venture_capitals
+        WHERE is_active = 1
+          AND (stage LIKE '%' || COALESCE(?,stage) || '%' OR ? IS NULL)
+          AND (sectors LIKE '%' || COALESCE(?,sectors) || '%' OR ? IS NULL)
+        ORDER BY
+          CASE WHEN geography LIKE '%' || COALESCE(?,geography) || '%' THEN 0 ELSE 1 END
+        LIMIT 6
+      `).bind(
+        session.fundraising_stage, session.fundraising_stage,
+        session.sector, session.sector,
+        session.geography
+      ).all();
+      matchedVCs = vcRows.results || [];
     }
 
-    // Get user ID from various possible fields
-    const userId = user?.id || user?.userId || user?.sub || '1';
+    let pendingGoals: any[] = [];
+    try {
+      const goalsRes = await c.env.DB.prepare(`
+        SELECT id, description, goal_status, week_of
+        FROM goals
+        WHERE user_id = ? AND goal_status != 'Done' AND status = 'active'
+        ORDER BY created_at DESC LIMIT 5
+      `).bind(userId).all();
+      pendingGoals = goalsRes.results || [];
+    } catch {}
 
-    let railwayUrl = c.env.RAILWAY_API_URL || '';
-    if (!railwayUrl) {
-      return c.json({ 
-        error: 'Railway API not configured',
-        message: 'Configure RAILWAY_API_URL in Cloudflare environment variables'
-      }, 500);
-    }
+    return c.json({ session, matchedVCs, pendingGoals });
+  } catch (e) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+});
 
-    if (!railwayUrl.startsWith('http://') && !railwayUrl.startsWith('https://')) {
-      railwayUrl = 'https://' + railwayUrl;
-    }
+// ── Whisper Transcription endpoint ─────────────────────────────────────────
+app.post('/transcribe', jwtMiddleware, async (c) => {
+  const groqKey = c.env.GROQ_API_KEY;
+  if (!groqKey) return c.json({ error: 'Groq API key not configured' }, 500);
 
-    console.log('[BRAND] Calling Railway generate-images:', `${railwayUrl}/api/agents/brand/generate-images`);
-    console.log('[BRAND] User ID:', userId);
-    console.log('[BRAND] Custom prompt:', custom_prompt);
+  let formData: FormData;
+  try {
+    formData = await c.req.formData();
+  } catch (e) {
+    return c.json({ error: 'Failed to parse audio upload' }, 400);
+  }
 
-    const response = await fetch(`${railwayUrl}/api/agents/brand/generate-images`, {
+  const audioFile = formData.get('audio') as File | null;
+  if (!audioFile) return c.json({ error: 'No audio file found in request' }, 400);
+
+  const groqForm = new FormData();
+  groqForm.append('file', audioFile, audioFile.name || 'recording.webm');
+  groqForm.append('model', 'whisper-large-v3-turbo');
+  groqForm.append('temperature', '0');
+  groqForm.append('response_format', 'json');
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        website_url: website_url || 'general',
-        user_id: String(userId),
-        cloudflare_api_url: new URL(c.req.url).origin,
-        custom_prompt: custom_prompt || null
-      })
+      headers: { 'Authorization': `Bearer ${groqKey}` },
+      body: groqForm,
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[BRAND] Railway error:', response.status, errorText);
-      return c.json({ 
-        error: 'Railway API error',
-        detail: errorText
-      }, response.status);
+      const errText = await response.text();
+      console.error('[TRANSCRIBE] Groq Whisper error:', errText);
+      return c.json({ error: 'Transcription failed', details: errText }, 500);
     }
 
-    const data = await response.json();
-    return c.json(data);
-  } catch (error) {
-    console.error('[BRAND] Error calling Railway:', error);
-    return c.json({ 
-      error: 'Failed to generate images',
-      detail: error instanceof Error ? error.message : 'Unknown error'
-    }, 500);
+    const result = await response.json() as { text: string };
+    return c.json({ transcription: result.text || '' });
+  } catch (e) {
+    console.error('[TRANSCRIBE] Fetch error:', e);
+    return c.json({ error: 'Network error calling Whisper API' }, 500);
   }
 });
 

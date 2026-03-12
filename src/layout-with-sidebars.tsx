@@ -790,22 +790,22 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                 </div>
                 
                 <div class="flex items-center space-x-1 md:space-x-3 lg:space-x-6 overflow-x-auto scrollbar-hide">
-                    <a href="/" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                    <!-- <a href="/" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
                         <span class="text-base md:text-lg">🏠</span>
                         <span class="text-xs md:text-sm font-medium">Home</span>
-                    </a>
+                    </a> -->
                     <a href="/dashboard" class="nav-link bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white flex items-center space-x-1 md:space-x-2 border border-purple-500/30 whitespace-nowrap">
                         <span class="text-base md:text-lg">🎯</span>
                         <span class="text-xs md:text-sm font-medium">Hub</span>
                     </a>
-                    <a href="/competitions" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                    <!-- <a href="/competitions" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
                         <span class="text-base md:text-lg">🏅</span>
                         <span class="hidden sm:inline text-xs md:text-sm font-medium">Comp</span>
                     </a>
                     <a href="/events" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
                         <span class="text-base md:text-lg">📅</span>
                         <span class="hidden sm:inline text-xs md:text-sm font-medium">Events</span>
-                    </a>
+                    </a> -->
                     <a href="/leaderboard" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
                         <span class="text-base md:text-lg">🏆</span>
                         <span class="hidden lg:inline text-xs md:text-sm font-medium">Board</span>
@@ -816,10 +816,10 @@ export function createLayoutWithSidebars(props: LayoutProps): string {
                         <span class="hidden lg:inline text-xs md:text-sm font-medium">Team</span>
                     </a>
                     ` : ''}
-                    <a href="/dashboard?tab=directory" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
+                    <!-- <a href="/dashboard?tab=directory" class="nav-link text-gray-300 hover:text-white flex items-center space-x-1 md:space-x-2 transition-all whitespace-nowrap">
                         <span class="text-base md:text-lg">🔥</span>
                         <span class="hidden lg:inline text-xs md:text-sm font-medium">Trend</span>
-                    </a>
+                    </a> -->
                     <button onclick="logout()" class="bg-white hover:bg-gray-100 text-gray-900 px-3 md:px-5 py-1.5 md:py-2 rounded-full font-semibold transition-all shadow-lg hover:shadow-xl text-xs md:text-sm whitespace-nowrap">
                         <span class="hidden sm:inline">Sign Out</span>
                         <span class="sm:hidden">Exit</span>

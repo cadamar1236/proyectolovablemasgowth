@@ -1,24 +1,36 @@
 {
-  "name": "astar-vercel-frontend",
-  "version": "1.0.0",
-  "description": "Frontend de respaldo para ASTAR* Platform - Desplegado en Vercel conectado a Railway backend",
-  "main": "index.html",
+  "name": "astar-react-frontend",
+  "version": "2.0.0",
+  "description": "React CSR frontend for ASTAR* Platform - Deployed on Vercel with Railway backend",
+  "type": "module",
   "scripts": {
-    "dev": "npx serve .",
-    "build": "echo 'Static site, no build needed'",
-    "deploy": "vercel --prod"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && vercel --prod"
   },
-  "keywords": [
-    "astar",
-    "startup",
-    "validation",
-    "vercel",
-    "railway",
-    "backup"
-  ],
-  "author": "ASTAR Team",
-  "license": "MIT",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.22.0",
+    "axios": "^1.6.7",
+    "chart.js": "^4.4.1",
+    "react-chartjs-2": "^5.2.0",
+    "zustand": "^4.5.0",
+    "@tanstack/react-query": "^5.20.0",
+    "date-fns": "^3.3.1",
+    "clsx": "^2.1.0"
+  },
   "devDependencies": {
-    "serve": "^14.2.0"
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.1.0",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.35",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0"
   }
 }

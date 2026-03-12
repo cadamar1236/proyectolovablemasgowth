@@ -239,6 +239,10 @@ marketingAI.post('/create-goal', async (c) => {
       return c.json({ error: 'Description and task are required' }, 400);
     }
 
+    // Fetch the user's actual name to use as DRI default
+    const userRecord = await c.env.DB.prepare('SELECT name FROM users WHERE id = ?').bind(userId).first() as any;
+    const userName = userRecord?.name || null;
+
     const result = await c.env.DB.prepare(`
       INSERT INTO goals (
         user_id, description, task, priority, priority_label, 
@@ -254,7 +258,7 @@ marketingAI.post('/create-goal', async (c) => {
       priority || 'P0',
       priority_label || 'Urgent & important',
       cadence || 'One time',
-      dri || 'Giorgio',
+      dri || userName,
       goal_status || 'To start',
       category || 'ASTAR',
       week_of || null
